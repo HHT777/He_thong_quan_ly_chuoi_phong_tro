@@ -44,3 +44,28 @@ test("CT-004 settlement coordinates every lifecycle write in one transaction", (
   assert.match(route, /moveOutService\.settle/);
   assert.doesNotMatch(route, /BienBanTraPhong\.create/);
 });
+
+test("CT-005 incident completion creates exactly one financial branch and notification transactionally", () => {
+  const service = source("services/incident.service.js");
+  const route = source("routes/mvp.routes.js");
+
+  assert.match(service, /sequelize\.transaction\(/);
+  assert.match(service, /payload\.responsible === "CHU_TRO"/);
+  assert.match(service, /KhoanChi\.create/);
+  assert.match(service, /ChiTietThanhToan\.create/);
+  assert.match(service, /await bill\.update/);
+  assert.match(service, /ThongBao\.create/);
+  assert.match(service, /INCIDENT_FINANCE_ALREADY_EXISTS/);
+  assert.match(route, /incidentService\.update/);
+});
+
+test("CT-005 soft delete requires a reason and rejects processed or financed incidents", () => {
+  const service = source("services/incident.service.js");
+  const route = source("routes/mvp.routes.js");
+
+  assert.match(service, /DELETE_REASON_REQUIRED/);
+  assert.match(service, /INCIDENT_CANNOT_BE_DELETED/);
+  assert.match(service, /da_xoa: true/);
+  assert.match(service, /nguoi_xoa_id: actorId/);
+  assert.match(route, /router\.delete\("\/incidents\/:id"/);
+});

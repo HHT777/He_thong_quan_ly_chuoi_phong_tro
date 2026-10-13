@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const billService = require("../services/khoanPhaiThu.service");
 const moveOutService = require("../services/moveOut.service");
+const incidentService = require("../services/incident.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -222,7 +223,24 @@ router.post("/incidents", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 router.get("/incidents", async (req, res, next) => { try { return data(res, await SuCo.findAll({ where: req.user.vai_tro === "KHACH_THUE" ? { ma_nguoi_gui: req.user.ma_tai_khoan, da_xoa: false } : { da_xoa: false }, order: [["ngay_gui", "DESC"]] })); } catch (e) { next(e); } });
-router.patch("/incidents/:id", landlord, async (req, res, next) => { try { const row = await SuCo.findByPk(req.params.id); if (!row) throw fail(404, "Sự cố không tồn tại"); if (row.trang_thai === "DA_XU_LY") throw fail(409, "Sự cố đã xử lý không thể mở lại"); const status = req.body.status || row.trang_thai; const patch = { trang_thai: status, doi_tuong_chiu_phi: req.body.responsible ?? row.doi_tuong_chiu_phi, chi_phi_sua_chua: req.body.cost ?? row.chi_phi_sua_chua, ket_qua_xu_ly: req.body.note ?? row.ket_qua_xu_ly, ngay_chinh_sua: new Date() }; if (status === "DANG_XU_LY") Object.assign(patch, { nguoi_tiep_nhan_id: req.user.ma_tai_khoan, ngay_tiep_nhan: row.ngay_tiep_nhan || new Date() }); if (status === "DA_XU_LY") patch.ngay_hoan_tat = new Date(); await row.update(patch); return data(res, row); } catch (e) { next(e); } });
+router.patch("/incidents/:id", landlord, async (req, res, next) => {
+  try {
+    return data(res, await incidentService.update(
+      req.params.id,
+      req.body,
+      req.user.ma_tai_khoan,
+    ));
+  } catch (e) { next(e); }
+});
+router.delete("/incidents/:id", landlord, async (req, res, next) => {
+  try {
+    return data(res, await incidentService.softDelete(
+      req.params.id,
+      req.body.reason,
+      req.user.ma_tai_khoan,
+    ));
+  } catch (e) { next(e); }
+});
 
 router.post("/co-tenants", tenant, async (req, res, next) => { try { const contract = await HopDong.findOne({ where: { ma_khach_thue: req.user.ma_khach_thue, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, include: [{ model: PhongTro, as: "phongTro" }] }); if (!contract) throw fail(404, "Không có hợp đồng hiệu lực"); const count = await ThanhVienPhong.count({ where: { ma_phong: contract.ma_phong, trang_thai_cu_tru: "DANG_O" } }); if (count + 1 >= Number(contract.phongTro.so_nguoi_toi_da)) throw fail(409, "Phòng đã đủ người"); return data(res, await ThanhVienPhong.create({ ho_ten: req.body.name, so_dien_thoai: req.body.phone, ngay_vao: req.body.startDate, trang_thai_cu_tru: "DANG_O", ma_phong: contract.ma_phong, ma_hop_dong: contract.ma_hop_dong }), 201); } catch (e) { next(e); } });
 router.get("/co-tenants", async (req, res, next) => { try { const where = {}; if (req.user.vai_tro === "KHACH_THUE") { const contracts = await HopDong.findAll({ where: { ma_khach_thue: req.user.ma_khach_thue }, attributes: ["ma_hop_dong"], raw: true }); where.ma_hop_dong = { [Op.in]: contracts.map((c) => c.ma_hop_dong) }; } return data(res, await ThanhVienPhong.findAll({ where })); } catch (e) { next(e); } });
