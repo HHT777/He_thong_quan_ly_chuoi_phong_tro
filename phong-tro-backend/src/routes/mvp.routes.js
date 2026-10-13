@@ -7,6 +7,7 @@ const authorize = require("../middleware/authorize");
 const billService = require("../services/khoanPhaiThu.service");
 const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
+const coTenantService = require("../services/coTenant.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -149,12 +150,14 @@ router.delete("/assets/:id", landlord, async (req, res, next) => {
 router.post("/requests", tenant, async (req, res, next) => {
   try {
     const type = req.body.type; if (!["GIA_HAN", "TRA_PHONG", "DE_XUAT_BAN_CUNG_PHONG"].includes(type)) throw fail(422, "Loại yêu cầu không hợp lệ");
+    if (type === "DE_XUAT_BAN_CUNG_PHONG") {
+      return data(res, await coTenantService.propose(req.user.ma_khach_thue, req.body), 201);
+    }
     const contract = await HopDong.findOne({ where: { ma_khach_thue: req.user.ma_khach_thue, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } } }); if (!contract) throw fail(404, "Không có hợp đồng hiệu lực");
     const row = await sequelize.transaction(async (transaction) => {
       const request = await YeuCau.create({ loai_yeu_cau: type, noi_dung: req.body.content || type, trang_thai: "CHO_XU_LY", ma_khach_thue: req.user.ma_khach_thue }, { transaction });
       if (type === "GIA_HAN") await YeuCauGiaHan.create({ ma_yeu_cau: request.ma_yeu_cau, ma_hop_dong: contract.ma_hop_dong, ngay_ket_thuc_de_xuat: req.body.requestedEndDate }, { transaction });
       if (type === "TRA_PHONG") await YeuCauTraPhong.create({ ma_yeu_cau: request.ma_yeu_cau, ma_hop_dong: contract.ma_hop_dong }, { transaction });
-      if (type === "DE_XUAT_BAN_CUNG_PHONG") await DeXuatBanCungPhong.create({ ma_yeu_cau: request.ma_yeu_cau, ma_phong: contract.ma_phong, ho_ten_nguoi_de_xuat: req.body.name, so_dien_thoai_nguoi_de_xuat: req.body.phone, noi_dung_bo_sung: req.body.note || null }, { transaction });
       return request;
     }); return data(res, row, 201);
   } catch (e) { next(e); }
@@ -185,6 +188,14 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng không còn hiệu lực để trả phòng");
         await PhongTro.update({ trang_thai: "DANG_XU_LY_TRA_PHONG" }, { where: { ma_phong: contract.ma_phong }, transaction });
         automation = { type: "MOVE_OUT_OPENED", contractId: contract.ma_hop_dong, roomId: contract.ma_phong };
+      }
+      if (status === "DA_PHE_DUYET" && row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG") {
+        const member = await coTenantService.approve(row, transaction);
+        automation = {
+          type: "CO_TENANT_ADMITTED",
+          memberId: member.ma_thanh_vien_phong,
+          roomId: member.ma_phong,
+        };
       }
       const tenantRow = await KhachThue.findByPk(row.ma_khach_thue, { transaction });
       if (tenantRow?.ma_tai_khoan) await ThongBao.create({ loai_thong_bao: "KET_QUA_YEU_CAU", noi_dung: status === "DA_PHE_DUYET" ? `Yêu cầu ${row.loai_yeu_cau} của bạn đã được phê duyệt.` : `Yêu cầu ${row.loai_yeu_cau} của bạn đã bị từ chối.`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }, { transaction });
@@ -242,7 +253,14 @@ router.delete("/incidents/:id", landlord, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post("/co-tenants", tenant, async (req, res, next) => { try { const contract = await HopDong.findOne({ where: { ma_khach_thue: req.user.ma_khach_thue, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, include: [{ model: PhongTro, as: "phongTro" }] }); if (!contract) throw fail(404, "Không có hợp đồng hiệu lực"); const count = await ThanhVienPhong.count({ where: { ma_phong: contract.ma_phong, trang_thai_cu_tru: "DANG_O" } }); if (count + 1 >= Number(contract.phongTro.so_nguoi_toi_da)) throw fail(409, "Phòng đã đủ người"); return data(res, await ThanhVienPhong.create({ ho_ten: req.body.name, so_dien_thoai: req.body.phone, ngay_vao: req.body.startDate, trang_thai_cu_tru: "DANG_O", ma_phong: contract.ma_phong, ma_hop_dong: contract.ma_hop_dong }), 201); } catch (e) { next(e); } });
+router.post("/co-tenants", tenant, async (req, res, next) => {
+  try {
+    return data(res, await coTenantService.propose(
+      req.user.ma_khach_thue,
+      req.body,
+    ), 201);
+  } catch (e) { next(e); }
+});
 router.get("/co-tenants", async (req, res, next) => { try { const where = {}; if (req.user.vai_tro === "KHACH_THUE") { const contracts = await HopDong.findAll({ where: { ma_khach_thue: req.user.ma_khach_thue }, attributes: ["ma_hop_dong"], raw: true }); where.ma_hop_dong = { [Op.in]: contracts.map((c) => c.ma_hop_dong) }; } return data(res, await ThanhVienPhong.findAll({ where })); } catch (e) { next(e); } });
 router.patch("/co-tenants/:id", landlord, async (req, res, next) => { try { const row = await ThanhVienPhong.findByPk(req.params.id); if (!row) throw fail(404, "Thành viên phòng không tồn tại"); if (req.body.status === "DA_ROI") await row.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: req.body.leaveDate || new Date() }); return data(res, row); } catch (e) { next(e); } });
 

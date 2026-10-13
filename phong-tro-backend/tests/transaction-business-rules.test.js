@@ -69,3 +69,21 @@ test("CT-005 soft delete requires a reason and rejects processed or financed inc
   assert.match(service, /nguoi_xoa_id: actorId/);
   assert.match(route, /router\.delete\("\/incidents\/:id"/);
 });
+
+test("CT-008 co-tenant proposal creates request detail first and residence only after approval", () => {
+  const service = source("services/coTenant.service.js");
+  const route = source("routes/mvp.routes.js");
+
+  assert.match(service, /sequelize\.transaction\(/);
+  assert.match(service, /YeuCau\.create/);
+  assert.match(service, /DeXuatBanCungPhong\.create/);
+  assert.match(service, /trang_thai: "CHO_XU_LY"/);
+  assert.match(service, /async function approve\(request, transaction\)/);
+  assert.match(service, /ThanhVienPhong\.create/);
+  assert.match(service, /ROOM_CAPACITY_REACHED/);
+  assert.match(service, /CO_TENANT_ALREADY_RESIDENT/);
+  assert.match(route, /coTenantService\.approve\(row, transaction\)/);
+  const coTenantRoute = route.slice(route.indexOf('router.post("/co-tenants"'));
+  assert.match(coTenantRoute, /coTenantService\.propose/);
+  assert.doesNotMatch(coTenantRoute.split('router.get("/co-tenants"')[0], /ThanhVienPhong\.create/);
+});
