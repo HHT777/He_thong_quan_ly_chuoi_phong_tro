@@ -11,6 +11,7 @@ const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
+const tenantAccountService = require("../services/tenantAccount.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -45,15 +46,7 @@ router.patch("/account/password", async (req, res, next) => {
 
 router.post("/accounts", landlord, async (req, res, next) => {
   try {
-    const tenantRow = await KhachThue.findByPk(req.body.tenantId);
-    if (!tenantRow) throw fail(404, "Khách thuê không tồn tại");
-    if (tenantRow.ma_tai_khoan) throw fail(409, "Khách thuê đã có tài khoản");
-    const account = await sequelize.transaction(async (transaction) => {
-      const row = await TaiKhoan.create({ ten_dang_nhap: req.body.username || tenantRow.so_dien_thoai, mat_khau: req.body.password || "1", vai_tro: "KHACH_THUE", trang_thai: "HOAT_DONG", bat_buoc_doi_mat_khau: true }, { transaction });
-      await tenantRow.update({ ma_tai_khoan: row.ma_tai_khoan }, { transaction });
-      return row;
-    });
-    return data(res, account, 201);
+    return data(res, await tenantAccountService.create(req.body.tenantId), 201);
   } catch (e) { next(e); }
 });
 router.patch("/accounts/:id/status", landlord, async (req, res, next) => {
