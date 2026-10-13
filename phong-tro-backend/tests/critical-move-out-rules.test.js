@@ -46,3 +46,22 @@ test("CT-001 move-out approval keeps the contract valid and only transitions the
     /PhongTro\.update\(\{\s*trang_thai:\s*"DANG_XU_LY_TRA_PHONG"/,
   );
 });
+
+test("CT-002 settlement leaves the approved move-out request in its valid state", () => {
+  const settlement = routeBlock(
+    'router.post("/move-outs/:contractId/settle"',
+    'router.post("/incidents"',
+  );
+
+  assert.deepEqual(statusDomain("ck_YeuCau_2"), [
+    "CHO_XU_LY",
+    "DA_PHE_DUYET",
+    "TU_CHOI",
+  ]);
+  assert.doesNotMatch(settlement, /YeuCau\.findByPk/);
+  assert.doesNotMatch(settlement, /DA_HOAN_TAT/);
+  assert.match(
+    settlement,
+    /contract\.update\(\{\s*trang_thai:\s*"DA_THANH_LY"/,
+  );
+});

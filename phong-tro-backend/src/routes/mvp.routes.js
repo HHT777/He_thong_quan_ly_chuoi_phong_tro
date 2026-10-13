@@ -195,8 +195,6 @@ router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) =>
       if (deduction > 0) await KhoanKhauTru.create({ loai_khau_tru: req.body.deductionType || "KHAC", ly_do: req.body.reason || "Khấu trừ khi trả phòng", so_tien: deduction, ma_bien_ban_tra_phong: report.ma_bien_ban }, { transaction });
       if (deposit) await deposit.update({ so_tien_da_hoan: refund, so_tien_da_khau_tru: deduction, trang_thai: deduction === Number(deposit.so_tien_coc) ? "DA_KHAU_TRU_TOAN_BO" : deduction > 0 ? "DA_KHAU_TRU_MOT_PHAN" : "DA_HOAN" }, { transaction });
       await contract.update({ trang_thai: "DA_THANH_LY", ngay_thanh_ly: new Date() }, { transaction }); await PhongTro.update({ trang_thai: "TRONG" }, { where: { ma_phong: contract.ma_phong }, transaction });
-      const moveOut = req.body.moveOutRequestId ? await YeuCau.findByPk(req.body.moveOutRequestId, { transaction }) : null;
-      if (moveOut?.loai_yeu_cau === "TRA_PHONG") await moveOut.update({ trang_thai: "DA_HOAN_TAT" }, { transaction });
       const tenantRow = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
       if (tenantRow?.ma_tai_khoan) await ThongBao.create({ loai_thong_bao: "THANH_LY_HOP_DONG", noi_dung: "Hợp đồng của bạn đã được thanh lý. Vui lòng kiểm tra thông tin hoàn/khấu trừ tiền cọc.", thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }, { transaction });
       return report;
