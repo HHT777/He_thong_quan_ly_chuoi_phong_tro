@@ -18,6 +18,14 @@ const landlord = authorize("CHU_TRO");
 const tenant = authorize("KHACH_THUE");
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const data = (res, value, status = 200) => res.status(status).json({ success: true, data: value });
+const INCIDENT_PRIORITIES = Object.freeze(["THAP", "TRUNG_BINH", "CAO", "KHAN_CAP"]);
+const incidentPriority = (value) => {
+  const priority = value || "TRUNG_BINH";
+  if (!INCIDENT_PRIORITIES.includes(priority)) {
+    throw fail(422, "Mức độ ưu tiên sự cố không hợp lệ", "INVALID_INCIDENT_PRIORITY");
+  }
+  return priority;
+};
 
 router.patch("/account/password", async (req, res, next) => {
   try {
@@ -202,7 +210,22 @@ router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) =>
   } catch (e) { next(e); }
 });
 
-router.post("/incidents", async (req, res, next) => { try { const roomId = req.body.roomId; if (!roomId || !req.body.description) throw fail(422, "Thiếu thông tin sự cố"); return data(res, await SuCo.create({ ma_nguoi_gui: req.user.ma_tai_khoan, ma_phong: roomId, loai_su_co: req.body.type || req.body.title || "KHAC", muc_do_uu_tien: req.body.priority || "BINH_THUONG", mo_ta: req.body.description, hinh_anh_url: req.body.imageUrl || null, trang_thai: "CHO_TIEP_NHAN" }), 201); } catch (e) { next(e); } });
+router.post("/incidents", async (req, res, next) => {
+  try {
+    const roomId = req.body.roomId;
+    if (!roomId || !req.body.description) throw fail(422, "Thiếu thông tin sự cố");
+    const priority = incidentPriority(req.body.priority);
+    return data(res, await SuCo.create({
+      ma_nguoi_gui: req.user.ma_tai_khoan,
+      ma_phong: roomId,
+      loai_su_co: req.body.type || req.body.title || "KHAC",
+      muc_do_uu_tien: priority,
+      mo_ta: req.body.description,
+      hinh_anh_url: req.body.imageUrl || null,
+      trang_thai: "CHO_TIEP_NHAN",
+    }), 201);
+  } catch (e) { next(e); }
+});
 router.get("/incidents", async (req, res, next) => { try { return data(res, await SuCo.findAll({ where: req.user.vai_tro === "KHACH_THUE" ? { ma_nguoi_gui: req.user.ma_tai_khoan, da_xoa: false } : { da_xoa: false }, order: [["ngay_gui", "DESC"]] })); } catch (e) { next(e); } });
 router.patch("/incidents/:id", landlord, async (req, res, next) => { try { const row = await SuCo.findByPk(req.params.id); if (!row) throw fail(404, "Sự cố không tồn tại"); if (row.trang_thai === "DA_XU_LY") throw fail(409, "Sự cố đã xử lý không thể mở lại"); const status = req.body.status || row.trang_thai; const patch = { trang_thai: status, doi_tuong_chiu_phi: req.body.responsible ?? row.doi_tuong_chiu_phi, chi_phi_sua_chua: req.body.cost ?? row.chi_phi_sua_chua, ket_qua_xu_ly: req.body.note ?? row.ket_qua_xu_ly, ngay_chinh_sua: new Date() }; if (status === "DANG_XU_LY") Object.assign(patch, { nguoi_tiep_nhan_id: req.user.ma_tai_khoan, ngay_tiep_nhan: row.ngay_tiep_nhan || new Date() }); if (status === "DA_XU_LY") patch.ngay_hoan_tat = new Date(); await row.update(patch); return data(res, row); } catch (e) { next(e); } });
 

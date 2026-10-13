@@ -621,7 +621,11 @@ export function renderFormPage(context, config) {
           (field) => `
         <label>
           ${escapeHtml(field.label)}
-          <input name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""} ${field.value !== undefined ? `value="${escapeHtml(field.value)}"` : ""}>
+          ${field.options
+            ? `<select name="${field.name}" ${field.required ? "required" : ""}>
+                ${field.options.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === field.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+              </select>`
+            : `<input name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""} ${field.value !== undefined ? `value="${escapeHtml(field.value)}"` : ""}>`}
         </label>
       `
         )
