@@ -10,6 +10,7 @@ const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const billAdjustmentService = require("../services/billAdjustment.service");
+const billGenerationService = require("../services/billGeneration.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -79,19 +80,7 @@ router.post("/bills/:id/adjustments", landlord, adjustBill);
 
 router.post("/bills/generate", landlord, async (req, res, next) => {
   try {
-    const period = req.body.period; const contracts = await HopDong.findAll({ where: { trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } } });
-    const created = []; const skipped = [];
-    for (const contract of contracts) {
-      try {
-        const { nam, thang } = require("../services/meterReading.service").parsePeriod(period);
-        const meter = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, nam, thang, trang_thai_xac_nhan: "DA_XAC_NHAN" } });
-        if (!meter) { skipped.push({ roomId: contract.ma_phong, reason: "MISSING_CONFIRMED_METER" }); continue; }
-        const previous = await require("../services/meterReading.service").previousReading(contract.ma_phong, period);
-        const electricity = (Number(meter.chi_so_moi) - previous) * Number(meter.don_gia_ap_dung);
-        created.push(await billService.createKhoanPhaiThu({ ma_hop_dong: contract.ma_hop_dong, ky: period, tien_phong: Number(contract.gia_thue), tien_dien: electricity, tien_nuoc: Number(req.body.waterAmount || 0), phi_dich_vu: Number(req.body.serviceFee || 0), phi_phat_sinh: 0, khoan_giam_tru: 0, tong_phai_thanh_toan: Number(contract.gia_thue) + electricity + Number(req.body.waterAmount || 0) + Number(req.body.serviceFee || 0) }));
-      } catch (error) { skipped.push({ roomId: contract.ma_phong, reason: error.message }); }
-    }
-    return data(res, { created, skipped }, 201);
+    return data(res, await billGenerationService.generate(req.body.period), 201);
   } catch (e) { next(e); }
 });
 router.get("/debt", async (req, res, next) => {

@@ -4,6 +4,9 @@ const { Op } = require("sequelize");
 const reportService = require("../src/services/cashflowReport.service");
 const adjustmentService = require("../src/services/billAdjustment.service");
 const meterReadingService = require("../src/services/meterReading.service");
+const billGenerationService = require("../src/services/billGeneration.service");
+const fs = require("node:fs");
+const path = require("node:path");
 
 test("CT-006 cashflow filters both sources by inclusive period and building", () => {
   const { receiptWhere, expenseWhere } = reportService.buildWhere({
@@ -44,4 +47,17 @@ test("CT-011 first electricity period requires an explicit prior reading", () =>
       && error.details.period === "2026-10",
   );
   assert.equal(meterReadingService.requirePreviousReading({ chi_so_moi: "125" }, "2026-10", "room-1"), 125);
+});
+
+test("CT-012 derives water from contract price and active occupants", () => {
+  assert.equal(billGenerationService.calculateWater("100000.00", 3), 300000);
+  assert.throws(() => billGenerationService.calculateWater(100000, 0), (error) => error.code === "MISSING_BILLABLE_OCCUPANTS");
+});
+
+test("CT-012 bill generation ignores client-provided monetary overrides", () => {
+  const route = fs.readFileSync(path.resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
+  const generationRoute = route.slice(route.indexOf('router.post("/bills/generate"'), route.indexOf('router.get("/debt"'));
+  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period\)/);
+  assert.doesNotMatch(generationRoute, /waterAmount|serviceFee/);
+  assert.equal(billGenerationService.SERVICE_FEE_DECISION.code, "SERVICE_FEE_SCHEMA_MISSING");
 });
