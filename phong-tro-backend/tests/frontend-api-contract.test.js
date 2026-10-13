@@ -50,3 +50,13 @@ test("CT-003 meter-reading SPA consumes the API DTO contract", () => {
     assert.doesNotMatch(source, new RegExp(rawField), `SPA must not consume raw field ${rawField}`);
   }
 });
+
+test("CT-013 room status filters use the database status domain", () => {
+  const view = frontendSource("shared/components/view.js");
+  const dashboard = frontendSource("modules/overview/dashboard.tab.js");
+  const sources = `${view}\n${dashboard}`;
+
+  assert.match(view, /DANG_XU_LY_TRA_PHONG/);
+  assert.match(dashboard, /trang_thai === "DANG_XU_LY_TRA_PHONG"/);
+  assert.doesNotMatch(sources, /\bDANG_XU_LY_TRA\b|\bDANG_TRA\b/);
+});
