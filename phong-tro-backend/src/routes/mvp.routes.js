@@ -5,6 +5,7 @@ const sequelize = require("../config/database");
 const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const billService = require("../services/khoanPhaiThu.service");
+const moveOutService = require("../services/moveOut.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -195,18 +196,12 @@ router.post(["/requests/:id/withdraw", "/requests/:id/revoke"], (req, res) => re
 
 router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) => {
   try {
-    const result = await sequelize.transaction(async (transaction) => {
-      const contract = await HopDong.findByPk(req.params.contractId, { transaction, lock: transaction.LOCK.UPDATE }); if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng không còn hiệu lực");
-      const deposit = await TienCoc.findOne({ where: { ma_hop_dong: contract.ma_hop_dong }, transaction, lock: transaction.LOCK.UPDATE });
-      const deduction = Math.max(0, Number(req.body.deduction || 0)); const refund = Math.max(0, Number(deposit?.so_tien_coc || 0) - deduction);
-      const report = await BienBanTraPhong.create({ ngay_kiem_tra: req.body.inspectionDate || new Date(), tinh_trang_phong: req.body.roomCondition || "Đã kiểm tra", ghi_chu: req.body.reason || null, tong_khoan_khau_tru: deduction, so_tien_coc_duoc_hoan: refund, ma_hop_dong: contract.ma_hop_dong, ma_yeu_cau_tra_phong: req.body.moveOutRequestId || null, nguoi_lap_id: req.user.ma_tai_khoan }, { transaction });
-      if (deduction > 0) await KhoanKhauTru.create({ loai_khau_tru: req.body.deductionType || "KHAC", ly_do: req.body.reason || "Khấu trừ khi trả phòng", so_tien: deduction, ma_bien_ban_tra_phong: report.ma_bien_ban }, { transaction });
-      if (deposit) await deposit.update({ so_tien_da_hoan: refund, so_tien_da_khau_tru: deduction, trang_thai: deduction === Number(deposit.so_tien_coc) ? "DA_KHAU_TRU_TOAN_BO" : deduction > 0 ? "DA_KHAU_TRU_MOT_PHAN" : "DA_HOAN" }, { transaction });
-      await contract.update({ trang_thai: "DA_THANH_LY", ngay_thanh_ly: new Date() }, { transaction }); await PhongTro.update({ trang_thai: "TRONG" }, { where: { ma_phong: contract.ma_phong }, transaction });
-      const tenantRow = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
-      if (tenantRow?.ma_tai_khoan) await ThongBao.create({ loai_thong_bao: "THANH_LY_HOP_DONG", noi_dung: "Hợp đồng của bạn đã được thanh lý. Vui lòng kiểm tra thông tin hoàn/khấu trừ tiền cọc.", thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }, { transaction });
-      return report;
-    }); return data(res, result, 201);
+    const result = await moveOutService.settle(
+      req.params.contractId,
+      req.body,
+      req.user.ma_tai_khoan,
+    );
+    return data(res, result, 200);
   } catch (e) { next(e); }
 });
 

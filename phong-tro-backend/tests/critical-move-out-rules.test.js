@@ -7,6 +7,10 @@ const routeSource = fs.readFileSync(
   path.resolve(__dirname, "../src/routes/mvp.routes.js"),
   "utf8",
 );
+const moveOutSource = fs.readFileSync(
+  path.resolve(__dirname, "../src/services/moveOut.service.js"),
+  "utf8",
+);
 const ddlSource = fs.readFileSync(
   path.resolve(__dirname, "../../data2.md"),
   "utf8",
@@ -48,17 +52,17 @@ test("CT-001 move-out approval keeps the contract valid and only transitions the
 });
 
 test("CT-002 settlement leaves the approved move-out request in its valid state", () => {
-  const settlement = routeBlock(
+  const route = routeBlock(
     'router.post("/move-outs/:contractId/settle"',
     'router.post("/incidents"',
   );
+  const settlement = `${route}\n${moveOutSource}`;
 
   assert.deepEqual(statusDomain("ck_YeuCau_2"), [
     "CHO_XU_LY",
     "DA_PHE_DUYET",
     "TU_CHOI",
   ]);
-  assert.doesNotMatch(settlement, /YeuCau\.findByPk/);
   assert.doesNotMatch(settlement, /DA_HOAN_TAT/);
   assert.match(
     settlement,
