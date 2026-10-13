@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { Op } = require("sequelize");
 const reportService = require("../src/services/cashflowReport.service");
+const adjustmentService = require("../src/services/billAdjustment.service");
 
 test("CT-006 cashflow filters both sources by inclusive period and building", () => {
   const { receiptWhere, expenseWhere } = reportService.buildWhere({
@@ -19,4 +20,17 @@ test("CT-006 cashflow filters both sources by inclusive period and building", ()
 test("CT-006 rejects malformed or reversed report periods", () => {
   assert.throws(() => reportService.buildWhere({ from: "2026-02-30" }), (error) => error.code === "INVALID_REPORT_PERIOD");
   assert.throws(() => reportService.buildWhere({ from: "2026-10-02", to: "2026-10-01" }), (error) => error.code === "INVALID_REPORT_PERIOD");
+});
+
+test("CT-007 negative adjustments reduce existing non-negative details", () => {
+  const details = [{ so_tien: 100 }, { so_tien: 50 }];
+  const changes = adjustmentService.planReductions(details, 120);
+  assert.deepEqual(changes.map((change) => change.amount), [0, 30]);
+  assert.equal(changes.reduce((sum, change, index) => sum + (Number(details[index].so_tien) - change.amount), 0), 120);
+});
+
+test("CT-007 only permits canonical bill line domains", () => {
+  assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("PHAT_SINH"), true);
+  assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("DIEU_CHINH"), false);
+  assert.throws(() => adjustmentService.planReductions([{ so_tien: 10 }], 11), (error) => error.code === "BILL_DETAIL_TOTAL_MISMATCH");
 });

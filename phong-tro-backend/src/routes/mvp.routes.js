@@ -9,6 +9,7 @@ const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
+const billAdjustmentService = require("../services/billAdjustment.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -70,17 +71,7 @@ router.post("/discounts", landlord, (req, res, next) => {
 });
 async function adjustBill(req, res, next) {
   try {
-    const reason = String(req.body.reason || "").trim(); const delta = Number(req.body.delta);
-    if (!reason || !Number.isFinite(delta) || delta === 0) throw fail(422, "Điều chỉnh cần số tiền khác 0 và lý do");
-    const result = await sequelize.transaction(async (transaction) => {
-      const bill = await ThanhToan.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE });
-      if (!bill) throw fail(404, "Khoản phải thu không tồn tại");
-      const total = Number(bill.tong_phai_tra) + delta;
-      if (total < Number(bill.tong_da_thanh_toan) || total < 0) throw fail(422, "Tổng mới không được thấp hơn số đã thu");
-      if (delta > 0) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: "DIEU_CHINH", so_tien: delta, dien_giai: reason }, { transaction });
-      await bill.update({ tong_phai_tra: total, so_tien_con_no: total - Number(bill.tong_da_thanh_toan), trang_thai: total === Number(bill.tong_da_thanh_toan) ? "DA_THANH_TOAN" : Number(bill.tong_da_thanh_toan) > 0 ? "THANH_TOAN_MOT_PHAN" : "CHUA_THANH_TOAN" }, { transaction });
-      return bill;
-    });
+    const result = await billAdjustmentService.adjust(req.params.id, req.body);
     return data(res, result, 201);
   } catch (e) { next(e); }
 }
