@@ -50,10 +50,10 @@ router.post("/accounts", landlord, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 router.patch("/accounts/:id/status", landlord, async (req, res, next) => {
-  try { const account = await TaiKhoan.findByPk(req.params.id); if (!account) throw fail(404, "Tài khoản không tồn tại"); if (!["HOAT_DONG", "DA_KHOA"].includes(req.body.status)) throw fail(422, "Trạng thái không hợp lệ"); await account.update({ trang_thai: req.body.status }); return data(res, account); } catch (e) { next(e); }
+  try { return data(res, await tenantAccountService.updateStatus(req.params.id, req.body.status)); } catch (e) { next(e); }
 });
 router.post("/accounts/reset-password", landlord, async (req, res, next) => {
-  try { const tenantRow = await KhachThue.findByPk(req.body.tenantId); const account = tenantRow?.ma_tai_khoan ? await TaiKhoan.findByPk(tenantRow.ma_tai_khoan) : null; if (!account) throw fail(404, "Tài khoản không tồn tại"); await account.update({ mat_khau: "1", bat_buoc_doi_mat_khau: true }); return data(res, { reset: true }); } catch (e) { next(e); }
+  try { return data(res, await tenantAccountService.resetPassword(req.body.tenantId)); } catch (e) { next(e); }
 });
 
 router.post("/discounts", landlord, (req, res, next) => {

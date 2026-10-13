@@ -74,6 +74,57 @@ async function create(tenantId) {
   return sequelize.transaction((transaction) => createWithinTransaction(tenantId, transaction));
 }
 
+function assertTenantRole(account) {
+  if (account.vai_tro !== "KHACH_THUE") {
+    throw fail(403, "TENANT_ACCOUNT_REQUIRED", "Chỉ được thao tác tài khoản khách thuê");
+  }
+  return account;
+}
+
+async function requireTenantAccount(accountId, transaction) {
+  const account = await TaiKhoan.findByPk(accountId, {
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!account) throw fail(404, "ACCOUNT_NOT_FOUND", "Tài khoản không tồn tại");
+  assertTenantRole(account);
+  const tenant = await KhachThue.findOne({
+    where: { ma_tai_khoan: account.ma_tai_khoan },
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!tenant) throw fail(409, "TENANT_PROFILE_REQUIRED", "Tài khoản khách thuê chưa liên kết hồ sơ khách thuê");
+  return { account, tenant };
+}
+
+async function updateStatus(accountId, status) {
+  if (!["HOAT_DONG", "DA_KHOA"].includes(status)) {
+    throw fail(422, "INVALID_ACCOUNT_STATUS", "Trạng thái tài khoản không hợp lệ");
+  }
+  return sequelize.transaction(async (transaction) => {
+    const { account, tenant } = await requireTenantAccount(accountId, transaction);
+    if (account.trang_thai === status) {
+      throw fail(409, "ACCOUNT_STATUS_UNCHANGED", `Tài khoản đã ở trạng thái ${status}`);
+    }
+    if (status === "HOAT_DONG") await requireRentalEligibility(tenant.ma_khach_thue, transaction);
+    await account.update({ trang_thai: status }, { transaction });
+    return accountDto(account);
+  });
+}
+
+async function resetPassword(tenantId) {
+  return sequelize.transaction(async (transaction) => {
+    const tenant = await KhachThue.findByPk(tenantId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!tenant?.ma_tai_khoan) throw fail(404, "ACCOUNT_NOT_FOUND", "Tài khoản khách thuê không tồn tại");
+    const { account } = await requireTenantAccount(tenant.ma_tai_khoan, transaction);
+    await account.update({ mat_khau: "1", bat_buoc_doi_mat_khau: true }, { transaction });
+    return { reset: true, account: accountDto(account) };
+  });
+}
+
 module.exports = {
   ACTIVE_CONTRACT_STATES,
   accountDto,
@@ -81,4 +132,8 @@ module.exports = {
   requireRentalEligibility,
   createWithinTransaction,
   create,
+  assertTenantRole,
+  requireTenantAccount,
+  updateStatus,
+  resetPassword,
 };

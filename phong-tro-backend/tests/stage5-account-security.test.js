@@ -26,3 +26,22 @@ test("CT-009 account creation checks contract and deposit in one transaction", (
   assert.match(createRoute, /tenantAccountService\.create\(req\.body\.tenantId\)/);
   assert.doesNotMatch(createRoute, /req\.body\.(username|password)/);
 });
+
+test("CT-010 rejects landlord accounts before status or password changes", () => {
+  assert.throws(
+    () => service.assertTenantRole({ vai_tro: "CHU_TRO" }),
+    (error) => error.status === 403 && error.code === "TENANT_ACCOUNT_REQUIRED",
+  );
+  assert.equal(service.assertTenantRole({ vai_tro: "KHACH_THUE" }).vai_tro, "KHACH_THUE");
+});
+
+test("CT-010 status and reset routes use guarded tenant account operations", () => {
+  const accountService = source("services/tenantAccount.service.js");
+  const route = source("routes/mvp.routes.js");
+  assert.match(accountService, /async function requireTenantAccount/);
+  assert.match(accountService, /assertTenantRole\(account\)/);
+  assert.match(accountService, /where: \{ ma_tai_khoan: account\.ma_tai_khoan \}/);
+  assert.match(accountService, /status === "HOAT_DONG".*requireRentalEligibility/);
+  assert.match(route, /tenantAccountService\.updateStatus\(req\.params\.id, req\.body\.status\)/);
+  assert.match(route, /tenantAccountService\.resetPassword\(req\.body\.tenantId\)/);
+});
