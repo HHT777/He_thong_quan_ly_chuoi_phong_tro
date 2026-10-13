@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { Op } = require("sequelize");
 const reportService = require("../src/services/cashflowReport.service");
 const adjustmentService = require("../src/services/billAdjustment.service");
+const meterReadingService = require("../src/services/meterReading.service");
 
 test("CT-006 cashflow filters both sources by inclusive period and building", () => {
   const { receiptWhere, expenseWhere } = reportService.buildWhere({
@@ -33,4 +34,14 @@ test("CT-007 only permits canonical bill line domains", () => {
   assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("PHAT_SINH"), true);
   assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("DIEU_CHINH"), false);
   assert.throws(() => adjustmentService.planReductions([{ so_tien: 10 }], 11), (error) => error.code === "BILL_DETAIL_TOTAL_MISMATCH");
+});
+
+test("CT-011 first electricity period requires an explicit prior reading", () => {
+  assert.throws(
+    () => meterReadingService.requirePreviousReading(null, "2026-10", "room-1"),
+    (error) => error.status === 422
+      && error.code === "INITIAL_READING_REQUIRED"
+      && error.details.period === "2026-10",
+  );
+  assert.equal(meterReadingService.requirePreviousReading({ chi_so_moi: "125" }, "2026-10", "room-1"), 125);
 });
