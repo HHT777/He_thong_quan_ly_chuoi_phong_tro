@@ -8,6 +8,7 @@ const billService = require("../services/khoanPhaiThu.service");
 const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
+const cashflowReportService = require("../services/cashflowReport.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
@@ -277,6 +278,14 @@ router.post("/notifications/broadcast", landlord, async (req, res, next) => {
     return data(res, { recipients: recipients.length }, 201);
   } catch (e) { next(e); }
 });
-router.get("/reports/cashflow", landlord, async (req, res, next) => { try { const [receipts, expenses] = await Promise.all([KhoanThu.findAll({ where: { trang_thai_ghi_nhan: "HIEU_LUC" } }), KhoanChi.findAll()]); return data(res, { totalCollected: receipts.reduce((sum, row) => sum + Number(row.so_tien), 0), totalExpenses: expenses.reduce((sum, row) => sum + Number(row.so_tien), 0), receipts, expenses }); } catch (e) { next(e); } });
+router.get("/reports/cashflow", landlord, async (req, res, next) => {
+  try {
+    return data(res, await cashflowReportService.getCashflow({
+      from: req.query.from,
+      to: req.query.to,
+      buildingId: req.query.buildingId,
+    }));
+  } catch (e) { next(e); }
+});
 
 module.exports = router;
