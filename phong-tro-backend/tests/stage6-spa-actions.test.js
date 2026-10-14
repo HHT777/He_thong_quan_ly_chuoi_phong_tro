@@ -43,3 +43,12 @@ test("CT-015 resident tab edits profiles and preserves rental history", () => {
   assert.match(tab, /!row\.hopDongs\?\.length && !row\.ma_tai_khoan/);
   assert.match(tab, /api\.del\(`\/management\/khach-thue\/\$\{row\.ma_khach_thue\}`/);
 });
+
+test("CT-015 contract tab creates contracts and renews only non-liquidated contracts", () => {
+  const tab = frontend("modules/residents-contracts/contracts.tab.js");
+  assert.match(tab, /endpoint: "\/hop-dong"/);
+  assert.match(tab, /tien_coc: Number/);
+  assert.match(tab, /\/hop-dong\/\$\{row\.ma_hop_dong\}\/renew/);
+  assert.match(tab, /\["DANG_HIEU_LUC", "SAP_HET_HAN", "HET_HAN"\]\.includes/);
+  assert.doesNotMatch(tab, /\[.*"DA_THANH_LY".*\]\.includes/);
+});
