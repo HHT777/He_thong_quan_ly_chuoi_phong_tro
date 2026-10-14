@@ -74,3 +74,14 @@ test("CT-015 incident tab accepts and completes incidents through canonical stat
   assert.match(tab, /responsibleTenantId/);
   assert.match(tab, /responsibilityBasis/);
 });
+
+test("CT-015 move-out tab exposes the complete settlement checklist for approved requests", () => {
+  const tab = frontend("modules/operations/move-outs.tab.js");
+  const route = fs.readFileSync(path.resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
+  assert.match(route, /router\.get\("\/move-outs", landlord/);
+  assert.match(tab, /trang_thai === "DA_PHE_DUYET"/);
+  assert.match(tab, /assetsChecked: raw\.assetsChecked === "true"/);
+  assert.match(tab, /debtReviewed: raw\.debtReviewed === "true"/);
+  assert.match(tab, /moveOutRequestId: row\.ma_yeu_cau/);
+  assert.match(tab, /\/v1\/move-outs\/\$\{row\.ma_hop_dong\}\/settle/);
+});

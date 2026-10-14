@@ -180,6 +180,22 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
 });
 router.post(["/requests/:id/withdraw", "/requests/:id/revoke"], (req, res) => res.status(409).json({ success: false, message: "Schema data2.md không có trạng thái rút yêu cầu; không thể lưu thao tác này an toàn" }));
 
+router.get("/move-outs", landlord, async (req, res, next) => {
+  try {
+    const requests = await YeuCau.findAll({
+      where: { loai_yeu_cau: "TRA_PHONG" },
+      order: [["ngay_gui", "DESC"]],
+      raw: true,
+    });
+    const details = requests.length ? await YeuCauTraPhong.findAll({
+      where: { ma_yeu_cau: { [Op.in]: requests.map((row) => row.ma_yeu_cau) } },
+      raw: true,
+    }) : [];
+    const contractByRequest = new Map(details.map((row) => [row.ma_yeu_cau, row.ma_hop_dong]));
+    return data(res, requests.map((row) => ({ ...row, ma_hop_dong: contractByRequest.get(row.ma_yeu_cau) || null })));
+  } catch (e) { next(e); }
+});
+
 router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) => {
   try {
     const result = await moveOutService.settle(
