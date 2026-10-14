@@ -72,6 +72,13 @@ async function createFreshRental(landlordToken, label = "integration", { createA
       body: JSON.stringify({ tenantId: fresh.tenant.ma_khach_thue }),
     });
     assert.equal(account.response.status, 201, JSON.stringify(account.body));
+    const initialToken = await login({ username: fresh.unique.phone, password: "1" });
+    const passwordChanged = await request("/api/v1/account/password", {
+      method: "PATCH",
+      headers: headers(initialToken),
+      body: JSON.stringify({ currentPassword: "1", newPassword: integration.newAccountPassword }),
+    });
+    assert.equal(passwordChanged.response.status, 200, JSON.stringify(passwordChanged.body));
     tenantToken = await login({ username: fresh.unique.phone, password: integration.newAccountPassword });
   }
   return { ...fresh, contract: contract.body.data, account: account?.body.data, tenantToken };
