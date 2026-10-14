@@ -22,3 +22,10 @@ test("CT-015 building tab supports edit and canonical status transitions", () =>
   assert.match(tab, /NGUNG_HOAT_DONG/);
   assert.match(tab, /HOAT_DONG/);
 });
+
+test("CT-015 room tab edits rooms and only toggles safe availability states", () => {
+  const tab = frontend("modules/properties/rooms.tab.js");
+  assert.match(tab, /\/phong\/\$\{row\.ma_phong\}/);
+  assert.match(tab, /\["TRONG", "NGUNG_SU_DUNG"\]\.includes/);
+  assert.match(tab, /trang_thai: row\.trang_thai === "TRONG" \? "NGUNG_SU_DUNG" : "TRONG"/);
+});
