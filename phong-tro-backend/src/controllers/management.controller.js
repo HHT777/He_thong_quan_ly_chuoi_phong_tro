@@ -1,4 +1,4 @@
-const { CanTro, PhongTro, KhachThue, HopDong, ChiPhi } = require("../models");
+const { CanTro, PhongTro, KhachThue, HopDong, KhoanChi, ChuTro, TaiKhoan } = require("../models");
 
 function notFound(message) {
   return { status: 404, message };
@@ -23,11 +23,13 @@ class ManagementController {
 
   async createCanTro(req, res, next) {
     try {
+      const owner = await ChuTro.findOne({ where: { ma_tai_khoan: req.user.ma_tai_khoan } });
+      if (!owner) throw notFound("Không tìm thấy hồ sơ Chủ trọ");
       res
         .status(201)
         .json({
           success: true,
-          data: await CanTro.create(req.body),
+          data: await CanTro.create({ ...req.body, ma_chu_tro: owner.ma_chu_tro, trang_thai: req.body.trang_thai || "HOAT_DONG" }),
           message: "Tạo căn trọ thành công",
         });
     } catch (error) {
@@ -54,6 +56,8 @@ class ManagementController {
     try {
       const item = await CanTro.findByPk(req.params.id);
       if (!item) throw notFound("Căn trọ không tồn tại");
+      const roomCount = await PhongTro.count({ where: { ma_can: item.ma_can } });
+      if (roomCount > 0) throw { status: 409, message: "Không thể xóa căn đã có phòng; hãy chuyển sang Ngừng hoạt động" };
       await item.destroy();
       res.json({
         success: true,
@@ -68,7 +72,10 @@ class ManagementController {
   async listKhachThue(req, res, next) {
     try {
       const data = await KhachThue.findAll({
-        include: [{ model: HopDong, as: "hopDongs" }],
+        include: [
+          { model: HopDong, as: "hopDongs" },
+          { model: TaiKhoan, as: "taiKhoan", attributes: ["ma_tai_khoan", "ten_dang_nhap", "vai_tro", "trang_thai", "bat_buoc_doi_mat_khau"] },
+        ],
         order: [["ma_khach_thue", "ASC"]],
       });
       res.json({
@@ -114,6 +121,8 @@ class ManagementController {
     try {
       const item = await KhachThue.findByPk(req.params.id);
       if (!item) throw notFound("Khách thuê không tồn tại");
+      const contractCount = await HopDong.count({ where: { ma_khach_thue: item.ma_khach_thue } });
+      if (contractCount > 0) throw { status: 409, message: "Không thể xóa khách thuê đã có lịch sử hợp đồng" };
       await item.destroy();
       res.json({
         success: true,
@@ -127,7 +136,7 @@ class ManagementController {
 
   async listChiPhi(req, res, next) {
     try {
-      const data = await ChiPhi.findAll({ order: [["ngay_chi", "DESC"]] });
+      const data = await KhoanChi.findAll({ order: [["ngay_phat_sinh", "DESC"]] });
       res.json({
         success: true,
         data,
@@ -144,10 +153,7 @@ class ManagementController {
         .status(201)
         .json({
           success: true,
-          data: await ChiPhi.create({
-            ...req.body,
-            nguoi_ghi_nhan: req.user.ma_tai_khoan,
-          }),
+          data: await KhoanChi.create(req.body),
           message: "Tạo khoản chi thành công",
         });
     } catch (error) {
@@ -157,7 +163,7 @@ class ManagementController {
 
   async updateChiPhi(req, res, next) {
     try {
-      const item = await ChiPhi.findByPk(req.params.id);
+      const item = await KhoanChi.findByPk(req.params.id);
       if (!item) throw notFound("Khoản chi không tồn tại");
       await item.update(req.body);
       res.json({
@@ -172,7 +178,7 @@ class ManagementController {
 
   async deleteChiPhi(req, res, next) {
     try {
-      const item = await ChiPhi.findByPk(req.params.id);
+      const item = await KhoanChi.findByPk(req.params.id);
       if (!item) throw notFound("Khoản chi không tồn tại");
       await item.destroy();
       res.json({

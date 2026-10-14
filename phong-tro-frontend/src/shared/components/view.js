@@ -74,8 +74,19 @@ export function shellPage(title, description = "") {
   `;
 }
 
-// Modal helper for create forms
-function openCreateModal(config, onCreated) {
+function fieldControl(field, value = "") {
+  if (field.options) {
+    return `<select class="form-control" name="${field.name}" ${field.required ? "required" : ""}>
+      ${field.options.map((option) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+    </select>`;
+  }
+  if (field.type === "textarea") {
+    return `<textarea class="form-control" name="${field.name}" ${field.required ? "required" : ""}>${escapeHtml(value)}</textarea>`;
+  }
+  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.required ? "required" : ""}>`;
+}
+
+export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
@@ -83,7 +94,7 @@ function openCreateModal(config, onCreated) {
       <div class="modal-header">
         <div class="modal-title-wrap">
           <span class="modal-icon">${icons.plus(20)}</span>
-          <h3 class="modal-title">${escapeHtml(config.create.label || "Thêm mới")}</h3>
+          <h3 class="modal-title">${escapeHtml(title)}</h3>
         </div>
         <button class="modal-close-btn" aria-label="Đóng" data-modal-close>
           ${icons.x(20)}
@@ -91,19 +102,19 @@ function openCreateModal(config, onCreated) {
       </div>
       <div class="modal-body">
         <form class="panel form-grid" data-create-form style="box-shadow:none;border:none;padding:0;margin:0;max-width:100%;">
-          ${config.create.fields
+          ${fields
             .map(
               (field) => `
             <label class="modal-field">
               <span>${escapeHtml(field.label)}</span>
-              <input class="form-control" name="${field.name}" type="${field.type || "text"}" ${field.required ? "required" : ""}>
+              ${fieldControl(field, initial[field.name] ?? field.value ?? "")}
             </label>
           `
             )
             .join("")}
           <div class="form-grid__actions modal-footer" style="margin-top:20px;">
             <button type="button" class="btn btn--secondary" data-modal-close>Hủy</button>
-            <button type="submit" class="btn btn--primary">${escapeHtml(config.create.label || "Thêm mới")}</button>
+            <button type="submit" class="btn btn--primary">${escapeHtml(submitLabel)}</button>
             <span data-create-message style="color:var(--red-primary);font-size:13px;"></span>
           </div>
         </form>
@@ -128,8 +139,7 @@ function openCreateModal(config, onCreated) {
     message.textContent = "Đang lưu...";
     try {
       const raw = Object.fromEntries(new FormData(form));
-      const body = config.create.map ? config.create.map(raw) : raw;
-      await onCreated(body);
+      await submit(raw);
       showToast("Đã lưu thành công!", "success");
       close();
     } catch (err) {
@@ -143,7 +153,17 @@ function openCreateModal(config, onCreated) {
   document.body.appendChild(overlay);
 }
 
-export function renderTable(container, columns, rows) {
+// Modal helper for create forms
+function openCreateModal(config, onCreated) {
+  return openFormModal({
+    title: config.create.label || "Thêm mới",
+    fields: config.create.fields,
+    submitLabel: config.create.label || "Thêm mới",
+    submit: (raw) => onCreated(config.create.map ? config.create.map(raw) : raw),
+  });
+}
+
+export function renderTable(container, columns, rows, rowActions = []) {
   if (!rows || !rows.length) {
     container.innerHTML = `
       <div class="empty-state">
@@ -166,6 +186,7 @@ export function renderTable(container, columns, rows) {
                 return `<th class="${isNumeric ? "table-align-right" : ""}">${escapeHtml(column.label)}</th>`;
               })
               .join("")}
+            ${rowActions.length ? "<th>Thao tác</th>" : ""}
           </tr>
         </thead>
         <tbody>
@@ -194,6 +215,7 @@ export function renderTable(container, columns, rows) {
                   return `<td class="${isNumeric ? "table-align-right tabular-nums" : ""}">${escapeHtml(rawVal)}</td>`;
                 })
                 .join("")}
+              ${rowActions.length ? `<td><div class="table-actions">${rowActions.filter((action) => !action.visible || action.visible(row)).map((action) => `<button class="btn ${action.className || "btn--secondary"}" data-row-action="${escapeHtml(action.id)}" data-row-index="${rows.indexOf(row)}">${escapeHtml(action.label)}</button>`).join(" ") || "—"}</div></td>` : ""}
             </tr>
           `
             )
@@ -509,8 +531,39 @@ export async function renderList(context, config) {
       if (viewMode === "grid" && isRoomsModule) {
         renderCardGrid(viewContainer, paginated);
       } else {
-        renderTable(viewContainer, config.columns, paginated);
+        renderTable(viewContainer, config.columns, paginated, config.rowActions || []);
       }
+
+      viewContainer.querySelectorAll("[data-row-action]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const action = (config.rowActions || []).find((item) => item.id === button.dataset.rowAction);
+          const row = paginated[Number(button.dataset.rowIndex)];
+          if (!action || !row) return;
+          const execute = async (raw = {}) => {
+            button.disabled = true;
+            try {
+              const values = action.map ? action.map(raw, row) : raw;
+              await action.run(context, row, values);
+              showToast(action.successMessage || "Thao tác thành công!", "success");
+              await renderList(context, config);
+            } catch (error) {
+              showToast(error.message, "error");
+              button.disabled = false;
+            }
+          };
+          if (action.fields?.length) {
+            openFormModal({
+              title: action.title || action.label,
+              fields: action.fields,
+              initial: action.initial ? action.initial(row) : {},
+              submitLabel: action.submitLabel || action.label,
+              submit: execute,
+            });
+          } else if (!action.confirm || window.confirm(action.confirm(row))) {
+            await execute();
+          }
+        });
+      });
 
       // Render Pagination
       const paginationContainer = content.querySelector("#mgmtPaginationContainer");
