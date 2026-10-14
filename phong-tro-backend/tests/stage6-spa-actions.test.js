@@ -29,3 +29,10 @@ test("CT-015 room tab edits rooms and only toggles safe availability states", ()
   assert.match(tab, /\["TRONG", "NGUNG_SU_DUNG"\]\.includes/);
   assert.match(tab, /trang_thai: row\.trang_thai === "TRONG" \? "NGUNG_SU_DUNG" : "TRONG"/);
 });
+
+test("CT-015 asset tab supports condition updates and confirmed deletion", () => {
+  const tab = frontend("modules/properties/assets.tab.js");
+  assert.match(tab, /api\.put\(`\/v1\/assets\/\$\{row\.ma_tai_san\}`/);
+  assert.match(tab, /api\.del\(`\/v1\/assets\/\$\{row\.ma_tai_san\}`/);
+  assert.match(tab, /condition: row\.tinh_trang/);
+});
