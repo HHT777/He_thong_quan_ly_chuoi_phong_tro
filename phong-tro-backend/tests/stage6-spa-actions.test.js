@@ -64,3 +64,13 @@ test("CT-015 payment tab records payments and confirms pending evidence", () => 
   assert.match(service, /KhoanThu\.create/);
   assert.match(service, /billService\.updateBillStatus/);
 });
+
+test("CT-015 incident tab accepts and completes incidents through canonical states", () => {
+  const tab = frontend("modules/operations/incidents.tab.js");
+  assert.match(tab, /trang_thai === "CHO_TIEP_NHAN"/);
+  assert.match(tab, /status: "DANG_XU_LY"/);
+  assert.match(tab, /trang_thai === "DANG_XU_LY"/);
+  assert.match(tab, /status: "DA_XU_LY"/);
+  assert.match(tab, /responsibleTenantId/);
+  assert.match(tab, /responsibilityBasis/);
+});
