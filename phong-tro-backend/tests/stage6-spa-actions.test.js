@@ -36,3 +36,10 @@ test("CT-015 asset tab supports condition updates and confirmed deletion", () =>
   assert.match(tab, /api\.del\(`\/v1\/assets\/\$\{row\.ma_tai_san\}`/);
   assert.match(tab, /condition: row\.tinh_trang/);
 });
+
+test("CT-015 resident tab edits profiles and preserves rental history", () => {
+  const tab = frontend("modules/residents-contracts/residents.tab.js");
+  assert.match(tab, /api\.put\(`\/management\/khach-thue\/\$\{row\.ma_khach_thue\}`/);
+  assert.match(tab, /!row\.hopDongs\?\.length && !row\.ma_tai_khoan/);
+  assert.match(tab, /api\.del\(`\/management\/khach-thue\/\$\{row\.ma_khach_thue\}`/);
+});
