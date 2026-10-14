@@ -6,22 +6,30 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node scripts/run-test-suite.js unit",
+    "test:integration": "node scripts/run-test-suite.js integration"
   },
-  "keywords": ["phong-tro", "management", "api"],
+  "keywords": [
+    "phong-tro",
+    "management",
+    "api"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
-    "mysql2": "^3.6.0",
-    "sequelize": "^6.35.1",
-    "dotenv": "^16.3.1",
-    "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
-    "joi": "^17.11.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
-    "node-cron": "^3.0.2"
+    "multer": "^2.4.0",
+    "mysql2": "^3.6.0",
+    "node-cron": "^3.0.2",
+    "sequelize": "^6.35.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
