@@ -643,7 +643,8 @@ export async function renderList(context, config) {
       // Create button opens sleek Modal Dialog
       content.querySelector("#btnOpenCreate")?.addEventListener("click", () => {
         openCreateModal(config, async (body) => {
-          await context.api.post(config.create.endpoint || config.endpoint, body);
+          const headers = typeof config.create.headers === "function" ? config.create.headers(body) : config.create.headers;
+          await context.api.post(config.create.endpoint || config.endpoint, body, headers);
           await renderList(context, config);
         });
       });

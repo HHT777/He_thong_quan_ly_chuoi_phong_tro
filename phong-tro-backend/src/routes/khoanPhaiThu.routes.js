@@ -5,6 +5,7 @@ const {
 } = require("../controllers/khoanPhaiThu.controller");
 const authMiddleware = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
+const paymentConfirmationService = require("../services/paymentConfirmation.service");
 
 const router = express.Router();
 
@@ -52,6 +53,15 @@ router.get(
   "/payment/stats",
   authorize("thanhToan.stats"),
   ThanhToanController.getPaymentStats.bind(ThanhToanController),
+);
+router.post(
+  "/payment/:id/confirm",
+  authorize("thanhToan.write"),
+  async (req, res, next) => {
+    try {
+      res.json({ success: true, data: await paymentConfirmationService.confirm(req.params.id), message: "Xác nhận minh chứng thanh toán thành công" });
+    } catch (error) { next(error); }
+  },
 );
 router.get(
   "/payment/:id",

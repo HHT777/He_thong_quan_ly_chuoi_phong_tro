@@ -52,3 +52,15 @@ test("CT-015 contract tab creates contracts and renews only non-liquidated contr
   assert.match(tab, /\["DANG_HIEU_LUC", "SAP_HET_HAN", "HET_HAN"\]\.includes/);
   assert.doesNotMatch(tab, /\[.*"DA_THANH_LY".*\]\.includes/);
 });
+
+test("CT-015 payment tab records payments and confirms pending evidence", () => {
+  const tab = frontend("modules/finance/payments.tab.js");
+  const service = fs.readFileSync(path.resolve(__dirname, "../src/services/paymentConfirmation.service.js"), "utf8");
+  assert.match(tab, /\/khoan-phai-thu\/payment\/create/);
+  assert.match(tab, /trang_thai_xac_nhan === "CHO_XAC_NHAN"/);
+  assert.match(tab, /\/payment\/\$\{row\.ma_giao_dich\}\/confirm/);
+  assert.match(service, /async function confirm/);
+  assert.match(service, /sequelize\.transaction/);
+  assert.match(service, /KhoanThu\.create/);
+  assert.match(service, /billService\.updateBillStatus/);
+});
