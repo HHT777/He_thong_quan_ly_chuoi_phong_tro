@@ -14,7 +14,7 @@ function renderRooms(rooms) {
         room.trang_thai,
         "status-badge--info",
       ];
-      return `<tr><td>P${room.ma_phong}</td><td>${room.canTro?.ten_can || `Căn #${room.ma_can}`}</td><td>${room.mo_ta || "—"}</td><td>${FormatUtil.currency(room.gia_thue)}</td><td><span class="status-badge ${tone}">${label}</span></td><td>${room.trang_thai === "DANG_THUE" ? "Đang thuê" : "Chưa có"}</td></tr>`;
+      return `<tr><td>${room.so_phong || `P${room.ma_phong}`}</td><td>${room.canTro?.ten_can || `Căn #${room.ma_can}`}</td><td>${room.noi_that_mo_ta || "—"}</td><td>${FormatUtil.currency(room.gia_thue)}</td><td><span class="status-badge ${tone}">${label}</span></td><td>${room.trang_thai === "DANG_THUE" ? "Đang thuê" : "Chưa có"}</td></tr>`;
     })
     .join("");
 }
@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     search?.addEventListener("input", () =>
       renderRooms(
         rooms.filter((room) =>
-          `${room.ma_phong} ${room.mo_ta} ${room.trang_thai} ${room.canTro?.ten_can}`
+          `${room.ma_phong} ${room.so_phong} ${room.noi_that_mo_ta} ${room.trang_thai} ${room.canTro?.ten_can}`
             .toLowerCase()
             .includes(search.value.toLowerCase()),
         ),

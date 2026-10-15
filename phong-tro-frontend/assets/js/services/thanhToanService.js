@@ -1,6 +1,3 @@
 export const thanhToanService = {
-  getAll: async () => {
-    console.log("Get all payments");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/khoan-phai-thu/payment/list?limit=100"),
 };

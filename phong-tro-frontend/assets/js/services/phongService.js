@@ -1,6 +1,3 @@
 export const phongService = {
-  getAll: async () => {
-    console.log("Get all rooms");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/phong?limit=100"),
 };

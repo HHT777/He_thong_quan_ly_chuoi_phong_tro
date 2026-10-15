@@ -1,6 +1,3 @@
 export const tienPhongService = {
-  getAll: async () => {
-    console.log("Get all room fees");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/khoan-phai-thu?limit=100"),
 };

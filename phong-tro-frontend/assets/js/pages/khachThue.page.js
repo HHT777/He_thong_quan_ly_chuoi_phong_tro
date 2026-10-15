@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         items
           .map((item) => {
             const contract = item.hopDongs?.[0];
-            return `<tr><td>${item.ho_ten}</td><td>${contract ? `P${contract.ma_phong}` : "—"}</td><td>${contract ? `HD-${contract.ma_hop_dong}` : "—"}</td><td>${contract?.ngay_ket_thuc ? new Date(contract.ngay_ket_thuc).toLocaleDateString("vi-VN") : "—"}</td><td>${item.trang_thai}</td></tr>`;
+            return `<tr><td>${item.ho_ten}</td><td>${contract ? `P${contract.ma_phong}` : "—"}</td><td>${contract ? `HD-${contract.ma_hop_dong}` : "—"}</td><td>${contract?.ngay_ket_thuc ? new Date(contract.ngay_ket_thuc).toLocaleDateString("vi-VN") : "—"}</td><td>${contract?.trang_thai || "CHUA_CO_HOP_DONG"}</td></tr>`;
           })
           .join("") || '<tr><td colspan="5">Chưa có khách thuê.</td></tr>';
   } catch (error) {

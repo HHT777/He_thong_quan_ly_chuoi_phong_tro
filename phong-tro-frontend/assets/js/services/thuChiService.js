@@ -1,6 +1,3 @@
 export const thuChiService = {
-  getAll: async () => {
-    console.log("Get all income/outcome records");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/management/thu-chi"),
 };

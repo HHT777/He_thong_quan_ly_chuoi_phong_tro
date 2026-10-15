@@ -1,6 +1,3 @@
 export const cocService = {
-  getAll: async () => {
-    console.log("Get all deposits");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/dat-coc?limit=100"),
 };

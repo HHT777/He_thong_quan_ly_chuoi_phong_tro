@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         items
           .map(
             (item) =>
-              `<tr><td>Chi</td><td>${item.noi_dung || item.loai_chi_phi}</td><td>${FormatUtil.currency(item.so_tien)}</td><td>${new Date(item.ngay_chi).toLocaleDateString("vi-VN")}</td><td><span class="status-badge status-badge--success">Đã ghi nhận</span></td></tr>`,
+              `<tr><td>Chi</td><td>${item.ghi_chu || item.loai_khoan_chi}</td><td>${FormatUtil.currency(item.so_tien)}</td><td>${new Date(item.ngay_phat_sinh).toLocaleDateString("vi-VN")}</td><td><span class="status-badge status-badge--success">Đã ghi nhận</span></td></tr>`,
           )
           .join("") || '<tr><td colspan="5">Chưa có giao dịch chi.</td></tr>';
   } catch (error) {

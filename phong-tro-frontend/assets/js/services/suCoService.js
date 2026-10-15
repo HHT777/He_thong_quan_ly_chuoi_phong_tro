@@ -1,6 +1,3 @@
 export const suCoService = {
-  getAll: async () => {
-    console.log("Get all incidents");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/v1/incidents"),
 };

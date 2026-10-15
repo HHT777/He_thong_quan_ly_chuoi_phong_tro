@@ -273,7 +273,9 @@ async function loadDashboardData() {
 
   const user = window.ApiClient.getUser();
   if (user?.vai_tro !== "CHU_TRO") {
-    window.location.replace("/pages/khach-thue/thong-tin-thue.html");
+    window.location.replace(
+      window.ApiClient.pagePath("khach-thue/thong-tin-thue.html"),
+    );
     return false;
   }
 
@@ -323,7 +325,7 @@ async function loadDashboardData() {
       0,
     );
     const overdueBills = bills.filter(
-      (bill) => bill.trang_thai_thanh_toan === "QUA_HAN",
+      (bill) => Number(bill.so_tien_con_no || 0) > 0,
     );
     const ownerName =
       profile.khachThue?.ho_ten || profile.ten_dang_nhap || "bạn";
@@ -388,13 +390,10 @@ async function loadDashboardData() {
       urgent: daysUntil(contract.ngay_ket_thuc) <= 7,
     }));
     dashboardData.receivables = overdueBills.map((bill) => ({
-      name: bill.khachThue?.ho_ten || `Khách thuê #${bill.ma_khach_thue}`,
-      room: `Phòng ${bill.ma_phong}`,
-      overdue: Math.max(
-        1,
-        Math.ceil((now - new Date(bill.han_thanh_toan)) / 86400000),
-      ),
-      amount: Number(bill.tong_phai_thanh_toan || 0),
+      name: bill.hopDong?.khachThue?.ho_ten || `Hợp đồng #${bill.ma_hop_dong}`,
+      room: `Phòng ${bill.hopDong?.ma_phong || "—"}`,
+      overdue: Math.max(0, now.getDate() - 10),
+      amount: Number(bill.so_tien_con_no || 0),
     }));
     dashboardData.activity = [];
     return true;

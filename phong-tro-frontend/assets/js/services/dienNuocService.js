@@ -1,6 +1,3 @@
 export const dienNuocService = {
-  getAll: async () => {
-    console.log("Get all electricity/water records");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/v1/meter-readings?pageSize=100"),
 };

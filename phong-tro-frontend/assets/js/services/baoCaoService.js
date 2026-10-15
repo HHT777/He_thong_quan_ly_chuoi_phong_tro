@@ -1,6 +1,3 @@
 export const baoCaoService = {
-  getAll: async () => {
-    console.log("Get all reports");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/v1/reports/cashflow"),
 };

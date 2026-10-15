@@ -1,6 +1,3 @@
 export const hopDongService = {
-  getAll: async () => {
-    console.log("Get all contracts");
-    return { success: true, data: [] };
-  },
+  getAll: () => window.ApiClient.get("/hop-dong?limit=100"),
 };
