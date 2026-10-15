@@ -186,7 +186,7 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         const detail = await YeuCauGiaHan.findOne({ where: { ma_yeu_cau: row.ma_yeu_cau }, transaction, lock: transaction.LOCK.UPDATE });
         if (!detail?.ngay_ket_thuc_de_xuat) throw fail(422, "Yêu cầu gia hạn thiếu ngày kết thúc đề xuất");
         const contract = await HopDong.findByPk(detail.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE });
-        if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng không còn hiệu lực để gia hạn");
+        if (!contract || contract.trang_thai !== "SAP_HET_HAN") throw fail(409, "Chỉ có thể gia hạn hợp đồng sắp hết hạn", "CONTRACT_NOT_EXPIRING");
         if (String(detail.ngay_ket_thuc_de_xuat) <= String(contract.ngay_ket_thuc)) throw fail(422, "Ngày gia hạn phải sau ngày kết thúc hiện tại");
         const oldEndDate = contract.ngay_ket_thuc;
         const months = contractLifecycleService.renewalMonths(oldEndDate, detail.ngay_ket_thuc_de_xuat);

@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  HopDong, PhongTro, ChiSoDien, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan,
+  HopDong, PhongTro, ChiSoDien, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan, YeuCau,
 } = require("../src/models");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
@@ -20,6 +20,7 @@ test("FR-042 contract creation is recorded and history respects tenant ownership
     method: "PUT", headers: headers(landlord), body: JSON.stringify({ phi_dich_vu: 150000, reason: "Thỏa thuận phí dịch vụ" }),
   });
   assert.equal(updated.response.status, 200, JSON.stringify(updated.body));
+  await HopDong.update({ trang_thai: "SAP_HET_HAN" }, { where: { ma_hop_dong: fresh.contract.ma_hop_dong } });
   const renewalRequest = await request("/api/v1/requests", {
     method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ type: "GIA_HAN", content: "Gia hạn 6 tháng", requestedEndDate: "2028-03-30" }),
   });
@@ -34,6 +35,28 @@ test("FR-042 contract creation is recorded and history respects tenant ownership
   const other = await login(integration.otherTenant);
   const forbidden = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/history`, { headers: { Authorization: `Bearer ${other}` } });
   assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-108 rejects renewal approval unless the contract is SAP_HET_HAN", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "renewal-status");
+  const renewalRequest = await request("/api/v1/requests", {
+    method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({
+      type: "GIA_HAN", content: "Gia hạn 6 tháng", requestedEndDate: "2028-03-30",
+    }),
+  });
+  assert.equal(renewalRequest.response.status, 201, JSON.stringify(renewalRequest.body));
+  const approved = await request(`/api/v1/requests/${renewalRequest.body.data.ma_yeu_cau}`, {
+    method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET", requestedEndDate: "2035-01-01" }),
+  });
+  assert.equal(approved.response.status, 409, JSON.stringify(approved.body));
+  assert.equal(approved.body.error?.code, "CONTRACT_NOT_EXPIRING");
+  const [contract, pending] = await Promise.all([
+    HopDong.findByPk(fresh.contract.ma_hop_dong),
+    YeuCau.findByPk(renewalRequest.body.data.ma_yeu_cau),
+  ]);
+  assert.equal(contract.ngay_ket_thuc, "2027-09-30");
+  assert.equal(pending.trang_thai, "CHO_XU_LY");
 });
 
 test("FR-195 transfers a contract and all dependent state atomically", async () => {
