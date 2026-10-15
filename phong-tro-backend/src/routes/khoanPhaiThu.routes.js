@@ -59,7 +59,7 @@ router.post(
   authorize("thanhToan.write"),
   async (req, res, next) => {
     try {
-      res.json({ success: true, data: await paymentConfirmationService.confirm(req.params.id), message: "Xác nhận minh chứng thanh toán thành công" });
+      res.json({ success: true, data: await paymentConfirmationService.confirm(req.params.id, req.user.ma_tai_khoan), message: "Xác nhận minh chứng thanh toán thành công" });
     } catch (error) { next(error); }
   },
 );

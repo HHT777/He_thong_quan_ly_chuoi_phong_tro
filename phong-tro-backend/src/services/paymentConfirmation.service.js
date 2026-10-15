@@ -1,8 +1,9 @@
 const sequelize = require("../config/database");
 const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, ThongBao } = require("../models");
 const billService = require("./khoanPhaiThu.service");
+const { writeAuditLog } = require("./auditLog.service");
 
-async function confirm(id) {
+async function confirm(id, actorId) {
   return sequelize.transaction(async (transaction) => {
     const payment = await GiaoDichThanhToan.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!payment) throw { status: 404, code: "PAYMENT_NOT_FOUND", message: "Không tìm thấy giao dịch thanh toán" };
@@ -33,6 +34,10 @@ async function confirm(id) {
       ma_can: bill.hopDong.phongTro.ma_can,
     }, { transaction });
     await billService.updateBillStatus(bill.ma_thanh_toan, transaction);
+    await writeAuditLog({
+      transaction, actorId, action: "PAYMENT_EVIDENCE_CONFIRMED", entityType: "GiaoDichThanhToan", entityId: payment.ma_giao_dich,
+      after: { billId: bill.ma_thanh_toan, amount },
+    });
     if (bill.hopDong.khachThue?.ma_tai_khoan) {
       await ThongBao.create({
         ma_tai_khoan: bill.hopDong.khachThue.ma_tai_khoan,

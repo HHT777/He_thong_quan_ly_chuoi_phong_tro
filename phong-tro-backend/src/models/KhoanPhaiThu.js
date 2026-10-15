@@ -63,6 +63,10 @@ const KhoanPhaiThu = sequelize.define(
       defaultValue: "CHUA_THANH_TOAN",
       allowNull: false,
     },
+    version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    da_ghi_no: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+    ngay_ghi_no: { type: DataTypes.DATE, allowNull: true },
+    so_tien_ghi_no: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
   },
   {
     tableName: "khoan_phai_thu",

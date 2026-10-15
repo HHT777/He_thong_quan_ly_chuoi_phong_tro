@@ -1,5 +1,6 @@
 const sequelize = require("../config/database");
 const { ThanhToan, ChiTietThanhToan } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
 
 const ALLOWED_LINE_TYPES = new Set([
   "TIEN_PHONG", "TIEN_DIEN", "TIEN_NUOC", "DICH_VU", "SUA_CHUA", "PHAT_SINH",
@@ -31,7 +32,7 @@ function planReductions(details, amount) {
   return changes;
 }
 
-async function adjust(billId, payload) {
+async function adjust(billId, payload, actorId) {
   const { reason, delta } = validateInput(payload);
   return sequelize.transaction(async (transaction) => {
     const bill = await ThanhToan.findByPk(billId, { transaction, lock: transaction.LOCK.UPDATE });
@@ -75,6 +76,10 @@ async function adjust(billId, payload) {
       so_tien_con_no: rounded(total - paid),
       trang_thai: total === paid ? "DA_THANH_TOAN" : paid > 0 ? "THANH_TOAN_MOT_PHAN" : "CHUA_THANH_TOAN",
     }, { transaction });
+    if (actorId) await writeAuditLog({
+      transaction, actorId, action: "BILL_ADJUSTED", entityType: "ThanhToan", entityId: bill.ma_thanh_toan,
+      before: { total: oldTotal }, after: { total, delta }, reason,
+    });
     return bill;
   });
 }

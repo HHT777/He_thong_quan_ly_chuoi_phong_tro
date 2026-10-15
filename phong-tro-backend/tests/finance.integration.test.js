@@ -55,4 +55,12 @@ test("UC-20/22/11/12/23 real finance flow: bill, multiple payments, debt and ove
   const debtBill = debt.body.data.find((item) => item.ma_thanh_toan === bill.ma_thanh_toan);
   assert.equal(Number(debtBill.tong_da_thanh_toan), Number(bill.tong_da_thanh_toan) + firstAmount);
   assert.equal(Number(debtBill.so_tien_con_no), total - firstAmount);
+
+  const stats = await request(`/api/khoan-phai-thu/payment/stats?startDate=2026-01-01&endDate=2026-12-31`, {
+    headers: { Authorization: `Bearer ${landlord}` },
+  });
+  assert.equal(stats.response.status, 200, JSON.stringify(stats.body));
+  assert.equal(Array.isArray(stats.body.data), false);
+  assert.ok(Number(stats.body.data.count) >= 1);
+  assert.ok(Number(stats.body.data.total_amount) >= firstAmount);
 });

@@ -16,7 +16,7 @@ class KhoanPhaiThuController {
         return next(error);
       }
 
-      const khoan = await khoanPhaiThuService.createKhoanPhaiThu(value);
+      const khoan = await khoanPhaiThuService.createKhoanPhaiThu(value, req.user.ma_tai_khoan);
 
       res.status(201).json({
         success: true,
@@ -64,7 +64,7 @@ class KhoanPhaiThuController {
       );
       if (
         req.user.vai_tro === "KHACH_THUE" &&
-        khoan.ma_khach_thue !== req.user.ma_khach_thue
+        khoan.hopDong?.ma_khach_thue !== req.user.ma_khach_thue
       ) {
         return res
           .status(403)
@@ -129,6 +129,13 @@ class KhoanPhaiThuController {
 class ThanhToanController {
   async createThanhToan(req, res, next) {
     try {
+      const idempotencyKey = req.get("Idempotency-Key");
+      if (!idempotencyKey) {
+        return res.status(400).json({
+          success: false,
+          message: "Thiếu Idempotency-Key",
+        });
+      }
       const { error, value } = thanhToanValidation.createThanhToan.validate(
         req.body,
       );
@@ -142,7 +149,7 @@ class ThanhToanController {
         value.nguoi_xac_nhan = req.user.ma_tai_khoan;
       }
 
-      const thanhToan = await thanhToanService.createThanhToan(value);
+      const thanhToan = await thanhToanService.createThanhToan(value, idempotencyKey, req.user.ma_tai_khoan);
 
       res.status(201).json({
         success: true,
@@ -186,6 +193,12 @@ class ThanhToanController {
   async getThanhToanById(req, res, next) {
     try {
       const thanhToan = await thanhToanService.getThanhToanById(req.params.id);
+      if (
+        req.user.vai_tro === "KHACH_THUE" &&
+        String(thanhToan.thanhToan?.hopDong?.ma_khach_thue) !== String(req.user.ma_khach_thue)
+      ) {
+        return res.status(403).json({ success: false, message: "Bạn chỉ được xem thanh toán của mình" });
+      }
 
       res.json({
         success: true,

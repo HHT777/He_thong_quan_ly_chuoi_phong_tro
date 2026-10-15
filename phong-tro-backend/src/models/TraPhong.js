@@ -49,6 +49,11 @@ const TraPhong = sequelize.define(
       type: DataTypes.DECIMAL(12, 2),
       defaultValue: 0,
     },
+    tien_phong_hoan_lai: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    tien_dien: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    tien_nuoc: { type: DataTypes.DECIMAL(12, 2), defaultValue: 0 },
+    phan_bo_quyet_toan: { type: DataTypes.JSON, allowNull: true },
+    da_bat_dau_thanh_ly: { type: DataTypes.BOOLEAN, defaultValue: false },
     ngay_thanh_ly: {
       type: DataTypes.DATE,
       allowNull: true,

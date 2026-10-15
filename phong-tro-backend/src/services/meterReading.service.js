@@ -27,6 +27,8 @@ function toDto(row) {
     submittedAt: plain.ngay_ghi_nhan,
     confirmedAt: plain.ngay_xac_nhan,
     confirmedBy: plain.nguoi_xac_nhan_id ? { id: plain.nguoi_xac_nhan_id } : null,
+    consumption: plain.previousReading == null ? null : Number(plain.chi_so_moi) - Number(plain.previousReading),
+    electricityTotalVnd: plain.previousReading == null ? null : (Number(plain.chi_so_moi) - Number(plain.previousReading)) * Number(plain.don_gia_ap_dung),
   };
 }
 async function tenantContract(tenantId) {
@@ -83,14 +85,16 @@ async function callOcr(filePath) {
     return { status: "MANUAL_REQUIRED", rawValue: null, numericValue: null, warning: { code: error.name === "AbortError" ? "OCR_TIMEOUT" : "OCR_UNAVAILABLE", message: "OCR không sẵn sàng. Vui lòng nhập tay." } };
   } finally { clearTimeout(timer); }
 }
-async function createPreview(tenantId, period, file) {
+async function createPreview(tenantId, period, file, roomId) {
   parsePeriod(period);
-  const contract = await tenantContract(tenantId);
-  const previous = await previousReading(contract.ma_phong, period);
+  const contract = tenantId ? await tenantContract(tenantId) : null;
+  const targetRoomId = roomId || contract?.ma_phong;
+  if (!targetRoomId) throw { status: 422, code: "ROOM_REQUIRED", message: "Chủ trọ phải chọn phòng khi OCR" };
+  const previous = await previousReading(targetRoomId, period);
   const ocr = await callOcr(file.path);
   const token = `upl_${crypto.randomUUID()}`;
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-  previews.set(token, { tenantId, period, filePath: file.path, ocrValue: ocr.rawValue, ocrStatus: ocr.status, expiresAt });
+  previews.set(token, { tenantId, roomId: targetRoomId, period, filePath: file.path, ocrValue: ocr.rawValue, ocrStatus: ocr.status, expiresAt });
   return { uploadToken: token, expiresAt: expiresAt.toISOString(), ocrStatus: ocr.status, ocrValue: ocr.rawValue, suggestedReading: ocr.numericValue, previousReading: previous, canSubmit: ocr.numericValue !== null && ocr.numericValue >= previous, warnings: ocr.warning ? [ocr.warning] : [] };
 }
 function resolvePreview(tenantId, period, token) {

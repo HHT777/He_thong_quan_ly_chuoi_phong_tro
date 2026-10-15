@@ -13,6 +13,10 @@ const DienNuoc = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    ma_khach_thue: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     ky: {
       type: DataTypes.STRING(20),
       allowNull: false,
@@ -58,6 +62,23 @@ const DienNuoc = sequelize.define(
       defaultValue: "CHO_XAC_NHAN",
       allowNull: false,
     },
+    ocr_value: { type: DataTypes.STRING(32), allowNull: true },
+    entry_mode: {
+      type: DataTypes.ENUM(
+        "OCR_ACCEPTED",
+        "OCR_CORRECTED",
+        "MANUAL_AFTER_OCR_FAILURE",
+        "LANDLORD_MANUAL",
+      ),
+      allowNull: true,
+    },
+    correction_requested: { type: DataTypes.BOOLEAN, defaultValue: false },
+    correction_reason: { type: DataTypes.TEXT, allowNull: true },
+    evidence_path: { type: DataTypes.STRING(500), allowNull: true },
+    submitted_at: { type: DataTypes.DATE, allowNull: true },
+    confirmed_at: { type: DataTypes.DATE, allowNull: true },
+    confirmed_by: { type: DataTypes.INTEGER, allowNull: true },
+    version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
   },
   {
     tableName: "dien_nuoc",

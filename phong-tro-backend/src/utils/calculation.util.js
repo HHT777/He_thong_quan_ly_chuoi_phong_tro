@@ -10,9 +10,12 @@ const calculateBill = (hopDong, dienNuoc, giamTru = null) => {
    */
 
   const tienPhong = parseFloat(hopDong.gia_thue) || 0;
-  const tienDien = dienNuoc ? parseFloat(dienNuoc.thanh_tien) || 0 : 0;
-  const tienNuoc = dienNuoc ? parseFloat(dienNuoc.tien_nuoc) || 0 : 0;
-  const phiDichVu = parseFloat(hopDong.phi_dich_vu) || 0;
+  const previous = dienNuoc ? Number(dienNuoc.chi_so_truoc || 0) : 0;
+  const tienDien = dienNuoc
+    ? Number(dienNuoc.thanh_tien ?? (Math.max(0, Number(dienNuoc.chi_so_moi || 0) - previous) * Number(dienNuoc.don_gia_ap_dung || hopDong.don_gia_dien || 0)))
+    : 0;
+  const tienNuoc = dienNuoc ? Number(dienNuoc.tien_nuoc || 0) : 0;
+  const phiDichVu = Number(hopDong.phi_dich_vu || 0);
   const phiPhaSinh = 0; // Will be set when creating bill
   const khoanGiamTru = giamTru ? parseFloat(giamTru.gia_tri_giam) || 0 : 0;
 
@@ -40,7 +43,8 @@ const calculateWaterBill = (soNguoi) => {
 const calculateRoomStatus = (hopDong) => {
   /**
    * BR-10: Luồng trạng thái phòng
-   * Trống → Đã giữ → Đang thuê → Đang xử lý trả phòng → Trống
+   * Trống → Đang thuê → Đang xử lý trả phòng → Trống.
+   * data2.md không có trạng thái Đã giữ.
    */
   const now = new Date();
 
@@ -56,7 +60,7 @@ const calculateRoomStatus = (hopDong) => {
     return "DANG_XU_LY_TRA_PHONG";
   }
 
-  return "DA_GIU";
+  return "TRONG";
 };
 
 const calculateDepositReturn = (datCoc, tienCocBanDau, khoanKhauTru) => {

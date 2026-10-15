@@ -20,7 +20,7 @@ function calculateWater(unitPrice, occupantCount) {
   return price * count;
 }
 
-async function generate(period) {
+async function generate(period, actorId) {
   const { nam, thang } = meterReadingService.parsePeriod(period);
   const contracts = await HopDong.findAll({
     where: { trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } },
@@ -58,7 +58,7 @@ async function generate(period) {
         phi_phat_sinh: 0,
         khoan_giam_tru: 0,
         tong_phai_thanh_toan: rent + electricity + water,
-      }));
+      }, actorId));
     } catch (error) {
       skipped.push({
         roomId: contract.ma_phong,

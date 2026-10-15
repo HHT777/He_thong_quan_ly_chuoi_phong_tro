@@ -1,147 +1,95 @@
-const { ThanhToan, KhoanPhaiThu, TaiKhoan, ThongBao } = require("../models");
-const khoanPhaiThuService = require("./khoanPhaiThu.service");
+const crypto = require("crypto");
+const { Op, fn, col } = require("sequelize");
+const sequelize = require("../config/database");
+const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, ThongBao } = require("../models");
+const billService = require("./khoanPhaiThu.service");
+const { writeAuditLog } = require("./auditLog.service");
+
+function deterministicUuid(value) {
+  const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split("");
+  hex[12] = "4";
+  hex[16] = ((parseInt(hex[16], 16) & 3) | 8).toString(16);
+  return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`;
+}
 
 class ThanhToanService {
-  async createThanhToan(data) {
-    // Verify bill exists
-    const khoan = await KhoanPhaiThu.findByPk(data.ma_khoan_phai_thu);
-    if (!khoan) {
-      throw {
-        status: 404,
-        message: "Hóa đơn không tồn tại",
-      };
-    }
-
-    // Create payment
-    const thanhToan = await ThanhToan.create({
-      ...data,
-      nguoi_xac_nhan: data.nguoi_xac_nhan || null,
-    });
-
-    // Update bill status
-    await khoanPhaiThuService.updateBillStatus(data.ma_khoan_phai_thu);
-
-    // Send notification
-    const khachThue = await KhoanPhaiThu.findByPk(data.ma_khoan_phai_thu, {
-      attributes: ["ma_khach_thue"],
-    });
-
-    const taiKhoan = await TaiKhoan.findOne({
-      where: { ma_khach_thue: khachThue.ma_khach_thue },
-    });
-
-    if (taiKhoan) {
-      await ThongBao.create({
-        ma_tai_khoan_nhan: taiKhoan.ma_tai_khoan,
-        loai_thong_bao: "THANH_TOAN",
-        noi_dung: `Thanh toán ${data.so_tien.toLocaleString("vi-VN")}đ ngày ${new Date(data.ngay_thanh_toan).toLocaleDateString("vi-VN")} đã được ghi nhận`,
-        doi_tuong_lien_quan: "THANH_TOAN",
+  async createThanhToan(data, idempotencyKey, actorId) {
+    const billId = data.ma_khoan_phai_thu || data.ma_thanh_toan;
+    const paymentId = deterministicUuid(`payment:${billId}:${idempotencyKey}`);
+    const existing = await GiaoDichThanhToan.findByPk(paymentId);
+    if (existing) return existing;
+    const payment = await sequelize.transaction(async (transaction) => {
+      const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: PhongTro, as: "phongTro" }, { model: KhachThue, as: "khachThue" }] }], transaction, lock: transaction.LOCK.UPDATE });
+      if (!bill) throw { status: 404, message: "Khoản phải thu không tồn tại" };
+      const amount = Number(data.so_tien);
+      if (!Number.isFinite(amount) || amount <= 0) throw { status: 422, code: "INVALID_PAYMENT_AMOUNT", message: "Số tiền thanh toán phải lớn hơn 0" };
+      if (amount > Number(bill.so_tien_con_no)) throw { status: 422, code: "PAYMENT_EXCEEDS_OUTSTANDING", message: "Số tiền thu không được vượt quá số còn thiếu", details: { remaining: Number(bill.so_tien_con_no) } };
+      const row = await GiaoDichThanhToan.create({
+        ma_giao_dich: paymentId, ma_thanh_toan: bill.ma_thanh_toan, so_tien: amount,
+        thoi_diem_ghi_nhan: data.ngay_thanh_toan || new Date(), minh_chung_url: data.minh_chung_url || null,
+        trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(),
+      }, { transaction });
+      await KhoanThu.create({
+        loai_khoan_thu: "THANH_TOAN", so_tien: amount,
+        ngay_ghi_nhan: data.ngay_thanh_toan || new Date(), ghi_chu: data.ghi_chu || data.phuong_thuc || null,
+        trang_thai_ghi_nhan: "HIEU_LUC", ma_giao_dich_thanh_toan: row.ma_giao_dich,
+        ma_can: bill.hopDong.phongTro.ma_can,
+      }, { transaction });
+      await billService.updateBillStatus(bill.ma_thanh_toan, transaction);
+      if (actorId) await writeAuditLog({
+        transaction, actorId, action: "PAYMENT_RECORDED", entityType: "GiaoDichThanhToan", entityId: row.ma_giao_dich,
+        after: { billId: bill.ma_thanh_toan, amount }, reason: data.ghi_chu || null,
       });
-    }
-
-    return thanhToan;
+      return row;
+    });
+    const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: KhachThue, as: "khachThue" }] }] });
+    const accountId = bill?.hopDong?.khachThue?.ma_tai_khoan;
+    if (accountId) await ThongBao.create({ ma_tai_khoan: accountId, loai_thong_bao: "THANH_TOAN", noi_dung: `Đã ghi nhận thanh toán ${Number(data.so_tien).toLocaleString("vi-VN")}đ`, thoi_diem_tao: new Date(), da_doc: false });
+    return payment;
   }
 
   async getThanhToanList(filters, pagination) {
     const where = {};
-
-    if (filters.ma_khoan_phai_thu) {
-      where.ma_khoan_phai_thu = filters.ma_khoan_phai_thu;
-    }
-
-    if (filters.phuong_thuc) {
-      where.phuong_thuc = filters.phuong_thuc;
-    }
-
-    const billInclude = {
-      model: KhoanPhaiThu,
-      as: "khoanPhaiThu",
-      attributes: ["ky", "tong_phai_thanh_toan", "trang_thai_thanh_toan"],
-    };
-    if (filters.ma_khach_thue) {
-      billInclude.where = { ma_khach_thue: filters.ma_khach_thue };
-    }
-
-    const { count, rows } = await ThanhToan.findAndCountAll({
-      where,
-      include: [
-        {
-          ...billInclude,
-        },
-      ],
-      limit: pagination.limit,
-      offset: pagination.offset,
-      order: [["ngay_thanh_toan", "DESC"]],
+    if (filters.ma_khoan_phai_thu || filters.ma_thanh_toan) where.ma_thanh_toan = filters.ma_khoan_phai_thu || filters.ma_thanh_toan;
+    const tenantWhere = filters.ma_khach_thue ? { ma_khach_thue: filters.ma_khach_thue } : undefined;
+    const { count, rows } = await GiaoDichThanhToan.findAndCountAll({
+      where, distinct: true, limit: pagination.limit, offset: pagination.offset,
+      include: [{
+        model: ThanhToan,
+        as: "thanhToan",
+        required: Boolean(tenantWhere),
+        include: [{
+          model: HopDong,
+          as: "hopDong",
+          required: Boolean(tenantWhere),
+          where: tenantWhere,
+          include: [
+            { model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] },
+            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "so_phong"] },
+          ],
+        }],
+      }],
+      order: [["thoi_diem_ghi_nhan", "DESC"]],
     });
-
-    return { total: count, data: rows };
+    return { count, total: count, data: rows };
   }
 
-  async getThanhToanById(maThanhToan) {
-    const thanhToan = await ThanhToan.findByPk(maThanhToan, {
-      include: [
-        {
-          model: KhoanPhaiThu,
-          as: "khoanPhaiThu",
-        },
-      ],
-    });
-
-    if (!thanhToan) {
-      throw {
-        status: 404,
-        message: "Không tìm thấy khoản thanh toán",
-      };
-    }
-
-    return thanhToan;
+  async getThanhToanById(id) {
+    const row = await GiaoDichThanhToan.findByPk(id, { include: [{ model: ThanhToan, as: "thanhToan", include: [{ model: HopDong, as: "hopDong" }] }] });
+    if (!row) throw { status: 404, message: "Không tìm thấy giao dịch thanh toán" };
+    return row;
   }
-
-  async getPaymentsByBill(maKhoanPhaiThu) {
-    return await ThanhToan.findAll({
-      where: { ma_khoan_phai_thu: maKhoanPhaiThu },
-      order: [["ngay_thanh_toan", "DESC"]],
-    });
-  }
-
-  async getTotalPaidForBill(maKhoanPhaiThu) {
-    const result = await ThanhToan.sum("so_tien", {
-      where: { ma_khoan_phai_thu: maKhoanPhaiThu },
-    });
-
-    return result || 0;
-  }
-
-  async getPaymentStats(startDate, endDate) {
-    /**
-     * Get payment statistics for a date range
-     */
-    const payments = await ThanhToan.findAll({
-      where: {
-        ngay_thanh_toan: {
-          [require("sequelize").Op.between]: [startDate, endDate],
-        },
-      },
+  getPaymentsByBill(id) { return GiaoDichThanhToan.findAll({ where: { ma_thanh_toan: id }, order: [["thoi_diem_ghi_nhan", "DESC"]] }); }
+  async getTotalPaidForBill(id) { return Number(await GiaoDichThanhToan.sum("so_tien", { where: { ma_thanh_toan: id, trang_thai_xac_nhan: "DA_XAC_NHAN" } }) || 0); }
+  getPaymentStats(startDate, endDate) {
+    return GiaoDichThanhToan.findOne({
+      where: { thoi_diem_ghi_nhan: { [Op.between]: [startDate, endDate] }, trang_thai_xac_nhan: "DA_XAC_NHAN" },
       attributes: [
-        "phuong_thuc",
-        [
-          require("sequelize").fn("SUM", require("sequelize").col("so_tien")),
-          "total_amount",
-        ],
-        [
-          require("sequelize").fn(
-            "COUNT",
-            require("sequelize").col("ma_thanh_toan"),
-          ),
-          "count",
-        ],
+        [fn("COALESCE", fn("SUM", col("GiaoDichThanhToan.soTien")), 0), "total_amount"],
+        [fn("COUNT", col("GiaoDichThanhToan.maGiaoDich")), "count"],
       ],
-      group: ["phuong_thuc"],
       raw: true,
     });
-
-    return payments;
   }
 }
-
 module.exports = new ThanhToanService();

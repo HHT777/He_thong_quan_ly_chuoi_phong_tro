@@ -41,6 +41,9 @@ const GiamTru = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,
     },
+    ma_khoan_phai_thu: { type: DataTypes.INTEGER, allowNull: true },
+    version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    dang_ap_dung: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     ly_do: {
       type: DataTypes.TEXT,
       allowNull: true,
