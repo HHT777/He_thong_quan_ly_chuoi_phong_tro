@@ -28,6 +28,13 @@ test("UC-20/22/11/12/23 real finance flow: bill, multiple payments, debt and ove
   const total = Number(bill.so_tien_con_no);
   const firstAmount = Math.max(1, Math.floor(total / 2));
 
+  const missingKey = await request("/api/khoan-phai-thu/payment/create", {
+    method: "POST",
+    headers: headers(landlord),
+    body: JSON.stringify({ ma_khoan_phai_thu: bill.ma_thanh_toan, so_tien: firstAmount, phuong_thuc: "CHUYEN_KHOAN" }),
+  });
+  assert.equal(missingKey.response.status, 400);
+
   const paymentKey = `finance-${Date.now()}-1`;
   const first = await request("/api/khoan-phai-thu/payment/create", {
     method: "POST",
@@ -41,7 +48,23 @@ test("UC-20/22/11/12/23 real finance flow: bill, multiple payments, debt and ove
     body: JSON.stringify({ ma_khoan_phai_thu: bill.ma_thanh_toan, ngay_thanh_toan: new Date().toISOString(), so_tien: firstAmount, phuong_thuc: "CHUYEN_KHOAN" }),
   });
   assert.equal(repeated.response.status, 201);
-  assert.equal(repeated.body.data.ma_thanh_toan, first.body.data.ma_thanh_toan);
+  assert.equal(repeated.body.data.ma_giao_dich, first.body.data.ma_giao_dich);
+
+  const conflictingAmount = await request("/api/khoan-phai-thu/payment/create", {
+    method: "POST",
+    headers: headers(landlord, { "Idempotency-Key": paymentKey }),
+    body: JSON.stringify({ ma_khoan_phai_thu: bill.ma_thanh_toan, ngay_thanh_toan: new Date().toISOString(), so_tien: firstAmount + 1, phuong_thuc: "CHUYEN_KHOAN" }),
+  });
+  assert.equal(conflictingAmount.response.status, 409);
+
+  const otherBill = listed.body.data.find((item) => item.ma_thanh_toan !== bill.ma_thanh_toan && Number(item.so_tien_con_no) > 0);
+  assert.ok(otherBill, "seed must contain another outstanding bill");
+  const conflictingBill = await request("/api/khoan-phai-thu/payment/create", {
+    method: "POST",
+    headers: headers(landlord, { "Idempotency-Key": paymentKey }),
+    body: JSON.stringify({ ma_khoan_phai_thu: otherBill.ma_thanh_toan, ngay_thanh_toan: new Date().toISOString(), so_tien: firstAmount, phuong_thuc: "CHUYEN_KHOAN" }),
+  });
+  assert.equal(conflictingBill.response.status, 409);
 
   const overpay = await request("/api/khoan-phai-thu/payment/create", {
     method: "POST",
@@ -63,4 +86,6 @@ test("UC-20/22/11/12/23 real finance flow: bill, multiple payments, debt and ove
   assert.equal(Array.isArray(stats.body.data), false);
   assert.ok(Number(stats.body.data.count) >= 1);
   assert.ok(Number(stats.body.data.total_amount) >= firstAmount);
+  assert.ok(Number(stats.body.data.cash_collected) >= firstAmount);
+  assert.ok(Number(stats.body.data.deposit_offset) >= 0);
 });

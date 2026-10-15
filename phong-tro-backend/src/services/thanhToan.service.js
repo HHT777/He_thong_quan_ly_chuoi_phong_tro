@@ -15,13 +15,21 @@ function deterministicUuid(value) {
 class ThanhToanService {
   async createThanhToan(data, idempotencyKey, actorId) {
     const billId = data.ma_khoan_phai_thu || data.ma_thanh_toan;
-    const paymentId = deterministicUuid(`payment:${billId}:${idempotencyKey}`);
+    const amount = Number(data.so_tien);
+    const paymentId = deterministicUuid(`payment:${idempotencyKey}`);
     const existing = await GiaoDichThanhToan.findByPk(paymentId);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.ma_thanh_toan !== billId || Number(existing.so_tien) !== amount) {
+        throw Object.assign(new Error("Idempotency-Key đã được dùng cho thanh toán khác"), {
+          status: 409,
+          code: "IDEMPOTENCY_CONFLICT",
+        });
+      }
+      return existing;
+    }
     const payment = await sequelize.transaction(async (transaction) => {
       const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: PhongTro, as: "phongTro" }, { model: KhachThue, as: "khachThue" }] }], transaction, lock: transaction.LOCK.UPDATE });
       if (!bill) throw { status: 404, message: "Khoản phải thu không tồn tại" };
-      const amount = Number(data.so_tien);
       if (!Number.isFinite(amount) || amount <= 0) throw { status: 422, code: "INVALID_PAYMENT_AMOUNT", message: "Số tiền thanh toán phải lớn hơn 0" };
       if (amount > Number(bill.so_tien_con_no)) throw { status: 422, code: "PAYMENT_EXCEEDS_OUTSTANDING", message: "Số tiền thu không được vượt quá số còn thiếu", details: { remaining: Number(bill.so_tien_con_no) } };
       const row = await GiaoDichThanhToan.create({
