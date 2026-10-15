@@ -2,7 +2,7 @@ const Joi = require("joi");
 
 const phongValidation = {
   createPhong: Joi.object({
-    ma_can: Joi.number().required().messages({
+    ma_can: Joi.string().max(36).required().messages({
       "any.required": "Mã căn không được để trống",
     }),
     gia_thue: Joi.number().positive().required().messages({
@@ -11,28 +11,34 @@ const phongValidation = {
     }),
     trang_thai: Joi.string().valid(
       "TRONG",
-      "DA_GIU",
       "DANG_THUE",
       "DANG_XU_LY_TRA_PHONG",
+      "NGUNG_SU_DUNG",
     ),
-    mo_ta: Joi.string(),
+    so_phong: Joi.string().max(255).required(),
+    dien_tich: Joi.number().positive().required(),
+    so_nguoi_toi_da: Joi.number().integer().positive().required(),
+    noi_that_mo_ta: Joi.string().max(1000).allow("", null),
   }),
 
   updatePhong: Joi.object({
     gia_thue: Joi.number().positive(),
     trang_thai: Joi.string().valid(
       "TRONG",
-      "DA_GIU",
       "DANG_THUE",
       "DANG_XU_LY_TRA_PHONG",
+      "NGUNG_SU_DUNG",
     ),
-    mo_ta: Joi.string(),
+    so_phong: Joi.string().max(255),
+    dien_tich: Joi.number().positive(),
+    so_nguoi_toi_da: Joi.number().integer().positive(),
+    noi_that_mo_ta: Joi.string().max(1000).allow("", null),
   }),
 
   getPhong: Joi.object({
     page: Joi.number().min(1),
     limit: Joi.number().min(1),
-    ma_can: Joi.number(),
+    ma_can: Joi.string().max(36),
     trang_thai: Joi.string(),
   }),
 };

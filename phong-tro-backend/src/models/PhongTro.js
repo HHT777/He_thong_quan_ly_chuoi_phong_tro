@@ -17,6 +17,11 @@ const PhongTro = sequelize.define(
       type: DataTypes.DECIMAL(12, 2),
       allowNull: false,
     },
+    so_nguoi_toi_da: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 2,
+    },
     trang_thai: {
       type: DataTypes.ENUM(
         "TRONG",

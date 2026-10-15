@@ -36,12 +36,15 @@ class ManagementController {
       next(error);
     }
   }
+  async getCanTro(req, res, next) { try { const item = await CanTro.findByPk(req.params.id, { include: [{ model: PhongTro, as: "phongs" }] }); if (!item) throw notFound("Căn trọ không tồn tại"); res.json({ success: true, data: item }); } catch (error) { next(error); } }
 
   async updateCanTro(req, res, next) {
     try {
       const item = await CanTro.findByPk(req.params.id);
       if (!item) throw notFound("Căn trọ không tồn tại");
-      await item.update(req.body);
+      const patch = {}; for (const key of ["ten_can", "dia_chi", "mo_ta", "quy_dinh_chung", "hinh_anh_tong_quan_url", "trang_thai"]) if (req.body[key] !== undefined) patch[key] = req.body[key];
+      if (patch.trang_thai === "NGUNG_HOAT_DONG") { const occupied = await PhongTro.count({ where: { ma_can: item.ma_can, trang_thai: ["DANG_THUE", "DA_GIU", "DANG_XU_LY_TRA_PHONG"] } }); if (occupied) throw { status: 409, message: "Không thể ngừng hoạt động căn còn phòng đang thuê/giữ/xử lý trả" }; }
+      await item.update(patch);
       res.json({
         success: true,
         data: item,
@@ -71,7 +74,8 @@ class ManagementController {
 
   async listKhachThue(req, res, next) {
     try {
-      const data = await KhachThue.findAll({
+      const where = {}; if (req.query.q) { const { Op } = require("sequelize"); where[Op.or] = [{ ho_ten: { [Op.like]: `%${req.query.q}%` } }, { so_dien_thoai: { [Op.like]: `%${req.query.q}%` } }, { cccd_giay_to: { [Op.like]: `%${req.query.q}%` } }]; }
+      const data = await KhachThue.findAll({ where,
         include: [
           { model: HopDong, as: "hopDongs" },
           { model: TaiKhoan, as: "taiKhoan", attributes: ["ma_tai_khoan", "ten_dang_nhap", "vai_tro", "trang_thai", "bat_buoc_doi_mat_khau"] },
@@ -87,6 +91,7 @@ class ManagementController {
       next(error);
     }
   }
+  async getKhachThue(req, res, next) { try { const item = await KhachThue.findByPk(req.params.id, { include: [{ model: HopDong, as: "hopDongs" }, { model: TaiKhoan, as: "taiKhoan" }] }); if (!item) throw notFound("Khách thuê không tồn tại"); res.json({ success: true, data: item }); } catch (error) { next(error); } }
 
   async createKhachThue(req, res, next) {
     try {
@@ -106,7 +111,7 @@ class ManagementController {
     try {
       const item = await KhachThue.findByPk(req.params.id);
       if (!item) throw notFound("Khách thuê không tồn tại");
-      await item.update(req.body);
+      const patch = {}; for (const key of ["ho_ten", "so_dien_thoai", "cccd_giay_to"]) if (req.body[key] !== undefined) patch[key] = req.body[key]; await item.update(patch);
       res.json({
         success: true,
         data: item,
@@ -153,7 +158,7 @@ class ManagementController {
         .status(201)
         .json({
           success: true,
-          data: await KhoanChi.create(req.body),
+          data: await KhoanChi.create({ loai_khoan_chi: String(req.body.loai_khoan_chi || "").trim(), so_tien: Number(req.body.so_tien), ngay_phat_sinh: req.body.ngay_phat_sinh, pham_vi: req.body.pham_vi, ghi_chu: req.body.ghi_chu || null, ma_can: req.body.ma_can || null, trang_thai: "HIEU_LUC" }),
           message: "Tạo khoản chi thành công",
         });
     } catch (error) {
@@ -165,7 +170,7 @@ class ManagementController {
     try {
       const item = await KhoanChi.findByPk(req.params.id);
       if (!item) throw notFound("Khoản chi không tồn tại");
-      await item.update(req.body);
+      const patch = {}; for (const key of ["loai_khoan_chi", "ngay_phat_sinh", "pham_vi", "ghi_chu", "ma_can"]) if (req.body[key] !== undefined) patch[key] = req.body[key]; if (req.body.so_tien !== undefined) patch.so_tien = Number(req.body.so_tien); if (!patch.loai_khoan_chi && !item.loai_khoan_chi) throw Object.assign(new Error("Loại khoản chi là bắt buộc"), { status: 422 }); if (patch.so_tien !== undefined && (!Number.isFinite(patch.so_tien) || patch.so_tien < 0)) throw Object.assign(new Error("Số tiền không hợp lệ"), { status: 422 }); await item.update(patch);
       res.json({
         success: true,
         data: item,
@@ -180,7 +185,7 @@ class ManagementController {
     try {
       const item = await KhoanChi.findByPk(req.params.id);
       if (!item) throw notFound("Khoản chi không tồn tại");
-      await item.destroy();
+      const reason = String(req.body.reason || "").trim(); if (!reason) throw Object.assign(new Error("Lý do hủy là bắt buộc"), { status: 422 }); await item.update({ trang_thai: "DA_HUY", ly_do_huy: reason, ngay_huy: new Date(), nguoi_huy_id: req.user.ma_tai_khoan });
       res.json({
         success: true,
         data: null,

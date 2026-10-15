@@ -2,9 +2,9 @@ const { PhongTro, CanTro } = require("../models");
 const { Op } = require("sequelize");
 
 class PhongService {
-  async createPhong(data) {
+  async createPhong(data, transaction = null) {
     // Check if can exists
-    const canTro = await CanTro.findByPk(data.ma_can);
+    const canTro = await CanTro.findByPk(data.ma_can, { transaction });
     if (!canTro) {
       throw {
         status: 404,
@@ -14,10 +14,13 @@ class PhongService {
 
     const phong = await PhongTro.create({
       ma_can: data.ma_can,
+      so_phong: data.so_phong,
+      dien_tich: data.dien_tich,
       gia_thue: data.gia_thue,
+      so_nguoi_toi_da: data.so_nguoi_toi_da,
       trang_thai: data.trang_thai || "TRONG",
-      mo_ta: data.mo_ta,
-    });
+      noi_that_mo_ta: data.noi_that_mo_ta || null,
+    }, { transaction });
 
     return phong;
   }

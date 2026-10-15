@@ -16,6 +16,7 @@ router.post(
   authorize("canTro.write"),
   controller.createCanTro.bind(controller),
 );
+router.get("/can-tro/:id", authorize("canTro.read"), controller.getCanTro.bind(controller));
 router.put(
   "/can-tro/:id",
   authorize("canTro.write"),
@@ -37,6 +38,7 @@ router.post(
   authorize("khachThue.write"),
   controller.createKhachThue.bind(controller),
 );
+router.get("/khach-thue/:id", authorize("khachThue.read"), controller.getKhachThue.bind(controller));
 router.put(
   "/khach-thue/:id",
   authorize("khachThue.write"),
