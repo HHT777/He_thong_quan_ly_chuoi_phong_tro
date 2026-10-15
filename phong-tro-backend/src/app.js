@@ -14,6 +14,9 @@ const datCocRoutes = require("./routes/datCoc.routes");
 const khoanPhaiThuRoutes = require("./routes/khoanPhaiThu.routes");
 const managementRoutes = require("./routes/management.routes");
 const tenantRoutes = require("./routes/tenant.routes");
+const meterReadingRoutes = require("./routes/meterReading.routes");
+const mvpRoutes = require("./routes/mvp.routes");
+const { installApiResponse } = require("./utils/apiResponse");
 const app = express();
 
 // Middleware
@@ -21,6 +24,7 @@ app.use(cors());
 app.use(morgan("combined"));
 app.use(express.json());
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(installApiResponse);
 
 // Health check
 app.get("/health", (req, res) => {
@@ -45,6 +49,8 @@ app.use("/api/management", managementRoutes);
 // Short resource aliases kept for API consumers and documentation.
 app.use("/api", managementRoutes);
 app.use("/api", tenantRoutes);
+app.use("/api/v1", meterReadingRoutes);
+app.use("/api/v1", mvpRoutes);
 
 // 404 handler
 app.use((req, res) => {
