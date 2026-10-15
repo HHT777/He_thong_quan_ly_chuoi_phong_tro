@@ -81,15 +81,31 @@ class ThanhToanService {
   }
   getPaymentsByBill(id) { return GiaoDichThanhToan.findAll({ where: { ma_thanh_toan: id }, order: [["thoi_diem_ghi_nhan", "DESC"]] }); }
   async getTotalPaidForBill(id) { return Number(await GiaoDichThanhToan.sum("so_tien", { where: { ma_thanh_toan: id, trang_thai_xac_nhan: "DA_XAC_NHAN" } }) || 0); }
-  getPaymentStats(startDate, endDate) {
-    return GiaoDichThanhToan.findOne({
+  async getPaymentStats(startDate, endDate) {
+    const rows = await GiaoDichThanhToan.findAll({
       where: { thoi_diem_ghi_nhan: { [Op.between]: [startDate, endDate] }, trang_thai_xac_nhan: "DA_XAC_NHAN" },
       attributes: [
+        "nguon_thanh_toan",
         [fn("COALESCE", fn("SUM", col("GiaoDichThanhToan.soTien")), 0), "total_amount"],
         [fn("COUNT", col("GiaoDichThanhToan.maGiaoDich")), "count"],
       ],
+      group: ["nguon_thanh_toan"],
       raw: true,
     });
+    const bySource = Object.fromEntries(rows.map((row) => [row.nguon_thanh_toan, {
+      amount: Number(row.total_amount),
+      count: Number(row.count),
+    }]));
+    const cash = bySource.THU_TIEN || { amount: 0, count: 0 };
+    const deposit = bySource.KHAU_TRU_COC || { amount: 0, count: 0 };
+    return {
+      total_amount: cash.amount + deposit.amount,
+      count: cash.count + deposit.count,
+      cash_collected: cash.amount,
+      cash_count: cash.count,
+      deposit_offset: deposit.amount,
+      deposit_offset_count: deposit.count,
+    };
   }
 }
 module.exports = new ThanhToanService();
