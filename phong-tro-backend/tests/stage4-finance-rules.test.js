@@ -5,6 +5,7 @@ const reportService = require("../src/services/cashflowReport.service");
 const adjustmentService = require("../src/services/billAdjustment.service");
 const meterReadingService = require("../src/services/meterReading.service");
 const billGenerationService = require("../src/services/billGeneration.service");
+const { sumSignedLineAmounts, assertBillDetailTotal } = require("../src/utils/billLine.util");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -26,17 +27,21 @@ test("CT-006 rejects malformed or reversed report periods", () => {
   assert.throws(() => reportService.buildWhere({ from: "2026-10-02", to: "2026-10-01" }), (error) => error.code === "INVALID_REPORT_PERIOD");
 });
 
-test("CT-007 negative adjustments reduce existing non-negative details", () => {
-  const details = [{ so_tien: 100 }, { so_tien: 50 }];
-  const changes = adjustmentService.planReductions(details, 120);
-  assert.deepEqual(changes.map((change) => change.amount), [0, 30]);
-  assert.equal(changes.reduce((sum, change, index) => sum + (Number(details[index].so_tien) - change.amount), 0), 120);
+test("CT-007 signed bill lines preserve the algebraic detail-total invariant", () => {
+  const details = [
+    { loai_khoan: "TIEN_PHONG", so_tien: 100 },
+    { loai_khoan: "PHI_PHAT_SINH", so_tien: 50 },
+    { loai_khoan: "GIAM_TRU", so_tien: -30 },
+  ];
+  assert.equal(sumSignedLineAmounts(details), 120);
+  assert.equal(assertBillDetailTotal(details, 120), 120);
 });
 
 test("CT-007 only permits canonical bill line domains", () => {
-  assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("PHAT_SINH"), true);
+  assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("PHAT_SINH"), false);
+  assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("PHI_PHAT_SINH"), true);
   assert.equal(adjustmentService.ALLOWED_LINE_TYPES.has("DIEU_CHINH"), false);
-  assert.throws(() => adjustmentService.planReductions([{ so_tien: 10 }], 11), (error) => error.code === "BILL_DETAIL_TOTAL_MISMATCH");
+  assert.throws(() => sumSignedLineAmounts([{ loai_khoan: "GIAM_TRU", so_tien: 10 }]), (error) => error.code === "INVALID_BILL_LINE_SIGN");
 });
 
 test("CT-011 first electricity period requires an explicit prior reading", () => {
@@ -59,5 +64,7 @@ test("CT-012 bill generation ignores client-provided monetary overrides", () => 
   const generationRoute = route.slice(route.indexOf('router.post("/bills/generate"'), route.indexOf('router.get("/debt"'));
   assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan\)/);
   assert.doesNotMatch(generationRoute, /waterAmount|serviceFee/);
-  assert.equal(billGenerationService.SERVICE_FEE_DECISION.code, "SERVICE_FEE_SCHEMA_MISSING");
+  const service = fs.readFileSync(path.resolve(__dirname, "../src/services/billGeneration.service.js"), "utf8");
+  assert.match(service, /contract\.phi_dich_vu/);
+  assert.doesNotMatch(service, /SERVICE_FEE_SCHEMA_MISSING/);
 });

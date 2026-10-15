@@ -61,7 +61,7 @@ test("FR-096/187/188 settlement context, detailed deductions, debt offset and pa
   const incident = await SuCo.create({ loai_su_co: "HONG_THIET_BI", muc_do_uu_tien: "THAP", mo_ta: "Hỏng khóa", trang_thai: "DANG_XU_LY", ma_nguoi_gui: actor.ma_tai_khoan, ma_phong: fresh.room.ma_phong });
   const incidentCharge = await ChiPhiSuCoKhachThue.create({ ma_su_co: incident.ma_su_co, ma_hop_dong: fresh.contract.ma_hop_dong, so_tien: 40000, can_cu_trach_nhiem: "Khách làm hỏng" });
   const oldBill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, thang: 9, nam: 2026, loai_thanh_toan: "DINH_KY", tong_phai_tra: 50000, tong_da_thanh_toan: 0, so_tien_con_no: 50000, trang_thai: "CHUA_THANH_TOAN" });
-  await ChiTietThanhToan.create({ ma_thanh_toan: oldBill.ma_thanh_toan, loai_khoan: "KHAC", so_tien: 50000, dien_giai: "Nợ cũ" });
+  await ChiTietThanhToan.create({ ma_thanh_toan: oldBill.ma_thanh_toan, loai_khoan: "PHI_PHAT_SINH", so_tien: 50000, dien_giai: "Nợ cũ" });
 
   const settled = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {
     method: "POST", headers: headers(landlord), body: JSON.stringify(baseSettlement({

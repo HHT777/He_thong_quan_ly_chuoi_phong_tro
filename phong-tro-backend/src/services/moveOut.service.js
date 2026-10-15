@@ -5,6 +5,8 @@ const { TaiKhoan, KhachThue, HopDong, PhongTro, TaiSan, ChiSoDien, ThanhToan, Ch
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
 const contractLifecycle = require("./contractLifecycle.service");
+const { countBillableOccupants, calculateWaterCharge } = require("./occupancy.service");
+const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -33,9 +35,9 @@ async function getContext(contractId) {
     ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 } } }),
     ChiPhiSuCoKhachThue.findAll({ where: { ma_hop_dong: contractId, trang_thai: "CHO_KHAU_TRU" } }),
     ViPhamHopDong.findAll({ where: { ma_hop_dong: contractId } }), approvedRequest(contractId),
-    ThanhVienPhong.count({ where: { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" } }),
+    countBillableOccupants(contractId),
   ]);
-  return { tenant: contract.khachThue, room: contract.phongTro, contract, deposit, latestElectricityReading: reading, assets, outstandingBills: debts, outstandingDebt: debts.reduce((s, r) => s + Number(r.so_tien_con_no), 0), pendingIncidentCharges: incidents, violations, approvedMoveOutDate: request?.ngay_tra_da_duyet || null, occupantCount: Math.max(1, occupants) };
+  return { tenant: contract.khachThue, room: contract.phongTro, contract, deposit, latestElectricityReading: reading, assets, outstandingBills: debts, outstandingDebt: debts.reduce((s, r) => s + Number(r.so_tien_con_no), 0), pendingIncidentCharges: incidents, violations, approvedMoveOutDate: request?.ngay_tra_da_duyet || null, occupantCount: occupants };
 }
 async function settle(contractId, payload, actorId) {
   const other = validateChecklist(payload);
@@ -56,10 +58,10 @@ async function settle(contractId, payload, actorId) {
     await ChiSoDien.create({ ma_phong: contract.ma_phong, nam: period.year, thang: period.month, loai_chi_so: "CHOT_TRA_PHONG", khoa_nghiep_vu: contractId, chi_so_moi: finalValue, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", ngay_ghi_nhan: new Date(`${settlementDate}T23:59:00Z`), nguoi_ghi_nhan_id: actorId, nguoi_xac_nhan_id: actorId, ngay_xac_nhan: new Date(), da_xoa: false }, { transaction });
     const deposit = await TienCoc.findOne({ where: { ma_hop_dong: contractId }, transaction, lock: transaction.LOCK.UPDATE });
     if (!deposit || deposit.trang_thai === "CHUA_NHAN") throw fail(422, "Chưa nhận cọc", "DEPOSIT_NOT_RECEIVED");
-    const occupants = Math.max(1, await ThanhVienPhong.count({ where: { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" }, transaction }));
-    const water = money(Number(contract.don_gia_nuoc) * occupants * period.ratio);
+    const occupants = await countBillableOccupants(contractId, { transaction });
+    const water = calculateWaterCharge(contract.don_gia_nuoc, occupants, period.ratio);
     const currentBill = await ThanhToan.findOne({ where: { ma_hop_dong: contractId, nam: period.year, thang: period.month, loai_thanh_toan: "DINH_KY" }, include: [{ model: ChiTietThanhToan, as: "chiTiets" }], transaction, lock: transaction.LOCK.UPDATE });
-    const prepaid = currentBill?.trang_thai === "DA_THANH_TOAN" && currentBill.chiTiets.some((x) => x.loai_khoan === "TIEN_PHONG");
+    const prepaid = currentBill?.trang_thai === "DA_THANH_TOAN" && currentBill.chiTiets.some((x) => x.loai_khoan === BILL_LINE_TYPES.RENT);
     const prepaidRefund = prepaid ? money(Number(contract.gia_thue) * (1 - period.ratio)) : 0;
     const rent = prepaid ? 0 : money(Number(contract.gia_thue) * period.ratio);
     const debts = await ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, transaction, lock: transaction.LOCK.UPDATE });
@@ -89,7 +91,7 @@ async function settle(contractId, payload, actorId) {
     for (const x of incidents) await x.update({ trang_thai: "DA_KHAU_TRU", ngay_khau_tru: new Date() }, { transaction });
     let offset = Math.min(depositAmount, debtTotal);
     for (const bill of debts) { const paid = Math.min(offset, Number(bill.so_tien_con_no)); if (paid <= 0) break; await GiaoDichThanhToan.create({ ma_giao_dich: crypto.randomUUID(), ma_thanh_toan: bill.ma_thanh_toan, so_tien: paid, nguon_thanh_toan: "KHAU_TRU_COC", thoi_diem_ghi_nhan: new Date(), trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date() }, { transaction }); await billService.updateBillStatus(bill.ma_thanh_toan, transaction); offset -= paid; }
-    if (postDebt > 0) { const bill = await ThanhToan.create({ ma_hop_dong: contractId, thang: period.month, nam: period.year, loai_thanh_toan: "SAU_THANH_LY", ma_bien_ban_tra_phong: report.ma_bien_ban, tong_phai_tra: postDebt, tong_da_thanh_toan: 0, so_tien_con_no: postDebt, trang_thai: "CHUA_THANH_TOAN" }, { transaction }); await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: "NO_SAU_THANH_LY", so_tien: postDebt, dien_giai: "Nợ sau thanh lý" }, { transaction }); }
+    if (postDebt > 0) { const bill = await ThanhToan.create({ ma_hop_dong: contractId, thang: period.month, nam: period.year, loai_thanh_toan: "SAU_THANH_LY", ma_bien_ban_tra_phong: report.ma_bien_ban, tong_phai_tra: postDebt, tong_da_thanh_toan: 0, so_tien_con_no: postDebt, trang_thai: "CHUA_THANH_TOAN" }, { transaction }); await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: BILL_LINE_TYPES.POST_LIQUIDATION_DEBT, so_tien: postDebt, dien_giai: "Nợ sau thanh lý", nguoi_thuc_hien_id: actorId }, { transaction }); }
     await deposit.update({ so_tien_da_khau_tru: Math.min(depositAmount, totalDeduction), trang_thai: totalDeduction >= depositAmount ? "DA_KHAU_TRU_TOAN_BO" : totalDeduction > 0 ? "DA_KHAU_TRU_MOT_PHAN" : "DA_NHAN" }, { transaction });
     await ThanhVienPhong.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: settlementDate }, { where: { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" }, transaction });
     const before = contract.get({ plain: true }); await contract.update({ trang_thai: "DA_THANH_LY", ngay_thanh_ly: settlementDate }, { transaction });

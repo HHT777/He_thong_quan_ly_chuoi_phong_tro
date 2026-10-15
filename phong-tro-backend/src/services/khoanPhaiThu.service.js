@@ -2,6 +2,8 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { ThanhToan, ChiTietThanhToan, GiaoDichThanhToan, HopDong, PhongTro, KhachThue } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
+const { BILL_LINE_TYPES } = require("../domain/billing.constants");
+const { sumSignedLineAmounts } = require("../utils/billLine.util");
 
 function splitPeriod(period) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || "");
@@ -23,16 +25,22 @@ class KhoanPhaiThuService {
         : await HopDong.findOne({ where: { ma_phong: data.ma_phong, ma_khach_thue: data.ma_khach_thue, trang_thai: { [Op.ne]: "DA_THANH_LY" } }, transaction, lock: transaction.LOCK.UPDATE });
       if (!contract) throw { status: 404, message: "Không tìm thấy hợp đồng phù hợp" };
       if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
-      const positiveComponents = [
-        ["TIEN_PHONG", data.tien_phong, "Tiền phòng"], ["TIEN_DIEN", data.tien_dien, "Tiền điện"],
-        ["TIEN_NUOC", data.tien_nuoc, "Tiền nước"], ["PHI_DICH_VU", data.phi_dich_vu, "Phí dịch vụ"],
-        ["PHI_PHAT_SINH", data.phi_phat_sinh, "Phí phát sinh"],
-      ].filter(([, value]) => Number(value) > 0);
-      const calculated = positiveComponents.reduce((sum, [, value]) => sum + Number(value), 0) - Math.abs(Number(data.khoan_giam_tru || 0));
+      const lines = [
+        { type: BILL_LINE_TYPES.RENT, amount: Number(data.tien_phong), description: "Tiền phòng" },
+        { type: BILL_LINE_TYPES.ELECTRICITY, amount: Number(data.tien_dien), description: "Tiền điện" },
+        { type: BILL_LINE_TYPES.WATER, amount: Number(data.tien_nuoc), description: "Tiền nước" },
+        { type: BILL_LINE_TYPES.SERVICE_FEE, amount: Number(data.phi_dich_vu), description: "Phí dịch vụ" },
+        { type: BILL_LINE_TYPES.INCIDENTAL_FEE, amount: Number(data.phi_phat_sinh), description: "Phí phát sinh" },
+      ].filter(({ amount }) => amount > 0);
+      const gross = sumSignedLineAmounts(lines);
+      const requestedDiscount = Math.abs(Number(data.khoan_giam_tru || 0));
+      const discount = Math.min(Number.isFinite(requestedDiscount) ? requestedDiscount : 0, gross);
+      if (discount > 0) lines.push({ type: BILL_LINE_TYPES.DISCOUNT, amount: -discount, description: "Giảm trừ" });
+      const calculated = sumSignedLineAmounts(lines);
       const total = data.tong_phai_thanh_toan === undefined ? calculated : Number(data.tong_phai_thanh_toan);
       if (!Number.isFinite(total) || total < 0 || Math.abs(total - calculated) > 0.001) throw { status: 422, message: "Tổng phải trả không khớp tổng chi tiết", details: { calculated } };
       const bill = await ThanhToan.create({ ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY", tong_phai_tra: total, tong_da_thanh_toan: 0, so_tien_con_no: total, trang_thai: "CHUA_THANH_TOAN" }, { transaction });
-      for (const [type, amount, description] of positiveComponents) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: type, so_tien: amount, dien_giai: description }, { transaction });
+      for (const line of lines) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: line.type, so_tien: line.amount, dien_giai: line.description, nguoi_thuc_hien_id: actorId || null }, { transaction });
       if (actorId) await writeAuditLog({ transaction, actorId, action: "BILL_CREATED", entityType: "ThanhToan", entityId: bill.ma_thanh_toan, after: { period: data.ky, total } });
       return bill;
     });
