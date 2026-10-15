@@ -1,11 +1,14 @@
 -- P2/FR-183: immutable history and soft deletion for UUID meter readings.
 -- Rollback is manual after exporting meter history.
 SET @schema_name = DATABASE();
-ALTER TABLE `ChiSoDien`
-  ADD COLUMN IF NOT EXISTS `daXoa` boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS `lyDoXoa` varchar(1000) NULL,
-  ADD COLUMN IF NOT EXISTS `ngayXoa` timestamp NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `nguoiXoaId` varchar(36) NULL;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='daXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `daXoa` boolean NOT NULL DEFAULT false');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='lyDoXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `lyDoXoa` varchar(1000) NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='ngayXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `ngayXoa` timestamp NULL DEFAULT NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='nguoiXoaId'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `nguoiXoaId` varchar(36) NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='ChiSoDien' AND constraint_name='fk_ChiSoDien_nguoiXoaId'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD CONSTRAINT `fk_ChiSoDien_nguoiXoaId` FOREIGN KEY (`nguoiXoaId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND index_name='ix_ChiSoDien_2'), 'SELECT 1', 'CREATE INDEX `ix_ChiSoDien_2` ON `ChiSoDien` (`maPhong`, `daXoa`, `nam`, `thang`)');

@@ -3,21 +3,26 @@
 -- Rollback is manual because lifecycle/audit data must be exported before dropping columns/tables.
 SET @schema_name = DATABASE();
 
-ALTER TABLE `YeuCau`
-  ADD COLUMN IF NOT EXISTS `lyDoXuLy` varchar(1000) NULL,
-  ADD COLUMN IF NOT EXISTS `ngayDuyet` timestamp NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `ngayRutDuyet` timestamp NULL DEFAULT NULL,
-  ADD COLUMN IF NOT EXISTS `nguoiXuLyId` varchar(36) NULL;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='lyDoXuLy'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `lyDoXuLy` varchar(1000) NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='ngayDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `ngayDuyet` timestamp NULL DEFAULT NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='ngayRutDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `ngayRutDuyet` timestamp NULL DEFAULT NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `nguoiXuLyId` varchar(36) NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='fk_YeuCau_nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD CONSTRAINT `fk_YeuCau_nguoiXuLyId` FOREIGN KEY (`nguoiXuLyId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='ck_YeuCau_2'), 'ALTER TABLE `YeuCau` DROP CONSTRAINT `ck_YeuCau_2`', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 ALTER TABLE `YeuCau` ADD CONSTRAINT `ck_YeuCau_2` CHECK (`trangThai` IN ('CHO_XU_LY', 'DA_PHE_DUYET', 'TU_CHOI', 'DA_RUT'));
 
-ALTER TABLE `YeuCauTraPhong`
-  ADD COLUMN IF NOT EXISTS `ngayTraDuKien` date NULL,
-  ADD COLUMN IF NOT EXISTS `ngayTraDaDuyet` date NULL,
-  ADD COLUMN IF NOT EXISTS `lyDoTraSom` varchar(1000) NULL;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='ngayTraDuKien'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `ngayTraDuKien` date NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='ngayTraDaDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `ngayTraDaDuyet` date NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='lyDoTraSom'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `lyDoTraSom` varchar(1000) NULL');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `ChiPhiSuCoKhachThue` (
   `maChiPhiSuCo` varchar(36) NOT NULL,
