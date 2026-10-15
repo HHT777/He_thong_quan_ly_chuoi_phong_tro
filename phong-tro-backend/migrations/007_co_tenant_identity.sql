@@ -1,0 +1,7 @@
+-- P2/FR-166..178: mandatory identity information is required for new proposals.
+-- Rollback is manual after exporting identity/history data.
+SET @schema_name = DATABASE();
+ALTER TABLE `ThanhVienPhong` ADD COLUMN IF NOT EXISTS `soGiayTo` varchar(50) NULL, ADD COLUMN IF NOT EXISTS `ngaySinh` date NULL, ADD COLUMN IF NOT EXISTS `gioiTinh` varchar(20) NULL, ADD COLUMN IF NOT EXISTS `diaChiThuongTru` varchar(255) NULL, ADD COLUMN IF NOT EXISTS `quanHe` varchar(80) NULL;
+ALTER TABLE `DeXuatBanCungPhong` ADD COLUMN IF NOT EXISTS `soGiayTo` varchar(50) NULL, ADD COLUMN IF NOT EXISTS `ngaySinh` date NULL, ADD COLUMN IF NOT EXISTS `gioiTinh` varchar(20) NULL, ADD COLUMN IF NOT EXISTS `diaChiThuongTru` varchar(255) NULL, ADD COLUMN IF NOT EXISTS `quanHe` varchar(80) NULL, ADD COLUMN IF NOT EXISTS `ngayBatDauO` date NULL, ADD COLUMN IF NOT EXISTS `lyDoTuChoi` varchar(1000) NULL, ADD COLUMN IF NOT EXISTS `nguoiXuLyId` varchar(36) NULL, ADD COLUMN IF NOT EXISTS `ngayXuLy` timestamp NULL DEFAULT NULL;
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='DeXuatBanCungPhong' AND constraint_name='fk_DeXuatBanCungPhong_nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `DeXuatBanCungPhong` ADD CONSTRAINT `fk_DeXuatBanCungPhong_nguoiXuLyId` FOREIGN KEY (`nguoiXuLyId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
