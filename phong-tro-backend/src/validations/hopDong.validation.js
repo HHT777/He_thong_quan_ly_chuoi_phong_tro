@@ -9,6 +9,7 @@ const hopDongValidation = {
     gia_thue: Joi.number().positive().required(),
     tien_coc: Joi.number().min(0).required(),
     don_gia_dien: Joi.number().min(0).required(),
+    chi_so_dien_ban_dau: Joi.number().integer().min(0).required(),
     don_gia_nuoc: Joi.number().min(0).required(),
     dieu_khoan: Joi.string().max(255).required(),
     da_co_ban_giay_ky: Joi.boolean().valid(true).required(),

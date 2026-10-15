@@ -12,6 +12,7 @@ const validContract = {
   gia_thue: 2500000,
   tien_coc: 2500000,
   don_gia_dien: 3500,
+  chi_so_dien_ban_dau: 0,
   don_gia_nuoc: 100000,
   dieu_khoan: "Hop dong test",
 };
@@ -29,4 +30,5 @@ test("contract client sends the signed-paper confirmation as a boolean", () => {
   );
   assert.match(source, /name:\s*"da_co_ban_giay_ky"[\s\S]*type:\s*"checkbox"/);
   assert.match(source, /da_co_ban_giay_ky:\s*raw\.da_co_ban_giay_ky\s*===\s*"true"/);
+  assert.match(source, /chi_so_dien_ban_dau:\s*Number\(raw\.chi_so_dien_ban_dau\)/);
 });

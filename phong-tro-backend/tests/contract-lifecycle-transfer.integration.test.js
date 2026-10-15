@@ -1,8 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  HopDong, PhongTro, ChiSoDien, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan, YeuCau,
+  HopDong, PhongTro, ChiSoDien, TienCoc, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan, YeuCau,
 } = require("../src/models");
+const hopDongService = require("../src/services/hopDong.service");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
 async function createTargetRoom(landlord, label) {
@@ -57,6 +58,33 @@ test("FR-108 rejects renewal approval unless the contract is SAP_HET_HAN", async
   ]);
   assert.equal(contract.ngay_ket_thuc, "2027-09-30");
   assert.equal(pending.trang_thai, "CHO_XU_LY");
+});
+
+test("FR-183 creates the initial meter reading atomically with the contract", async () => {
+  const landlordToken = await login(integration.landlord);
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  const base = await createBaseRental(landlordToken, "initial-meter");
+  const contract = await hopDongService.createHopDong({
+    ma_khach_thue: base.tenant.ma_khach_thue, ma_phong: base.room.ma_phong,
+    ngay_bat_dau: "2026-10-15", ngay_ket_thuc: "2027-10-14", gia_thue: 2500000,
+    tien_coc: 2500000, ngay_nhan_coc: "2026-10-15", don_gia_dien: 3500,
+    don_gia_nuoc: 100000, dieu_khoan: "FR-183", da_co_ban_giay_ky: true,
+    chi_so_dien_ban_dau: 321,
+  }, actor.ma_tai_khoan);
+  const reading = await ChiSoDien.findOne({ where: { ma_phong: base.room.ma_phong, loai_chi_so: "DAU_HOP_DONG" } });
+  assert.equal(reading.khoa_nghiep_vu, contract.ma_hop_dong);
+  assert.equal(Number(reading.chi_so_moi), 321);
+
+  const rollbackBase = await createBaseRental(landlordToken, "initial-meter-rollback");
+  await assert.rejects(() => hopDongService.createHopDong({
+    ma_khach_thue: rollbackBase.tenant.ma_khach_thue, ma_phong: rollbackBase.room.ma_phong,
+    ngay_bat_dau: "2026-10-15", ngay_ket_thuc: "2027-10-14", gia_thue: 2500000,
+    tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000,
+    dieu_khoan: "rollback", da_co_ban_giay_ky: true, chi_so_dien_ban_dau: 10,
+  }, "00000000-0000-0000-0000-000000000000"));
+  assert.equal(await HopDong.count({ where: { ma_phong: rollbackBase.room.ma_phong } }), 0);
+  assert.equal(await TienCoc.count({ include: [{ model: HopDong, as: "hopDong", where: { ma_phong: rollbackBase.room.ma_phong } }] }), 0);
+  assert.equal((await PhongTro.findByPk(rollbackBase.room.ma_phong)).trang_thai, "TRONG");
 });
 
 test("FR-195 transfers a contract and all dependent state atomically", async () => {

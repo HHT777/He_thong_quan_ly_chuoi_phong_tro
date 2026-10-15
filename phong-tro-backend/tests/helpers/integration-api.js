@@ -59,7 +59,7 @@ async function createFreshRental(landlordToken, label = "integration", { createA
     body: JSON.stringify({
       ma_khach_thue: fresh.tenant.ma_khach_thue, ma_phong: fresh.room.ma_phong,
       ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30",
-      gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000,
+      gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000, chi_so_dien_ban_dau: 0,
       dieu_khoan: "Integration test contract", ngay_nhan_coc: "2026-10-01",
       da_co_ban_giay_ky: true,
     }),

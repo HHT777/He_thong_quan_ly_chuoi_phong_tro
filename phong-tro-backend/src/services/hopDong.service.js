@@ -3,6 +3,7 @@ const {
   KhachThue,
   PhongTro,
   TienCoc,
+  ChiSoDien,
   ThongBao,
   TaiKhoan,
 } = require("../models");
@@ -49,8 +50,24 @@ class HopDongService {
     }
 
     // Create contract
-    const { tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, ...contractData } = data;
+    const { tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, chi_so_dien_ban_dau: initialElectricityReading, ...contractData } = data;
     const hopDong = await HopDong.create({ ...contractData, trang_thai: "DANG_HIEU_LUC" }, { transaction });
+    const start = new Date(`${hopDong.ngay_bat_dau}T00:00:00Z`);
+    await ChiSoDien.create({
+      ma_phong: hopDong.ma_phong,
+      nam: start.getUTCFullYear(),
+      thang: start.getUTCMonth() + 1,
+      loai_chi_so: "DAU_HOP_DONG",
+      khoa_nghiep_vu: hopDong.ma_hop_dong,
+      chi_so_moi: initialElectricityReading,
+      don_gia_ap_dung: hopDong.don_gia_dien,
+      trang_thai_xac_nhan: "DA_XAC_NHAN",
+      ngay_ghi_nhan: start,
+      nguoi_ghi_nhan_id: actorId,
+      nguoi_xac_nhan_id: actorId,
+      ngay_xac_nhan: new Date(),
+      da_xoa: false,
+    }, { transaction });
     await TienCoc.create({
       ma_hop_dong: hopDong.ma_hop_dong,
       so_tien_coc: tienCoc,

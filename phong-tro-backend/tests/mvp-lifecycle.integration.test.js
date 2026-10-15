@@ -15,7 +15,7 @@ test("UC-02..07 real lifecycle: account, building, room, tenant, deposit and con
     body: JSON.stringify({
       ma_khach_thue: "missing-tenant", ma_phong: invalidBase.room.ma_phong,
       ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30",
-      gia_thue: 1, tien_coc: 1, don_gia_dien: 1, don_gia_nuoc: 1,
+      gia_thue: 1, tien_coc: 1, don_gia_dien: 1, don_gia_nuoc: 1, chi_so_dien_ban_dau: 0,
       dieu_khoan: "Invalid tenant rollback",
       da_co_ban_giay_ky: true,
     }),
@@ -32,7 +32,7 @@ test("UC-26 contract race allows only one active rental", async () => {
   const payload = {
     ma_khach_thue: fresh.tenant.ma_khach_thue, ma_phong: fresh.room.ma_phong,
     ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30",
-    gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000,
+    gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000, chi_so_dien_ban_dau: 0,
     dieu_khoan: "Concurrent contract test",
     da_co_ban_giay_ky: true,
   };
