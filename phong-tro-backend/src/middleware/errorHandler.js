@@ -2,6 +2,15 @@
 const errorHandler = (err, req, res, next) => {
   console.error("Error:", err);
 
+  if (typeof res.apiError === "function" && req.path.startsWith("/api/v1/")) {
+    return res.apiError(
+      err.status || 500,
+      err.code || "INTERNAL_ERROR",
+      err.message || "Lỗi máy chủ nội bộ",
+      err.details || null,
+    );
+  }
+
   // Joi validation error
   if (err.isJoi) {
     return res.status(400).json({

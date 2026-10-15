@@ -4,8 +4,8 @@ API backend cho hệ thống quản lý chuỗi phòng trọ
 
 ## Yêu cầu
 
-- Node.js >= 14.0.0
-- MySQL >= 5.7
+- Node.js >= 20.0.0
+- MySQL >= 8.0.16
 - npm >= 6.0.0
 
 ## Cài đặt
@@ -27,19 +27,19 @@ cp .env.example .env
 ```env
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=ql_phong_tro
+DB_NAME=phong_tro
 DB_USER=root
 DB_PASSWORD=
 PORT=3001
 NODE_ENV=development
-JWT_SECRET=phong_tro_secret_key_2026
+JWT_SECRET=replace_with_a_long_random_secret
 ```
 
-### 3. Tạo database
+### 3. Database
 
-```sql
-CREATE DATABASE ql_phong_tro CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+Backend dùng schema 25 bảng trong `../data2.md` và từ điển dữ liệu
+`../data1.md`. Cấu hình `DB_NAME=phong_tro` trỏ tới database đã import schema
+này. Không bật Sequelize auto-sync để tránh tự ý đổi cấu trúc.
 
 ## Chạy Server
 
@@ -56,6 +56,12 @@ npm start
 ```
 
 Server sẽ chạy trên http://localhost:3001
+
+### MVP versioned API and OCR
+
+Keep `DB_SYNC=false`. Configure `OCR_BASE_URL` in `.env` for the internal
+FastAPI OCR service. The UC-09/UC-10 endpoints are under `/api/v1`; liveness is
+`GET /health` and database readiness is `GET /ready`.
 
 ## API Endpoints
 
@@ -137,20 +143,19 @@ Các lỗi validation và database sẽ trả về với status code phù hợp:
 
 ## Database Schema
 
-Các bảng chính:
+Backend ánh xạ đúng 25 bảng PascalCase/camelCase trong `data2.md`. Một số bảng
+nghiệp vụ chính:
 
-- `khach_thue` - Khách thuê
-- `tai_khoan` - Tài khoản đăng nhập
-- `can_tro` - Căn trọ
-- `phong_tro` - Phòng trọ
-- `hop_dong` - Hợp đồng
-- `dat_coc` - Đặt cọc / Giữ phòng
-- `dien_nuoc` - Tiêu thụ điện nước
-- `khoan_phai_thu` - Khoản phải thu (hóa đơn)
-- `thanh_toan` - Thanh toán
-- `chi_phi` - Chi phí
-- `tra_phong` - Trả phòng
-- `thong_bao` - Thông báo
+- `TaiKhoan`, `ChuTro`, `KhachThue`
+- `CanTro`, `PhongTro`, `TaiSan`
+- `HopDong`, `TienCoc`, `ThanhVienPhong`, `ViPhamHopDong`
+- `ChiSoDien`
+- `ThanhToan` (nghĩa vụ theo kỳ), `ChiTietThanhToan`,
+  `GiaoDichThanhToan` (từng lần thu)
+- `YeuCau` cùng ba bảng subtype
+- `SuCo`, `SuCoTaiSan`
+- `KhoanThu`, `KhoanChi`
+- `BienBanTraPhong`, `KhoanKhauTru`, `ThongBao`
 
 ## Business Rules Implemented
 

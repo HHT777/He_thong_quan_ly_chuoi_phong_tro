@@ -6,14 +6,22 @@ const { initCronJobs } = require("./jobs/cron.jobs");
 const PORT = process.env.PORT || 3001;
 
 // Sync database only when explicitly requested, then start server
-const databaseSync =
-  process.env.DB_SYNC === "true"
-    ? sequelize.sync({ alter: process.env.DB_SYNC_ALTER === "true" })
-    : Promise.resolve();
+const databaseSync = sequelize
+  .authenticate()
+  .then(() => console.log("✓ Database connected successfully"))
+  .then(() =>
+    process.env.DB_SYNC === "true"
+      ? sequelize.sync({ alter: process.env.DB_SYNC_ALTER === "true" })
+      : undefined,
+  );
 
 databaseSync
   .then(() => {
-    console.log("✓ Database synced");
+    console.log(
+      process.env.DB_SYNC === "true"
+        ? "✓ Database schema synced"
+        : "✓ Database schema sync skipped (DB_SYNC is disabled)",
+    );
 
     // Initialize cron jobs
     initCronJobs();
