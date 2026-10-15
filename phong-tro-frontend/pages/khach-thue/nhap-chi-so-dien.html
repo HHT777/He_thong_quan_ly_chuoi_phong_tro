@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nhập chỉ số điện · TroHub</title>
+    <title>Nhập chỉ số điện · ISK19</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -39,7 +39,7 @@
             </div>
             <div class="page-hero__actions">
               <button class="btn btn--ghost" type="button">Xem lịch sử</button>
-              <button class="btn btn--primary" type="button">Lưu chỉ số</button>
+              <button id="submit-reading" class="btn btn--primary" type="button">Gửi chờ xác nhận</button>
             </div>
           </section>
 
@@ -53,27 +53,21 @@
               </div>
               <div class="form-grid">
                 <div class="field">
-                  <label>Chỉ số điện cũ</label><input value="180" />
+                  <label>Chỉ số điện cũ</label><input id="previous-reading" value="0" readonly />
                 </div>
                 <div class="field">
-                  <label>Chỉ số điện mới</label><input value="210" />
+                  <label>Chỉ số điện mới</label><input id="reading-value" type="number" min="0" required />
                 </div>
                 <div class="field">
-                  <label>Chỉ số nước cũ</label><input value="12" />
-                </div>
-                <div class="field">
-                  <label>Chỉ số nước mới</label><input value="14" />
+                  <label>Ảnh công tơ điện (JPEG/PNG)</label><input id="meter-image" type="file" accept="image/jpeg,image/png" required />
                 </div>
                 <div class="field" style="grid-column: 1 / -1">
-                  <label>Ghi chú</label
-                  ><textarea>
-Chỉ số máy lạnh và thiết bị giặt hoạt động bình thường.</textarea
-                  >
+                  <label>Cảnh báo OCR / ghi chú</label><textarea id="ocr-warning" readonly></textarea>
                 </div>
               </div>
               <div class="form-actions">
                 <button class="btn btn--ghost" type="button">Hủy</button>
-                <button class="btn btn--primary" type="button">Xác nhận</button>
+                <button id="preview-reading" class="btn btn--primary" type="button">Đọc ảnh & xem trước</button>
               </div>
             </article>
             <aside class="detail-card">
@@ -86,15 +80,15 @@ Chỉ số máy lạnh và thiết bị giặt hoạt động bình thường.</
               <div class="metric-list">
                 <div class="metric-item">
                   <span class="metric-item__label">Tiền điện</span
-                  ><span class="metric-item__value">180K</span>
+                  >                  <span id="ocr-suggested" class="metric-item__value">—</span>
                 </div>
                 <div class="metric-item">
-                  <span class="metric-item__label">Tiền nước</span
-                  ><span class="metric-item__value">64K</span>
+                  <span class="metric-item__label">Trạng thái</span
+                  ><span id="reading-status" class="metric-item__value">Chưa gửi</span>
                 </div>
                 <div class="metric-item">
-                  <span class="metric-item__label">Tổng</span
-                  ><span class="metric-item__value">244K</span>
+                  <span class="metric-item__label">Kỳ</span
+                  ><span id="reading-period" class="metric-item__value"></span>
                 </div>
               </div>
             </aside>
@@ -104,6 +98,8 @@ Chỉ số máy lạnh và thiết bị giặt hoạt động bình thường.</
       </div>
     </div>
     <script src="../../assets/js/utils/include.util.js"></script>
+    <script src="../../assets/js/config/apiConfig.js"></script>
+    <script src="../../assets/js/services/apiClient.js"></script>
     <script src="../../assets/js/utils/format.util.js"></script>
     <script src="../../assets/js/components/sidebar.js"></script>
     <script src="../../assets/js/components/navbar.js"></script>
@@ -114,5 +110,6 @@ Chỉ số máy lạnh và thiết bị giặt hoạt động bình thường.</
       });
       includeAll();
     </script>
+    <script src="../../assets/js/pages/khachThue/nhapChiSoDien.page.js"></script>
   </body>
 </html>

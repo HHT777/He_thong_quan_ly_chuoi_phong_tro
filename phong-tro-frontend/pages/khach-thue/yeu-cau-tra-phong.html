@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yêu cầu trả phòng · TroHub</title>
+    <title>Yêu cầu trả phòng · ISK19</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -55,7 +55,7 @@
               </div>
               <div class="form-grid">
                 <div class="field">
-                  <label>Ngày dự kiến</label><input value="20/09/2026" />
+                  <label>Ngày dự kiến</label><input type="date" value="2026-09-20" />
                 </div>
                 <div class="field">
                   <label>Hạn cọc</label><input value="3 ngày sau hoàn tất" />
@@ -107,6 +107,9 @@ Rời phòng để chuyển chỗ ở mới. Mong quản lý kiểm tra tình tr
     <script src="../../assets/js/utils/format.util.js"></script>
     <script src="../../assets/js/components/sidebar.js"></script>
     <script src="../../assets/js/components/navbar.js"></script>
+    <script src="../../assets/js/config/apiConfig.js"></script>
+    <script src="../../assets/js/services/apiClient.js"></script>
+    <script src="../../assets/js/pages/khachThue/yeuCauTraPhong.page.js"></script>
     <script>
       document.addEventListener("partials:ready", () => {
         initSidebar();

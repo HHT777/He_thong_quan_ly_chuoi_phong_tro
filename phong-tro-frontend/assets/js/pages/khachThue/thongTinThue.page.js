@@ -1,11 +1,8 @@
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    const user = window.ApiClient.getUser();
     const [profileResponse, contractsResponse] = await Promise.all([
       window.ApiClient.get("/auth/profile"),
-      window.ApiClient.get(
-        `/hop-dong?ma_khach_thue=${user?.ma_khach_thue || ""}&limit=10`,
-      ),
+      window.ApiClient.get("/hop-dong?limit=10"),
     ]);
     const tenant = profileResponse.data?.khachThue || {};
     const contracts = contractsResponse.data || [];

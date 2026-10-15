@@ -11,21 +11,16 @@ function billStatusLabel(status) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    const user = window.ApiClient.getUser();
     const response = await window.ApiClient.get(
-      `/khoan-phai-thu/khach-thue/${user?.ma_khach_thue || ""}`,
+      "/khoan-phai-thu?limit=100",
     );
     const bills = response.data || [];
     const total = bills.reduce(
-      (sum, bill) => sum + Number(bill.tong_phai_thanh_toan || 0),
+      (sum, bill) => sum + Number(bill.tong_phai_tra || 0),
       0,
     );
     const paid = bills.reduce(
-      (sum, bill) =>
-        sum +
-        (bill.trang_thai_thanh_toan === "DA_THANH_TOAN"
-          ? Number(bill.tong_phai_thanh_toan || 0)
-          : 0),
+      (sum, bill) => sum + Number(bill.tong_da_thanh_toan || 0),
       0,
     );
     const due = total - paid;
@@ -36,14 +31,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.querySelector("[data-bill-due]").textContent =
       FormatUtil.currency(due);
     document.querySelector("[data-bill-due-date]").textContent = bills[0]
-      ?.han_thanh_toan
-      ? new Date(bills[0].han_thanh_toan).toLocaleDateString("vi-VN")
+      ? `10/${String(bills[0].thang).padStart(2, "0")}/${bills[0].nam}`
       : "—";
     document.querySelector("[data-bill-rows]").innerHTML =
       bills
         .map((bill) => {
-          const [label, tone] = billStatusLabel(bill.trang_thai_thanh_toan);
-          return `<tr><td>Hóa đơn phòng ${bill.ma_phong}</td><td>${bill.ky}</td><td>${FormatUtil.currency(bill.tong_phai_thanh_toan)}</td><td><span class="status-badge ${tone}">${label}</span></td></tr>`;
+          const [label, tone] = billStatusLabel(bill.trang_thai);
+          const room = bill.hopDong?.phongTro?.ma_phong || bill.hopDong?.ma_phong || "—";
+          return `<tr><td>Hóa đơn phòng ${room}</td><td>${String(bill.thang).padStart(2, "0")}/${bill.nam}</td><td>${FormatUtil.currency(bill.tong_phai_tra)}</td><td><span class="status-badge ${tone}">${label}</span></td></tr>`;
         })
         .join("") || '<tr><td colspan="4">Chưa có khoản phải thu.</td></tr>';
   } catch (error) {

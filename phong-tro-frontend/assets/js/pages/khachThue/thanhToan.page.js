@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       items
         .map(
           (item) =>
-            `<tr><td>${item.ma_thanh_toan}</td><td>${new Date(item.ngay_thanh_toan).toLocaleDateString("vi-VN")}</td><td>${FormatUtil.currency(item.so_tien)}</td><td>${item.phuong_thuc || "—"}</td></tr>`,
+            `<tr><td>${item.ma_giao_dich}</td><td>${new Date(item.thoi_diem_ghi_nhan).toLocaleDateString("vi-VN")}</td><td>${FormatUtil.currency(item.so_tien)}</td><td>${item.trang_thai_xac_nhan}</td></tr>`,
         )
         .join("") ||
       '<tr><td colspan="4">Chưa có lịch sử thanh toán.</td></tr>';

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yêu cầu gia hạn · TroHub</title>
+    <title>Yêu cầu gia hạn · ISK19</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -58,7 +58,7 @@
                   <label>Hiện tại</label><input value="18/08/2026" />
                 </div>
                 <div class="field">
-                  <label>Thời gian gia hạn muốn</label><input value="6 tháng" />
+                  <label>Thời gian gia hạn muốn</label><select id="renewal-months"><option value="6">6 tháng</option><option value="12">12 tháng</option></select>
                 </div>
                 <div class="field">
                   <label>Giá thuê đề xuất</label
@@ -112,6 +112,9 @@ Mong muốn tiếp tục thuê thêm 6 tháng vì đã quen khu vực và cần 
     </div>
     <script src="../../assets/js/utils/include.util.js"></script>
     <script src="../../assets/js/utils/format.util.js"></script>
+    <script src="../../assets/js/config/apiConfig.js"></script>
+    <script src="../../assets/js/services/apiClient.js"></script>
+    <script src="../../assets/js/pages/khachThue/yeuCauGiaHan.page.js"></script>
     <script src="../../assets/js/components/sidebar.js"></script>
     <script src="../../assets/js/components/navbar.js"></script>
     <script>
