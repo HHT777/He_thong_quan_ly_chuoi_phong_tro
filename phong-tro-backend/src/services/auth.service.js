@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { TaiKhoan, KhachThue } = require("../models");
+const sequelize = require("../config/database");
 
 class AuthService {
   async login(ten_dang_nhap, mat_khau) {
@@ -32,7 +33,7 @@ class AuthService {
     }
 
     // Check account status
-    if (taiKhoan.trang_thai === "TAM_DUNG") {
+    if (taiKhoan.trang_thai === "DA_KHOA") {
       throw {
         status: 403,
         message: "Tài khoản của bạn đã bị khóa",
@@ -45,7 +46,8 @@ class AuthService {
         ma_tai_khoan: taiKhoan.ma_tai_khoan,
         ten_dang_nhap: taiKhoan.ten_dang_nhap,
         vai_tro: taiKhoan.vai_tro,
-        ma_khach_thue: taiKhoan.ma_khach_thue,
+        ma_khach_thue: taiKhoan.khachThue?.ma_khach_thue || null,
+        bat_buoc_doi_mat_khau: taiKhoan.bat_buoc_doi_mat_khau,
       },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRE },
@@ -57,7 +59,8 @@ class AuthService {
         ma_tai_khoan: taiKhoan.ma_tai_khoan,
         ten_dang_nhap: taiKhoan.ten_dang_nhap,
         vai_tro: taiKhoan.vai_tro,
-        ma_khach_thue: taiKhoan.ma_khach_thue,
+        ma_khach_thue: taiKhoan.khachThue?.ma_khach_thue || null,
+        bat_buoc_doi_mat_khau: taiKhoan.bat_buoc_doi_mat_khau,
       },
     };
   }
@@ -75,20 +78,22 @@ class AuthService {
       };
     }
 
-    // Create customer
-    const khachThue = await KhachThue.create({
-      ho_ten: data.ho_ten,
-      so_dien_thoai: data.so_dien_thoai,
-      cccd_giay_to: data.cccd_giay_to,
-      thong_tin_lien_he: data.thong_tin_lien_he || "",
-    });
-
-    // Create account
-    const taiKhoan = await TaiKhoan.create({
-      ten_dang_nhap: data.ten_dang_nhap,
-      mat_khau: data.mat_khau,
-      vai_tro: "KHACH_THUE",
-      ma_khach_thue: khachThue.ma_khach_thue,
+    const { taiKhoan, khachThue } = await sequelize.transaction(async (transaction) => {
+      // data2.md đặt FK trên KhachThue.maTaiKhoan, vì vậy tài khoản phải tạo trước.
+      const account = await TaiKhoan.create({
+        ten_dang_nhap: data.ten_dang_nhap,
+        mat_khau: data.mat_khau,
+        vai_tro: "KHACH_THUE",
+        trang_thai: "HOAT_DONG",
+        bat_buoc_doi_mat_khau: true,
+      }, { transaction });
+      const tenant = await KhachThue.create({
+        ho_ten: data.ho_ten,
+        so_dien_thoai: data.so_dien_thoai,
+        cccd_giay_to: data.cccd_giay_to,
+        ma_tai_khoan: account.ma_tai_khoan,
+      }, { transaction });
+      return { taiKhoan: account, khachThue: tenant };
     });
 
     return {

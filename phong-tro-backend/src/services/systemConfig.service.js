@@ -37,4 +37,18 @@ function getSystemConfig() {
   });
 }
 
-module.exports = { DEFAULTS, readPositiveInteger, getSystemConfig };
+// Database values override environment/defaults when the configuration table is available.
+async function getPersistedSystemConfig() {
+  const { CauHinhHeThong } = require("../models");
+  const fallback = getSystemConfig();
+  const rows = await CauHinhHeThong.findAll();
+  const values = Object.fromEntries(rows.map((row) => [row.khoa, row.gia_tri]));
+  const number = (key, fallbackValue, min, max) => {
+    const value = values[key] ?? fallbackValue; const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw Object.assign(new Error(`Cấu hình ${key} không hợp lệ`), { status: 422, code: "INVALID_SYSTEM_CONFIG" });
+    return parsed;
+  };
+  return Object.freeze({ ...fallback, dueReminderDay: number("dueReminderDay", fallback.dueReminderDay, 1, 31), overdueDay: number("overdueDay", fallback.overdueDay, 1, 31), debtCloseDay: number("debtCloseDay", fallback.debtCloseDay, 1, 31), billScheduleDay: number("billScheduleDay", fallback.billScheduleDay, 1, 28), billScheduleHour: number("billScheduleHour", fallback.billScheduleHour, 0, 23), contractWarningDays: number("contractWarningDays", fallback.contractWarningDays, 1, 365), maxFileSizeBytes: number("maxFileSizeBytes", fallback.maxFileSizeBytes, 1, Number.MAX_SAFE_INTEGER) });
+}
+
+module.exports = { DEFAULTS, readPositiveInteger, getSystemConfig, getPersistedSystemConfig };

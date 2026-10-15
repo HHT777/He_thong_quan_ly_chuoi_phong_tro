@@ -52,8 +52,8 @@ test("CT-005 incident completion creates exactly one financial branch and notifi
   assert.match(service, /sequelize\.transaction\(/);
   assert.match(service, /payload\.responsible === "CHU_TRO"/);
   assert.match(service, /KhoanChi\.create/);
-  assert.match(service, /ChiTietThanhToan\.create/);
-  assert.match(service, /await bill\.update/);
+  assert.match(service, /ChiPhiSuCoKhachThue\.create/);
+  assert.doesNotMatch(service, /ChiTietThanhToan\.create/);
   assert.match(service, /ThongBao\.create/);
   assert.match(service, /INCIDENT_FINANCE_ALREADY_EXISTS/);
   assert.match(route, /incidentService\.update/);

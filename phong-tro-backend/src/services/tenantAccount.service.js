@@ -44,6 +44,9 @@ async function requireRentalEligibility(tenantId, transaction) {
   if (!deposit) {
     throw fail(422, "DEPOSIT_RECORD_REQUIRED", "Hợp đồng chưa có hồ sơ tiền cọc");
   }
+  if (deposit.trang_thai !== "DA_NHAN") {
+    throw fail(422, "DEPOSIT_NOT_RECEIVED", "Chỉ cấp/mở tài khoản khi tiền cọc đã nhận");
+  }
   return { contract, deposit };
 }
 

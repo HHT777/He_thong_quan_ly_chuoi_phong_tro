@@ -14,8 +14,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 function validateProposal(payload) {
   const name = String(payload.name || "").trim();
   const phone = String(payload.phone || "").trim();
-  if (!name || !phone) throw fail(422, "Thiếu họ tên hoặc số điện thoại người được đề xuất", "INVALID_CO_TENANT_PROPOSAL");
-  return { name, phone };
+  const identity = String(payload.identityNumber || payload.cccd || "").trim(); const birthDate = payload.birthDate || payload.ngaySinh; const gender = String(payload.gender || payload.gioiTinh || "").trim(); const address = String(payload.permanentAddress || payload.diaChiThuongTru || "").trim(); const relationship = String(payload.relationship || payload.quanHe || "").trim(); const startDate = payload.startDate || payload.ngayVao;
+  if (!name || !phone || !identity || !birthDate || !gender || !address || !relationship || !startDate) throw fail(422, "Thiếu thông tin tùy thân bắt buộc của người ở cùng", "INVALID_CO_TENANT_PROPOSAL");
+  return { name, phone, identity, birthDate, gender, address, relationship, startDate };
 }
 
 async function roomMembers(roomId, transaction) {
@@ -37,7 +38,7 @@ async function assertCapacityAndUniqueness(room, phone, transaction) {
 }
 
 async function propose(tenantId, payload) {
-  const { name, phone } = validateProposal(payload);
+  const { name, phone, identity, birthDate, gender, address, relationship, startDate } = validateProposal(payload);
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findOne({
       where: {
@@ -87,6 +88,7 @@ async function propose(tenantId, payload) {
       ho_ten_nguoi_de_xuat: name,
       so_dien_thoai_nguoi_de_xuat: phone,
       noi_dung_bo_sung: payload.note || null,
+      cccd_giay_to: identity, ngay_sinh: birthDate, gioi_tinh: gender, dia_chi_thuong_tru: address, quan_he: relationship, ngay_bat_dau_o: startDate,
     }, { transaction });
     return { request, proposal };
   });
@@ -115,10 +117,11 @@ async function approve(request, transaction) {
   return ThanhVienPhong.create({
     ho_ten: proposal.ho_ten_nguoi_de_xuat,
     so_dien_thoai: proposal.so_dien_thoai_nguoi_de_xuat,
-    ngay_vao: today(),
+    ngay_vao: proposal.ngay_bat_dau_o,
     trang_thai_cu_tru: "DANG_O",
     ma_phong: proposal.ma_phong,
     ma_hop_dong: contract.ma_hop_dong,
+    cccd_giay_to: proposal.cccd_giay_to, ngay_sinh: proposal.ngay_sinh, gioi_tinh: proposal.gioi_tinh, dia_chi_thuong_tru: proposal.dia_chi_thuong_tru, quan_he: proposal.quan_he,
   }, { transaction });
 }
 

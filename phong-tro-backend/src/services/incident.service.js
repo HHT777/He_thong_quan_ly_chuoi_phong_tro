@@ -4,21 +4,21 @@ const {
   SuCo,
   PhongTro,
   HopDong,
-  ThanhToan,
-  ChiTietThanhToan,
+  ChiPhiSuCoKhachThue,
   KhoanChi,
   ThongBao,
 } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const dateOnly = (value = new Date()) => new Date(value).toISOString().slice(0, 10);
 
 async function financialLinks(incidentId, transaction) {
-  const [expense, charge] = await Promise.all([
+  const [expense, pendingTenantCharge] = await Promise.all([
     KhoanChi.findOne({ where: { ma_su_co: incidentId }, transaction, lock: transaction.LOCK.UPDATE }),
-    ChiTietThanhToan.findOne({ where: { ma_su_co: incidentId }, transaction, lock: transaction.LOCK.UPDATE }),
+    ChiPhiSuCoKhachThue.findOne({ where: { ma_su_co: incidentId }, transaction, lock: transaction.LOCK.UPDATE }),
   ]);
-  return { expense, charge };
+  return { expense, pendingTenantCharge };
 }
 
 async function createFinancialBranch(incident, payload, transaction) {
@@ -34,7 +34,7 @@ async function createFinancialBranch(incident, payload, transaction) {
   }
 
   const links = await financialLinks(incident.ma_su_co, transaction);
-  if (links.expense || links.charge) {
+  if (links.expense || links.pendingTenantCharge) {
     throw fail(409, "Sự cố đã có bản ghi tài chính", "INCIDENT_FINANCE_ALREADY_EXISTS");
   }
   if (cost === 0) return null;
@@ -71,29 +71,13 @@ async function createFinancialBranch(incident, payload, transaction) {
   });
   if (!contract) throw fail(422, "Khách chịu phí không thuê phòng tại thời điểm xảy ra sự cố", "RESPONSIBLE_CONTRACT_NOT_FOUND");
 
-  const bill = await ThanhToan.findOne({
-    where: { ma_hop_dong: contract.ma_hop_dong, trang_thai: { [Op.ne]: "DA_THANH_TOAN" } },
-    order: [["nam", "DESC"], ["thang", "DESC"]],
-    transaction,
-    lock: transaction.LOCK.UPDATE,
-  });
-  if (!bill) throw fail(422, "Không có kỳ thanh toán chưa hoàn thành để ghi phí sửa chữa", "OPEN_BILL_NOT_FOUND");
-
-  const charge = await ChiTietThanhToan.create({
-    loai_khoan: "SUA_CHUA",
-    so_tien: cost,
-    dien_giai: `Sự cố: ${String(payload.responsibilityBasis).trim()}`,
-    ma_thanh_toan: bill.ma_thanh_toan,
+  return ChiPhiSuCoKhachThue.create({
     ma_su_co: incident.ma_su_co,
+    ma_hop_dong: contract.ma_hop_dong,
+    so_tien: cost,
+    can_cu_trach_nhiem: String(payload.responsibilityBasis).trim(),
+    trang_thai: "CHO_KHAU_TRU",
   }, { transaction });
-  const total = Number(bill.tong_phai_tra) + cost;
-  const paid = Number(bill.tong_da_thanh_toan);
-  await bill.update({
-    tong_phai_tra: total,
-    so_tien_con_no: total - paid,
-    trang_thai: paid === 0 ? "CHUA_THANH_TOAN" : "THANH_TOAN_MOT_PHAN",
-  }, { transaction });
-  return charge;
 }
 
 async function update(incidentId, payload, actorId) {
@@ -135,6 +119,10 @@ async function update(incidentId, payload, actorId) {
       }, { transaction });
     }
     await incident.update(patch, { transaction });
+    await writeAuditLog({
+      transaction, actorId, action: "INCIDENT_UPDATED", entityType: "SuCo", entityId: incident.ma_su_co,
+      after: { status: incident.trang_thai, cost: incident.chi_phi_sua_chua, responsible: incident.doi_tuong_chiu_phi },
+    });
     return incident;
   });
 }
@@ -152,7 +140,7 @@ async function softDelete(incidentId, reason, actorId) {
       || incident.ket_qua_xu_ly
       || incident.chi_phi_sua_chua !== null
       || incident.doi_tuong_chiu_phi;
-    if (hasProcessingData || links.expense || links.charge) {
+    if (hasProcessingData || links.expense || links.pendingTenantCharge) {
       throw fail(409, "Chỉ được xóa báo cáo chờ tiếp nhận chưa có dữ liệu xử lý", "INCIDENT_CANNOT_BE_DELETED");
     }
     await incident.update({
@@ -161,6 +149,7 @@ async function softDelete(incidentId, reason, actorId) {
       ngay_xoa: new Date(),
       nguoi_xoa_id: actorId,
     }, { transaction });
+    await writeAuditLog({ transaction, actorId, action: "INCIDENT_SOFT_DELETED", entityType: "SuCo", entityId: incident.ma_su_co, reason: normalizedReason });
     return incident;
   });
 }
