@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ChiSoDien, ChiTietThanhToan, ThanhToan, TaiKhoan } = require("../src/models");
+const { ChiSoDien, ChiTietThanhToan, ThanhToan, TaiKhoan, LichSuSuaHopDong } = require("../src/models");
 const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
 
 async function confirmedReadings(fresh) {
@@ -96,6 +96,8 @@ test("UC-15 move-out rejects incomplete input, settles once, and preserves lifec
   });
   assert.equal(first.response.status, 200, JSON.stringify(first.body));
   assert.equal(first.body.data.refund, 2499900);
+  const lifecycleHistory = await LichSuSuaHopDong.findAll({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } });
+  assert.ok(lifecycleHistory.some((row) => JSON.stringify(row.sau_json).includes("LIQUIDATED")));
   const repeated = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {
     method: "POST", headers: headers(landlord), body: JSON.stringify(payload),
   });

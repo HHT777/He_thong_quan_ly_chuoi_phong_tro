@@ -1,213 +1,98 @@
-const KhachThue = require("./KhachThue");
-const TaiKhoan = require("./TaiKhoan");
-const CanTro = require("./CanTro");
-const PhongTro = require("./PhongTro");
-const NoiThat = require("./NoiThat");
-const DatCoc = require("./DatCoc");
-const HopDong = require("./HopDong");
-const DienNuoc = require("./DienNuoc");
-const KhoanPhaiThu = require("./KhoanPhaiThu");
-const ThanhToan = require("./ThanhToan");
-const GiamTru = require("./GiamTru");
-const ChiPhi = require("./ChiPhi");
-const TraPhong = require("./TraPhong");
-const ThongBao = require("./ThongBao");
+const bcrypt = require("bcryptjs");
+const models = require("./schema");
+const AuditLog = require("./AuditLog");
 
-// Define associations
+const {
+  TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc,
+  ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo,
+  GiaoDichThanhToan, ChiTietThanhToan, KhoanChi, ThongBao,
+  BienBanTraPhong, KhoanThu, KhoanKhauTru, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo,
+} = models;
 
-// TaiKhoan -> KhachThue
-TaiKhoan.belongsTo(KhachThue, {
-  foreignKey: "ma_khach_thue",
-  as: "khachThue",
-});
-KhachThue.hasOne(TaiKhoan, {
-  foreignKey: "ma_khach_thue",
-  as: "taiKhoan",
+TaiKhoan.prototype.checkPassword = function checkPassword(password) {
+  return bcrypt.compare(password, this.mat_khau);
+};
+async function hashPassword(account) {
+  if (account.mat_khau && !/^\$2[aby]\$/.test(account.mat_khau)) {
+    account.mat_khau = await bcrypt.hash(account.mat_khau, 12);
+  }
+}
+TaiKhoan.beforeCreate(hashPassword);
+TaiKhoan.beforeUpdate(async (account) => {
+  if (account.changed("mat_khau")) await hashPassword(account);
 });
 
-// KhachThue associations
-KhachThue.hasMany(DatCoc, {
-  foreignKey: "ma_khach_thue",
-  as: "datCocs",
-});
-KhachThue.hasMany(HopDong, {
-  foreignKey: "ma_khach_thue",
-  as: "hopDongs",
-});
-KhachThue.hasMany(KhoanPhaiThu, {
-  foreignKey: "ma_khach_thue",
-  as: "khoanPhaiThus",
-});
-KhachThue.hasMany(GiamTru, {
-  foreignKey: "ma_khach_thue",
-  as: "giamTrus",
-});
-
-// CanTro associations
-CanTro.hasMany(PhongTro, {
-  foreignKey: "ma_can",
-  as: "phongs",
-});
-CanTro.hasMany(ChiPhi, {
-  foreignKey: "ma_can",
-  as: "chiPhis",
-});
-
-// PhongTro associations
-PhongTro.belongsTo(CanTro, {
-  foreignKey: "ma_can",
-  as: "canTro",
-});
-PhongTro.hasMany(NoiThat, {
-  foreignKey: "ma_phong",
-  as: "noiThats",
-});
-PhongTro.hasMany(DatCoc, {
-  foreignKey: "ma_phong",
-  as: "datCocs",
-});
-PhongTro.hasMany(HopDong, {
-  foreignKey: "ma_phong",
-  as: "hopDongs",
-});
-PhongTro.hasMany(DienNuoc, {
-  foreignKey: "ma_phong",
-  as: "dienNuocs",
-});
-PhongTro.hasMany(KhoanPhaiThu, {
-  foreignKey: "ma_phong",
-  as: "khoanPhaiThus",
-});
-PhongTro.hasMany(ChiPhi, {
-  foreignKey: "ma_phong",
-  as: "chiPhis",
-});
-
-// NoiThat associations
-NoiThat.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-NoiThat.hasMany(ChiPhi, {
-  foreignKey: "ma_tai_san",
-  as: "chiPhis",
-});
-
-// DatCoc associations
-DatCoc.belongsTo(KhachThue, {
-  foreignKey: "ma_khach_thue",
-  as: "khachThue",
-});
-DatCoc.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-
-// HopDong associations
-HopDong.belongsTo(KhachThue, {
-  foreignKey: "ma_khach_thue",
-  as: "khachThue",
-});
-HopDong.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-HopDong.hasOne(TraPhong, {
-  foreignKey: "ma_hop_dong",
-  as: "traPhong",
-});
-
-// DienNuoc associations
-DienNuoc.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-DienNuoc.belongsTo(TaiKhoan, {
-  foreignKey: "nguoi_nhap",
-  as: "nguoiNhap",
-});
-
-// KhoanPhaiThu associations
-KhoanPhaiThu.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-KhoanPhaiThu.belongsTo(KhachThue, {
-  foreignKey: "ma_khach_thue",
-  as: "khachThue",
-});
-KhoanPhaiThu.hasMany(ThanhToan, {
-  foreignKey: "ma_khoan_phai_thu",
-  as: "thanhToans",
-});
-
-// ThanhToan associations
-ThanhToan.belongsTo(KhoanPhaiThu, {
-  foreignKey: "ma_khoan_phai_thu",
-  as: "khoanPhaiThu",
-});
-ThanhToan.belongsTo(TaiKhoan, {
-  foreignKey: "nguoi_xac_nhan",
-  as: "nguoiXacNhan",
-});
-
-// GiamTru associations
-GiamTru.belongsTo(KhachThue, {
-  foreignKey: "ma_khach_thue",
-  as: "khachThue",
-});
-GiamTru.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-GiamTru.belongsTo(HopDong, {
-  foreignKey: "ma_hop_dong",
-  as: "hopDong",
-});
-
-// ChiPhi associations
-ChiPhi.belongsTo(CanTro, {
-  foreignKey: "ma_can",
-  as: "canTro",
-});
-ChiPhi.belongsTo(PhongTro, {
-  foreignKey: "ma_phong",
-  as: "phongTro",
-});
-ChiPhi.belongsTo(TaiKhoan, {
-  foreignKey: "nguoi_ghi_nhan",
-  as: "nguoiGhiNhan",
-});
-ChiPhi.belongsTo(NoiThat, {
-  foreignKey: "ma_tai_san",
-  as: "noiThat",
-});
-
-// TraPhong associations
-TraPhong.belongsTo(HopDong, {
-  foreignKey: "ma_hop_dong",
-  as: "hopDong",
-});
-
-// ThongBao associations
-ThongBao.belongsTo(TaiKhoan, {
-  foreignKey: "ma_tai_khoan_nhan",
-  as: "taiKhoan",
-});
+TaiKhoan.hasOne(KhachThue, { foreignKey: "ma_tai_khoan", as: "khachThue" });
+KhachThue.belongsTo(TaiKhoan, { foreignKey: "ma_tai_khoan", as: "taiKhoan" });
+TaiKhoan.hasOne(ChuTro, { foreignKey: "ma_tai_khoan", as: "chuTro" });
+ChuTro.belongsTo(TaiKhoan, { foreignKey: "ma_tai_khoan", as: "taiKhoan" });
+ChuTro.hasMany(CanTro, { foreignKey: "ma_chu_tro", as: "canTros" });
+CanTro.belongsTo(ChuTro, { foreignKey: "ma_chu_tro", as: "chuTro" });
+CanTro.hasMany(PhongTro, { foreignKey: "ma_can", as: "phongs" });
+PhongTro.belongsTo(CanTro, { foreignKey: "ma_can", as: "canTro" });
+PhongTro.hasMany(TaiSan, { foreignKey: "ma_phong", as: "taiSans" });
+TaiSan.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+KhachThue.hasMany(HopDong, { foreignKey: "ma_khach_thue", as: "hopDongs" });
+HopDong.belongsTo(KhachThue, { foreignKey: "ma_khach_thue", as: "khachThue" });
+PhongTro.hasMany(HopDong, { foreignKey: "ma_phong", as: "hopDongs" });
+HopDong.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+HopDong.hasMany(LichSuGiaHanHopDong, { foreignKey: "ma_hop_dong", as: "lichSuGiaHans" });
+LichSuGiaHanHopDong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+HopDong.hasMany(LichSuSuaHopDong, { foreignKey: "ma_hop_dong", as: "lichSuThayDois" });
+LichSuSuaHopDong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+HopDong.hasMany(LichSuChuyenPhong, { foreignKey: "ma_hop_dong", as: "lichSuChuyenPhongs" });
+LichSuChuyenPhong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+LichSuChuyenPhong.belongsTo(PhongTro, { foreignKey: "ma_phong_cu", as: "phongCu" });
+LichSuChuyenPhong.belongsTo(PhongTro, { foreignKey: "ma_phong_moi", as: "phongMoi" });
+HopDong.hasOne(TienCoc, { foreignKey: "ma_hop_dong", as: "tienCoc" });
+TienCoc.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+HopDong.hasMany(ThanhVienPhong, { foreignKey: "ma_hop_dong", as: "thanhVienPhongs" });
+ThanhVienPhong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+PhongTro.hasMany(ThanhVienPhong, { foreignKey: "ma_phong", as: "thanhVienPhongs" });
+ThanhVienPhong.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+HopDong.hasMany(ViPhamHopDong, { foreignKey: "ma_hop_dong", as: "viPhams" });
+ViPhamHopDong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+PhongTro.hasMany(ChiSoDien, { foreignKey: "ma_phong", as: "chiSoDiens" });
+ChiSoDien.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+ChiSoDien.hasMany(LichSuChinhSuaChiSoDien, { foreignKey: "ma_chi_so", as: "lichSuChinhSuas" });
+LichSuChinhSuaChiSoDien.belongsTo(ChiSoDien, { foreignKey: "ma_chi_so", as: "chiSoDien" });
+KhachThue.hasMany(YeuCau, { foreignKey: "ma_khach_thue", as: "yeuCaus" });
+YeuCau.belongsTo(KhachThue, { foreignKey: "ma_khach_thue", as: "khachThue" });
+HopDong.hasMany(ThanhToan, { foreignKey: "ma_hop_dong", as: "thanhToans" });
+ThanhToan.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+ThanhToan.hasMany(GiaoDichThanhToan, { foreignKey: "ma_thanh_toan", as: "giaoDichs" });
+GiaoDichThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });
+ThanhToan.hasMany(ChiTietThanhToan, { foreignKey: "ma_thanh_toan", as: "chiTiets" });
+ChiTietThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });
+PhongTro.hasMany(SuCo, { foreignKey: "ma_phong", as: "suCos" });
+SuCo.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+CanTro.hasMany(KhoanChi, { foreignKey: "ma_can", as: "khoanChis" });
+KhoanChi.belongsTo(CanTro, { foreignKey: "ma_can", as: "canTro" });
+TaiKhoan.hasMany(ThongBao, { foreignKey: "ma_tai_khoan", as: "thongBaos" });
+ThongBao.belongsTo(TaiKhoan, { foreignKey: "ma_tai_khoan", as: "taiKhoan" });
+HopDong.hasOne(BienBanTraPhong, { foreignKey: "ma_hop_dong", as: "bienBanTraPhong" });
+BienBanTraPhong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+BienBanTraPhong.hasMany(KhoanKhauTru, { foreignKey: "ma_bien_ban_tra_phong", as: "khoanKhauTrus" });
+KhoanKhauTru.belongsTo(BienBanTraPhong, { foreignKey: "ma_bien_ban_tra_phong", as: "bienBanTraPhong" });
+GiaoDichThanhToan.hasOne(KhoanThu, { foreignKey: "ma_giao_dich_thanh_toan", as: "khoanThu" });
+KhoanThu.belongsTo(GiaoDichThanhToan, { foreignKey: "ma_giao_dich_thanh_toan", as: "giaoDich" });
+SuCo.hasOne(ChiPhiSuCoKhachThue, { foreignKey: "ma_su_co", as: "chiPhiKhachThue" });
+ChiPhiSuCoKhachThue.belongsTo(SuCo, { foreignKey: "ma_su_co", as: "suCo" });
+HopDong.hasMany(ChiPhiSuCoKhachThue, { foreignKey: "ma_hop_dong", as: "chiPhiSuCoKhachThues" });
+ChiPhiSuCoKhachThue.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+PhongTro.hasMany(DatGiuPhong, { foreignKey: "ma_phong", as: "datGiuPhongs" });
+DatGiuPhong.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+DatGiuPhong.hasMany(LichSuGiaHanGiuPhong, { foreignKey: "ma_dat_giu", as: "lichSuGiaHans" });
+LichSuGiaHanGiuPhong.belongsTo(DatGiuPhong, { foreignKey: "ma_dat_giu", as: "datGiuPhong" });
 
 module.exports = {
-  KhachThue,
-  TaiKhoan,
-  CanTro,
-  PhongTro,
-  NoiThat,
-  DatCoc,
-  HopDong,
-  DienNuoc,
-  KhoanPhaiThu,
-  ThanhToan,
-  GiamTru,
-  ChiPhi,
-  TraPhong,
-  ThongBao,
+  ...models,
+  AuditLog,
+  NoiThat: TaiSan,
+  DatCoc: TienCoc,
+  DienNuoc: ChiSoDien,
+  KhoanPhaiThu: ThanhToan,
+  ChiPhi: KhoanChi,
+  TraPhong: BienBanTraPhong,
+  NguoiO: ThanhVienPhong,
 };

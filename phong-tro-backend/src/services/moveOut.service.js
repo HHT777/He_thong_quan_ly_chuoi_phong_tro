@@ -13,8 +13,12 @@ const {
   YeuCauTraPhong,
   BienBanTraPhong,
   KhoanKhauTru,
+  ChiPhiSuCoKhachThue,
+  ViPhamHopDong,
   ThongBao,
 } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
+const contractLifecycle = require("./contractLifecycle.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -100,18 +104,30 @@ async function settle(contractId, payload, actorId) {
       lock: transaction.LOCK.UPDATE,
     });
     const outstandingDebt = debts.reduce((sum, row) => sum + Number(row.so_tien_con_no), 0);
-    if (requestedDeduction < outstandingDebt) {
+    const pendingIncidentCharges = await ChiPhiSuCoKhachThue.findAll({
+      where: { ma_hop_dong: contract.ma_hop_dong, trang_thai: "CHO_KHAU_TRU" },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    const pendingIncidentTotal = pendingIncidentCharges.reduce((sum, row) => sum + Number(row.so_tien), 0);
+    const selectedViolations = Array.isArray(payload.violationDeductions) ? payload.violationDeductions : [];
+    const violationIds = selectedViolations.map((item) => item.violationId).filter(Boolean);
+    const violations = violationIds.length ? await ViPhamHopDong.findAll({ where: { ma_vi_pham: { [Op.in]: violationIds }, ma_hop_dong: contract.ma_hop_dong }, transaction, lock: transaction.LOCK.UPDATE }) : [];
+    if (violations.length !== violationIds.length) throw fail(422, "Có vi phạm không thuộc hợp đồng", "INVALID_VIOLATION_DEDUCTION");
+    const violationTotal = violations.reduce((sum, item) => sum + Number(selectedViolations.find((line) => line.violationId === item.ma_vi_pham).amount ?? item.muc_phat ?? 0), 0);
+    const totalDeduction = requestedDeduction + pendingIncidentTotal + violationTotal;
+    if (totalDeduction < outstandingDebt) {
       throw fail(422, "Tổng khấu trừ chưa bao gồm toàn bộ công nợ", "DEDUCTION_BELOW_OUTSTANDING_DEBT");
     }
 
     const depositAmount = Number(deposit.so_tien_coc);
-    const appliedDeduction = Math.min(depositAmount, requestedDeduction);
+    const appliedDeduction = Math.min(depositAmount, totalDeduction);
     const refund = Math.max(0, depositAmount - appliedDeduction);
     const report = await BienBanTraPhong.create({
       ngay_kiem_tra: payload.inspectionDate || today(),
       tinh_trang_phong: String(payload.roomCondition).trim(),
       ghi_chu: payload.reason || null,
-      tong_khoan_khau_tru: requestedDeduction,
+      tong_khoan_khau_tru: totalDeduction,
       so_tien_coc_duoc_hoan: refund,
       ma_hop_dong: contract.ma_hop_dong,
       ma_yeu_cau_tra_phong: payload.moveOutRequestId || null,
@@ -125,6 +141,20 @@ async function settle(contractId, payload, actorId) {
         so_tien: outstandingDebt,
         ma_bien_ban_tra_phong: report.ma_bien_ban,
       }, { transaction });
+    }
+    for (const pending of pendingIncidentCharges) {
+      await KhoanKhauTru.create({
+        loai_khau_tru: "SUA_CHUA_SU_CO",
+        ly_do: `Chi phí sự cố khách thuê chịu: ${pending.can_cu_trach_nhiem}`,
+        so_tien: pending.so_tien,
+        ma_bien_ban_tra_phong: report.ma_bien_ban,
+      }, { transaction });
+      await pending.update({ trang_thai: "DA_KHAU_TRU", ngay_khau_tru: new Date() }, { transaction });
+    }
+    for (const violation of violations) {
+      const amount = Number(selectedViolations.find((line) => line.violationId === violation.ma_vi_pham).amount ?? violation.muc_phat ?? 0);
+      if (!Number.isFinite(amount) || amount < 0) throw fail(422, "Mức khấu trừ vi phạm không hợp lệ", "INVALID_VIOLATION_DEDUCTION");
+      await KhoanKhauTru.create({ loai_khau_tru: "VI_PHAM_HOP_DONG", ly_do: violation.noi_dung, so_tien: amount, ma_bien_ban_tra_phong: report.ma_bien_ban, ma_vi_pham: violation.ma_vi_pham }, { transaction });
     }
     const otherDeduction = requestedDeduction - outstandingDebt;
     if (otherDeduction > 0) {
@@ -149,8 +179,15 @@ async function settle(contractId, payload, actorId) {
       where: { ma_hop_dong: contract.ma_hop_dong, trang_thai_cu_tru: "DANG_O" },
       transaction,
     });
+    const contractBeforeLiquidation = contract.get({ plain: true });
     await contract.update({ trang_thai: "DA_THANH_LY", ngay_thanh_ly: moveOutDate }, { transaction });
+    await contractLifecycle.recordChange({ contract, before: contractBeforeLiquidation, after: contract, reason: payload.reason || "Thanh lý khi trả phòng", actorId, transaction, action: "LIQUIDATED" });
     await room.update({ trang_thai: "TRONG" }, { transaction });
+
+    await writeAuditLog({
+      transaction, actorId, action: "MOVE_OUT_SETTLED", entityType: "HopDong", entityId: contract.ma_hop_dong,
+      after: { reportId: report.ma_bien_ban, totalDeduction, refund, pendingIncidentTotal }, reason: payload.reason || null,
+    });
 
     const tenant = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
     if (tenant?.ma_tai_khoan) {
@@ -176,7 +213,7 @@ async function settle(contractId, payload, actorId) {
       }, { transaction });
     }
 
-    return { report, outstandingDebt, appliedDeduction, refund };
+    return { report, outstandingDebt, pendingIncidentTotal, appliedDeduction, refund };
   });
 }
 

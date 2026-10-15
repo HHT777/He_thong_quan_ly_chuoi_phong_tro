@@ -15,9 +15,19 @@ function ddlTables() {
   return result;
 }
 
-test("Sequelize maps all 25 data2.md tables and physical columns", () => {
+test("Sequelize maps every documented table and physical column", () => {
   const expected = ddlTables();
-  assert.equal(expected.size, 25);
+  assert.ok(expected.size >= 25);
+  assert.deepEqual(
+    ["LichSuGiaHanHopDong", "LichSuSuaHopDong", "LichSuChuyenPhong"].filter((table) => !expected.has(table)),
+    [],
+    "Migration 010/011 tables must be represented in data2.md",
+  );
+  assert.deepEqual(
+    ["daCoBanGiayKy", "phiDichVu", "goiGiaHanChoPhep"].filter((column) => !expected.get("HopDong")?.includes(column)),
+    [],
+    "Migration 010 contract columns must be represented in data2.md",
+  );
   const registered = new Map();
   for (const model of Object.values(models)) {
     if (!model?.tableName || registered.has(model.tableName)) continue;

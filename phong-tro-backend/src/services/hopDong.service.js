@@ -2,16 +2,19 @@ const {
   HopDong,
   KhachThue,
   PhongTro,
-  DatCoc,
+  TienCoc,
   ThongBao,
   TaiKhoan,
 } = require("../models");
 const { Op } = require("sequelize");
+const sequelize = require("../config/database");
+const lifecycle = require("./contractLifecycle.service");
 
 class HopDongService {
-  async createHopDong(data) {
+  async createHopDong(data, actorId) {
+    return sequelize.transaction(async (transaction) => {
     // Verify customer exists
-    const khachThue = await KhachThue.findByPk(data.ma_khach_thue);
+    const khachThue = await KhachThue.findByPk(data.ma_khach_thue, { transaction });
     if (!khachThue) {
       throw {
         status: 404,
@@ -20,7 +23,7 @@ class HopDongService {
     }
 
     // Verify room exists
-    const phong = await PhongTro.findByPk(data.ma_phong);
+    const phong = await PhongTro.findByPk(data.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
     if (!phong) {
       throw {
         status: 404,
@@ -32,8 +35,10 @@ class HopDongService {
     const existingContract = await HopDong.findOne({
       where: {
         ma_phong: data.ma_phong,
-        trang_thai: "DANG_HIEU_LUC",
+        trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] },
       },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
     });
 
     if (existingContract) {
@@ -44,26 +49,41 @@ class HopDongService {
     }
 
     // Create contract
-    const hopDong = await HopDong.create(data);
+    const { tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, ...contractData } = data;
+    const hopDong = await HopDong.create({ ...contractData, trang_thai: "DANG_HIEU_LUC" }, { transaction });
+    await TienCoc.create({
+      ma_hop_dong: hopDong.ma_hop_dong,
+      so_tien_coc: tienCoc,
+      ngay_nhan_coc: ngayNhanCoc || null,
+      trang_thai: ngayNhanCoc ? "DA_NHAN" : "CHUA_NHAN",
+      so_tien_da_hoan: 0,
+      so_tien_da_khau_tru: 0,
+    }, { transaction });
 
     // Update room status to DA_GIU
-    await phong.update({ trang_thai: "DA_GIU" });
+    await phong.update({ trang_thai: "DANG_THUE" }, { transaction });
 
     // Send notification to customer
-    const taiKhoanKhach = await TaiKhoan.findOne({
-      where: { ma_khach_thue: data.ma_khach_thue },
-    });
+    const taiKhoanKhach = khachThue.ma_tai_khoan
+      ? await TaiKhoan.findByPk(khachThue.ma_tai_khoan, { transaction })
+      : null;
 
     if (taiKhoanKhach) {
       await ThongBao.create({
-        ma_tai_khoan_nhan: taiKhoanKhach.ma_tai_khoan,
+        ma_tai_khoan: taiKhoanKhach.ma_tai_khoan,
         loai_thong_bao: "HOP_DONG",
         noi_dung: "Hợp đồng thuê phòng của bạn đã được tạo",
-        doi_tuong_lien_quan: "HOP_DONG",
-      });
+        thoi_diem_tao: new Date(),
+      }, { transaction });
     }
 
+    await lifecycle.recordChange({
+      contract: hopDong, before: null, after: hopDong, reason: "Tạo hợp đồng điện tử",
+      actorId, transaction, action: "CREATED",
+    });
+
     return hopDong;
+    });
   }
 
   async getHopDongList(filters, pagination) {
@@ -97,7 +117,7 @@ class HopDongService {
       ],
       limit: pagination.limit,
       offset: pagination.offset,
-      order: [["ngay_ky", "DESC"]],
+      order: [["ngay_bat_dau", "DESC"]],
     });
 
     return { total: count, data: rows };
@@ -127,12 +147,23 @@ class HopDongService {
     return hopDong;
   }
 
-  async updateHopDong(maHopDong, data) {
-    const hopDong = await this.getHopDongById(maHopDong);
+  async updateHopDong(maHopDong, data, actorId) {
+    const { reason, ...patch } = data;
+    return sequelize.transaction(async (transaction) => {
+      const hopDong = await HopDong.findByPk(maHopDong, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!hopDong) throw { status: 404, message: "Hợp đồng không tồn tại" };
+      const before = hopDong.get({ plain: true });
+      await hopDong.update(patch, { transaction });
+      await lifecycle.recordChange({ contract: hopDong, before, after: hopDong, reason, actorId, transaction, action: patch.trang_thai === "DA_THANH_LY" ? "LIQUIDATED" : "UPDATED" });
+      return hopDong;
+    });
+  }
 
-    await hopDong.update(data);
-
-    return hopDong;
+  async getHistory(maHopDong, requester) {
+    const hopDong = await HopDong.findByPk(maHopDong);
+    if (!hopDong) throw { status: 404, message: "Hợp đồng không tồn tại" };
+    if (requester.vai_tro === "KHACH_THUE" && hopDong.ma_khach_thue !== requester.ma_khach_thue) throw { status: 403, message: "Bạn chỉ được xem lịch sử hợp đồng của mình" };
+    return lifecycle.getHistory(maHopDong);
   }
 
   async renewHopDong(maHopDong, ngayBatDauMoi, ngayKetThucMoi, giaThueMoi) {
@@ -193,6 +224,7 @@ class HopDongService {
 
     await hopDong.update({
       trang_thai: "DA_THANH_LY",
+      ngay_thanh_ly: new Date(),
     });
 
     // Update room status to TRONG
