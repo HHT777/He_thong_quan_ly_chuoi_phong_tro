@@ -57,7 +57,7 @@ test("CT-012 derives water from contract price and active occupants", () => {
 test("CT-012 bill generation ignores client-provided monetary overrides", () => {
   const route = fs.readFileSync(path.resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
   const generationRoute = route.slice(route.indexOf('router.post("/bills/generate"'), route.indexOf('router.get("/debt"'));
-  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period\)/);
+  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan\)/);
   assert.doesNotMatch(generationRoute, /waterAmount|serviceFee/);
   assert.equal(billGenerationService.SERVICE_FEE_DECISION.code, "SERVICE_FEE_SCHEMA_MISSING");
 });

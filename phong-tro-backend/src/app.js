@@ -26,6 +26,14 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.get("/health", (req, res) => {
   res.json({ success: true, message: "Server is running" });
 });
+app.get("/ready", async (req, res) => {
+  try {
+    await require("./config/database").authenticate();
+    res.json({ success: true, checks: { database: "up" } });
+  } catch (error) {
+    res.status(503).json({ success: false, checks: { database: "down" } });
+  }
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
