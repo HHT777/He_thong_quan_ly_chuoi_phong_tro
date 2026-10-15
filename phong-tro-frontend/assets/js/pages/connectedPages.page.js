@@ -207,9 +207,33 @@
           date(item.ngay_gui),
           item.noi_dung,
           item.trang_thai,
+          "—",
         ];
       }),
     );
+    document.querySelectorAll(".data-table tbody tr").forEach((row, index) => {
+      const item = moveOuts[index];
+      if (item?.trang_thai !== "DA_PHE_DUYET") return;
+      const actionCell = row.lastElementChild;
+      actionCell.textContent = "";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn btn--ghost";
+      button.textContent = "Rút duyệt";
+      button.addEventListener("click", async () => {
+        const reason = window.prompt("Nhập lý do rút duyệt yêu cầu trả phòng:")?.trim();
+        if (!reason) return window.alert("Lý do rút duyệt là bắt buộc.");
+        button.disabled = true;
+        try {
+          await api().post(`/v1/requests/${item.ma_yeu_cau}/revoke`, { reason });
+          await loadMoveOuts();
+        } catch (error) {
+          window.alert(error.message);
+          button.disabled = false;
+        }
+      });
+      actionCell.append(button);
+    });
   }
 
   const loaders = {

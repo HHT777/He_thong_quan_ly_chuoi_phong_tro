@@ -19,6 +19,24 @@ const ddlSource = fs.readFileSync(
   path.resolve(__dirname, "../../data2.md"),
   "utf8",
 );
+const frontendRoot = path.resolve(__dirname, "../../phong-tro-frontend");
+const ownerRequestSource = fs.readFileSync(
+  path.join(frontendRoot, "src/modules/residents-contracts/requests.tab.js"),
+  "utf8",
+);
+const legacyOwnerSource = fs.readFileSync(
+  path.join(frontendRoot, "assets/js/pages/connectedPages.page.js"),
+  "utf8",
+);
+
+function frontendSources(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    if (["node_modules", "dist"].includes(entry.name)) return [];
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) return frontendSources(target);
+    return /\.(?:html|js)$/.test(entry.name) ? [fs.readFileSync(target, "utf8")] : [];
+  });
+}
 
 function routeBlock(startMarker, endMarker) {
   const start = routeSource.indexOf(startMarker);
@@ -72,4 +90,14 @@ test("CT-002 settlement leaves the approved move-out request in its valid state"
     settlement,
     /contract\.update\(\{\s*trang_thai:\s*"DA_THANH_LY"/,
   );
+});
+
+test("FR-186 frontend exposes owner revoke with a reason and no tenant withdraw route", () => {
+  const frontendSource = frontendSources(frontendRoot).join("\n");
+
+  assert.doesNotMatch(frontendSource, /\/withdraw\b/);
+  assert.match(ownerRequestSource, /data-revoke/);
+  assert.match(ownerRequestSource, /\/v1\/requests\/\$\{button\.dataset\.revoke\}\/revoke/);
+  assert.match(ownerRequestSource, /prompt\([^)]*lý do rút duyệt/i);
+  assert.match(legacyOwnerSource, /\/v1\/requests\/\$\{item\.ma_yeu_cau\}\/revoke/);
 });
