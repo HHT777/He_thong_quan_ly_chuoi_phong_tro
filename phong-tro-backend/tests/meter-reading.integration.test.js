@@ -1,11 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const integration = require("./helpers/integration-env");
 
 const baseUrl = integration.baseUrl;
-const sampleImage = path.resolve(__dirname, "../../OCR/meter_ocr/test/image_073.jpg");
+const sampleImage = Buffer.from(
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAf/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=",
+  "base64",
+);
 
 async function jsonRequest(url, options = {}) {
   const response = await fetch(`${baseUrl}${url}`, options);
@@ -41,7 +42,7 @@ test("UC-09/UC-10 real API flow: OCR preview, submit, ownership, confirm and ide
 
   const form = new FormData();
   form.append("period", period);
-  form.append("file", new Blob([fs.readFileSync(sampleImage)], { type: "image/jpeg" }), "meter.jpg");
+  form.append("file", new Blob([sampleImage], { type: "image/jpeg" }), "meter.jpg");
   const preview = await jsonRequest("/api/v1/me/meter-reading-ocr-previews", {
     method: "POST",
     headers: tenantHeaders,
