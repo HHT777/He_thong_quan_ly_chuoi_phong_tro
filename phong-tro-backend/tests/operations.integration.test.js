@@ -22,7 +22,9 @@ test("UC-08/17/18/19/25 operations flow and ownership", async () => {
   const reopen = await request(`/api/v1/incidents/${incident.body.data.ma_su_co}`, { method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DANG_XU_LY" }) });
   assert.equal(reopen.response.status, 409);
   const coTenant = await request("/api/v1/co-tenants", { method: "POST", headers: headers(tenant), body: JSON.stringify({
-    name: "Nguoi O Test", phone: "0909000000", note: "Ban",
+    name: "Nguoi O Test", phone: "0909000000", identityNumber: "079203009999",
+    birthDate: "2003-06-15", gender: "NAM", permanentAddress: "TP Ho Chi Minh",
+    relationship: "BAN", startDate: "2026-10-15", note: "Ban",
   }) });
   assert.equal(coTenant.response.status, 201);
   const approved = await request(`/api/v1/requests/${coTenant.body.data.request.ma_yeu_cau}`, { method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET" }) });

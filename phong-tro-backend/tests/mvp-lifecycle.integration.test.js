@@ -17,6 +17,7 @@ test("UC-02..07 real lifecycle: account, building, room, tenant, deposit and con
       ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30",
       gia_thue: 1, tien_coc: 1, don_gia_dien: 1, don_gia_nuoc: 1,
       dieu_khoan: "Invalid tenant rollback",
+      da_co_ban_giay_ky: true,
     }),
   });
   assert.equal(invalidContract.response.status, 404);
@@ -33,6 +34,7 @@ test("UC-26 contract race allows only one active rental", async () => {
     ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30",
     gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000,
     dieu_khoan: "Concurrent contract test",
+    da_co_ban_giay_ky: true,
   };
   const results = await Promise.all([
     request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify(payload) }),

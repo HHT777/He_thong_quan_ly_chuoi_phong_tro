@@ -6,6 +6,7 @@ const numericContractValues = (raw) => ({
   tien_coc: Number(raw.tien_coc),
   don_gia_dien: Number(raw.don_gia_dien),
   don_gia_nuoc: Number(raw.don_gia_nuoc),
+  da_co_ban_giay_ky: raw.da_co_ban_giay_ky === "true",
   ngay_nhan_coc: raw.ngay_nhan_coc || null,
 });
 
@@ -28,6 +29,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
       { name: "don_gia_dien", label: "Đơn giá điện", type: "number", required: true },
       { name: "don_gia_nuoc", label: "Đơn giá nước/người", type: "number", required: true },
       { name: "dieu_khoan", label: "Điều khoản", type: "textarea", required: true },
+      { name: "da_co_ban_giay_ky", label: "Đã có bản giấy ký", type: "checkbox", required: true },
     ],
     map: numericContractValues,
   },

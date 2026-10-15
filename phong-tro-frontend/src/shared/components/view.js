@@ -75,6 +75,9 @@ export function shellPage(title, description = "") {
 }
 
 function fieldControl(field, value = "") {
+  if (field.type === "checkbox") {
+    return `<input class="form-control" name="${field.name}" type="checkbox" value="true" ${value === true || value === "true" ? "checked" : ""} ${field.required ? "required" : ""}>`;
+  }
   if (field.options) {
     return `<select class="form-control" name="${field.name}" ${field.required ? "required" : ""}>
       ${field.options.map((option) => `<option value="${escapeHtml(option.value)}" ${String(option.value) === String(value) ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}

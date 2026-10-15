@@ -26,7 +26,17 @@ test("UC-28 co-tenant proposal validates, deduplicates and admits only after app
     method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ name: "Missing phone" }),
   });
   assert.equal(missing.response.status, 422);
-  const payload = { name: "Nguoi O Integration", phone: "0987654321", note: "Ban" };
+  const payload = {
+    name: "Nguoi O Integration",
+    phone: "0987654321",
+    identityNumber: "079203001234",
+    birthDate: "2003-05-12",
+    gender: "NAM",
+    permanentAddress: "TP Ho Chi Minh",
+    relationship: "BAN",
+    startDate: "2026-10-15",
+    note: "Ban",
+  };
   const first = await request("/api/v1/co-tenants", {
     method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify(payload),
   });
