@@ -8,6 +8,7 @@ const DEFAULTS = Object.freeze({
   debtCloseDay: 10,
   billScheduleDay: 2,
   billScheduleHour: 8,
+  billingCronLookbackMonths: 3,
 });
 
 function readPositiveInteger(name, fallback, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
@@ -48,7 +49,7 @@ async function getPersistedSystemConfig() {
     if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw Object.assign(new Error(`Cấu hình ${key} không hợp lệ`), { status: 422, code: "INVALID_SYSTEM_CONFIG" });
     return parsed;
   };
-  return Object.freeze({ ...fallback, dueReminderDay: number("dueReminderDay", fallback.dueReminderDay, 1, 31), overdueDay: number("overdueDay", fallback.overdueDay, 1, 31), debtCloseDay: number("debtCloseDay", fallback.debtCloseDay, 1, 31), billScheduleDay: number("billScheduleDay", fallback.billScheduleDay, 1, 28), billScheduleHour: number("billScheduleHour", fallback.billScheduleHour, 0, 23), contractWarningDays: number("contractWarningDays", fallback.contractWarningDays, 1, 365), maxFileSizeBytes: number("maxFileSizeBytes", fallback.maxFileSizeBytes, 1, Number.MAX_SAFE_INTEGER) });
+  return Object.freeze({ ...fallback, dueReminderDay: number("dueReminderDay", fallback.dueReminderDay, 1, 31), overdueDay: number("overdueDay", fallback.overdueDay, 1, 31), debtCloseDay: number("debtCloseDay", fallback.debtCloseDay, 1, 31), billScheduleDay: number("billScheduleDay", fallback.billScheduleDay, 1, 28), billScheduleHour: number("billScheduleHour", fallback.billScheduleHour, 0, 23), billingCronLookbackMonths: number("billingCronLookbackMonths", fallback.billingCronLookbackMonths, 1, 24), contractWarningDays: number("contractWarningDays", fallback.contractWarningDays, 1, 365), maxFileSizeBytes: number("maxFileSizeBytes", fallback.maxFileSizeBytes, 1, Number.MAX_SAFE_INTEGER) });
 }
 
 module.exports = { DEFAULTS, readPositiveInteger, getSystemConfig, getPersistedSystemConfig };

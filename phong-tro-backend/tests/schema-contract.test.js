@@ -23,7 +23,8 @@ test("Sequelize maps every documented table and physical column", () => {
     [],
     "Migration 010/011 tables must be represented in data2.md",
   );
-  assert.equal(expected.size, 36, "Migration 012 must keep data2.md at 36 mapped tables");
+  assert.equal(expected.size, 37, "Migration 013 must map 37 documented tables");
+  assert.ok(expected.has("KhoanDieuChinh"), "Migration 013 adjustment table must be documented");
   assert.deepEqual(
     ["loaiChiSo", "khoaNghiepVu"].filter((column) => !expected.get("ChiSoDien")?.includes(column)),
     [],
@@ -33,6 +34,16 @@ test("Sequelize maps every documented table and physical column", () => {
     ["loaiThanhToan", "maBienBanTraPhong"].filter((column) => !expected.get("ThanhToan")?.includes(column)),
     [],
     "Migration 012 payment classification must be documented",
+  );
+  assert.deepEqual(
+    ["ngayLap", "daGui", "ngayGui", "daNhacHan", "ngayNhacHan", "quaHan", "ngayQuaHan", "daChotCongNo", "ngayChotCongNo", "soTienChotCongNo"].filter((column) => !expected.get("ThanhToan")?.includes(column)),
+    [],
+    "Migration 013 billing/debt lifecycle columns must be documented",
+  );
+  assert.deepEqual(
+    ["maKhoanDieuChinh", "nguoiThucHienId", "thoiDiemTao"].filter((column) => !expected.get("ChiTietThanhToan")?.includes(column)),
+    [],
+    "Migration 013 signed-line metadata must be documented",
   );
   assert.deepEqual(
     ["daCoBanGiayKy", "phiDichVu", "goiGiaHanChoPhep"].filter((column) => !expected.get("HopDong")?.includes(column)),

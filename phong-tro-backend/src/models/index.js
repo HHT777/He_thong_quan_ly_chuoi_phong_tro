@@ -5,7 +5,7 @@ const AuditLog = require("./AuditLog");
 const {
   TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc,
   ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo,
-  GiaoDichThanhToan, ChiTietThanhToan, KhoanChi, ThongBao,
+  GiaoDichThanhToan, KhoanDieuChinh, ChiTietThanhToan, KhoanChi, ThongBao,
   BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo,
 } = models;
 
@@ -78,6 +78,10 @@ ThanhToan.hasMany(GiaoDichThanhToan, { foreignKey: "ma_thanh_toan", as: "giaoDic
 GiaoDichThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });
 ThanhToan.hasMany(ChiTietThanhToan, { foreignKey: "ma_thanh_toan", as: "chiTiets" });
 ChiTietThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });
+HopDong.hasMany(KhoanDieuChinh, { foreignKey: "ma_hop_dong", as: "khoanDieuChinhs" });
+KhoanDieuChinh.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+KhoanDieuChinh.hasMany(ChiTietThanhToan, { foreignKey: "ma_khoan_dieu_chinh", as: "chiTietSnapshots" });
+ChiTietThanhToan.belongsTo(KhoanDieuChinh, { foreignKey: "ma_khoan_dieu_chinh", as: "khoanDieuChinh" });
 PhongTro.hasMany(SuCo, { foreignKey: "ma_phong", as: "suCos" });
 SuCo.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
 CanTro.hasMany(KhoanChi, { foreignKey: "ma_can", as: "khoanChis" });
