@@ -65,11 +65,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const card = addCard(`<article class="form-card" data-liquidation-form>
       <div class="form-card__head"><div><div class="eyebrow">Thanh lý</div><h2 class="section-title">Chốt trả phòng</h2></div></div>
       <form class="form-grid">
-        <div class="field"><label>Mã hợp đồng</label><input name="contractId" type="number" required></div>
+        <div class="field"><label>Mã hợp đồng</label><input name="contractId" type="text" required></div>
         <div class="field"><label>Chỉ số điện cuối</label><input name="finalElectricityReading" type="number" min="0" required></div>
         <div class="field"><label>Khấu trừ cọc</label><input name="deduction" type="number" min="0" value="0" required></div>
-        <div class="field"><label>Tiền nước</label><input name="waterAmount" type="number" min="0" value="0"></div>
-        <div class="field"><label>Tiền phòng hoàn lại</label><input name="rentRefund" type="number" min="0" value="0"></div>
+        <div class="field"><label>Tình trạng phòng</label><input name="roomCondition" type="text" required></div>
+        <div class="field"><label><input name="assetsChecked" type="checkbox" required> Đã kiểm tra tài sản</label></div>
+        <div class="field"><label><input name="debtReviewed" type="checkbox" required> Đã đối chiếu công nợ</label></div>
         <div class="field" style="grid-column:1/-1"><label>Lý do</label><textarea name="reason" required></textarea></div>
         <div class="form-actions" style="grid-column:1/-1"><button class="btn btn--primary" type="submit">Thanh lý hợp đồng</button></div>
       </form></article>`);
@@ -79,7 +80,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const values = Object.fromEntries(new FormData(event.currentTarget));
         const contractId = values.contractId;
         delete values.contractId;
-        for (const key of ["finalElectricityReading", "deduction", "waterAmount", "rentRefund"]) values[key] = Number(values[key] || 0);
+        for (const key of ["finalElectricityReading", "deduction"]) values[key] = Number(values[key] || 0);
+        values.assetsChecked = values.assetsChecked === "on";
+        values.debtReviewed = values.debtReviewed === "on";
         await ApiClient.post(`/v1/move-outs/${contractId}/settle`, values);
         notify("Đã thanh lý hợp đồng.");
         event.currentTarget.reset();

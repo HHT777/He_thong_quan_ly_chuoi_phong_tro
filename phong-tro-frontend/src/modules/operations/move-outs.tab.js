@@ -16,6 +16,7 @@ export default listTab({ id: "move-outs", route: "/operations/move-outs", title:
     visible: (row) => row.trang_thai === "DA_PHE_DUYET" && Boolean(row.ma_hop_dong),
     fields: [
       { name: "inspectionDate", label: "Ngày kiểm tra", type: "date", required: true },
+      { name: "finalElectricityReading", label: "Chỉ số điện cuối", type: "number", required: true },
       { name: "roomCondition", label: "Tình trạng phòng", type: "textarea", required: true },
       { name: "assetsChecked", label: "Đã kiểm tra tài sản", required: true, options: [{ value: "true", label: "Đã kiểm tra" }, { value: "false", label: "Chưa kiểm tra" }] },
       { name: "debtReviewed", label: "Đã đối chiếu công nợ", required: true, options: [{ value: "true", label: "Đã đối chiếu" }, { value: "false", label: "Chưa đối chiếu" }] },
@@ -28,6 +29,7 @@ export default listTab({ id: "move-outs", route: "/operations/move-outs", title:
       assetsChecked: raw.assetsChecked === "true",
       debtReviewed: raw.debtReviewed === "true",
       deduction: Number(raw.deduction),
+      finalElectricityReading: Number(raw.finalElectricityReading),
       moveOutRequestId: row.ma_yeu_cau,
     }),
     run: (context, row, values) => context.api.post(`/v1/move-outs/${row.ma_hop_dong}/settle`, values),

@@ -82,6 +82,20 @@ test("CT-015 move-out tab exposes the complete settlement checklist for approved
   assert.match(tab, /trang_thai === "DA_PHE_DUYET"/);
   assert.match(tab, /assetsChecked: raw\.assetsChecked === "true"/);
   assert.match(tab, /debtReviewed: raw\.debtReviewed === "true"/);
+  assert.match(tab, /finalElectricityReading: Number\(raw\.finalElectricityReading\)/);
   assert.match(tab, /moveOutRequestId: row\.ma_yeu_cau/);
   assert.match(tab, /\/v1\/move-outs\/\$\{row\.ma_hop_dong\}\/settle/);
+});
+
+test("C.2 frontend consumes settlement, debt and cashflow response contracts", () => {
+  const moveOut = frontend("modules/operations/move-outs.tab.js");
+  const debts = frontend("modules/finance/debts.tab.js");
+  const reports = frontend("modules/finance/reports.tab.js");
+  const legacyForms = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/assets/js/pages/mvpForms.page.js"), "utf8");
+  assert.match(moveOut, /name: "finalElectricityReading"/);
+  assert.match(debts, /loai_thanh_toan === "SAU_THANH_LY"/);
+  assert.match(reports, /data\.totalRevenue \?\? data\.totalCollected/);
+  assert.match(reports, /data\.depositDeductions/);
+  assert.match(legacyForms, /values\.assetsChecked = values\.assetsChecked === "on"/);
+  assert.doesNotMatch(legacyForms, /name="waterAmount"|name="rentRefund"/);
 });

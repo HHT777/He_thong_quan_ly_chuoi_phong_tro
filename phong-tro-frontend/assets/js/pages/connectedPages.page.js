@@ -84,7 +84,7 @@
         billTenant(item),
         billRoom(item) ? `P${billRoom(item)}` : null,
         currency(item.so_tien_con_no),
-        `10/${String(item.thang).padStart(2, "0")}/${item.nam}`,
+        item.loai_thanh_toan === "SAU_THANH_LY" ? "Nợ sau thanh lý" : `10/${String(item.thang).padStart(2, "0")}/${item.nam}`,
         item.trang_thai,
       ]),
     );
@@ -170,7 +170,7 @@
 
   async function loadReport() {
     const { data = {} } = await api().get("/v1/reports/cashflow");
-    const revenue = Number(data.totalCollected || 0);
+    const revenue = Number(data.totalRevenue ?? data.totalCollected ?? 0);
     const expenses = Number(data.totalExpenses || 0);
     const profit = revenue - expenses;
     const margin = revenue ? Math.round((profit / revenue) * 100) : 0;
