@@ -15,6 +15,7 @@ const tenantAccountService = require("../services/tenantAccount.service");
 const reservationService = require("../services/reservation.service");
 const contractViolationService = require("../services/contractViolation.service");
 const contractLifecycleService = require("../services/contractLifecycle.service");
+const moveOutRequestService = require("../services/moveOutRequest.service");
 const { writeAuditLog } = require("../services/auditLog.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
@@ -196,12 +197,13 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         automation = { type: "CONTRACT_RENEWED", contractId: contract.ma_hop_dong, endDate: contract.ngay_ket_thuc };
       }
       if (status === "DA_PHE_DUYET" && row.loai_yeu_cau === "TRA_PHONG") {
-        const detail = await YeuCauTraPhong.findOne({ where: { ma_yeu_cau: row.ma_yeu_cau }, transaction, lock: transaction.LOCK.UPDATE });
-        const contract = detail ? await HopDong.findByPk(detail.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE }) : null;
-        if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng không còn hiệu lực để trả phòng");
-        await detail.update({ ngay_tra_da_duyet: req.body.approvedMoveOutDate || detail.ngay_tra_du_kien || null }, { transaction });
-        await PhongTro.update({ trang_thai: "DANG_XU_LY_TRA_PHONG" }, { where: { ma_phong: contract.ma_phong }, transaction });
-        automation = { type: "MOVE_OUT_OPENED", contractId: contract.ma_hop_dong, roomId: contract.ma_phong };
+        automation = await moveOutRequestService.approve({
+          request: row,
+          approvedDate: req.body.approvedMoveOutDate,
+          earlyReturnReason: req.body.earlyReturnReason || req.body.reason,
+          actorId: req.user.ma_tai_khoan,
+          transaction,
+        });
       }
       if (status === "DA_PHE_DUYET" && row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG") {
         const member = await coTenantService.approve(row, transaction);
@@ -219,25 +221,9 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
     return data(res, result);
   } catch (e) { next(e); }
 });
-router.post(["/requests/:id/withdraw", "/requests/:id/revoke"], tenant, async (req, res, next) => {
+router.post("/requests/:id/revoke", landlord, async (req, res, next) => {
   try {
-    const reason = String(req.body.reason || "").trim();
-    if (!reason) throw fail(422, "Lý do rút yêu cầu là bắt buộc", "REQUEST_WITHDRAW_REASON_REQUIRED");
-    const result = await sequelize.transaction(async (transaction) => {
-      const row = await YeuCau.findOne({ where: { ma_yeu_cau: req.params.id, ma_khach_thue: req.user.ma_khach_thue }, transaction, lock: transaction.LOCK.UPDATE });
-      if (!row) throw fail(404, "Yêu cầu không tồn tại", "REQUEST_NOT_FOUND");
-      if (!["CHO_XU_LY", "DA_PHE_DUYET"].includes(row.trang_thai)) throw fail(409, "Yêu cầu không thể rút", "REQUEST_CANNOT_BE_WITHDRAWN");
-      if (row.loai_yeu_cau === "TRA_PHONG" && row.trang_thai === "DA_PHE_DUYET") {
-        const detail = await YeuCauTraPhong.findByPk(row.ma_yeu_cau, { transaction, lock: transaction.LOCK.UPDATE });
-        const contract = detail && await HopDong.findByPk(detail.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE });
-        if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Không thể rút yêu cầu sau khi thanh lý", "MOVE_OUT_ALREADY_SETTLED");
-        await PhongTro.update({ trang_thai: "DANG_THUE" }, { where: { ma_phong: contract.ma_phong }, transaction });
-      }
-      await row.update({ trang_thai: "DA_RUT", ly_do_xu_ly: reason, ngay_rut_duyet: new Date() }, { transaction });
-      await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "REQUEST_WITHDRAWN", entityType: "YeuCau", entityId: row.ma_yeu_cau, reason });
-      return row;
-    });
-    return data(res, result);
+    return data(res, await moveOutRequestService.revoke(req.params.id, req.body.reason, req.user.ma_tai_khoan));
   } catch (e) { next(e); }
 });
 

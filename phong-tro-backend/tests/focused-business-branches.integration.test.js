@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ChiSoDien, ChiTietThanhToan, ThanhToan, TaiKhoan, LichSuSuaHopDong } = require("../src/models");
+const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
 
 async function confirmedReadings(fresh) {
@@ -79,13 +80,14 @@ test("UC-15 move-out rejects incomplete input, settles once, and preserves lifec
   await confirmedReadings(fresh);
   const requestRow = await request("/api/v1/requests", {
     method: "POST", headers: headers(fresh.tenantToken),
-    body: JSON.stringify({ type: "TRA_PHONG", content: "Focused move-out" }),
+    body: JSON.stringify({ type: "TRA_PHONG", content: "Focused move-out", date: new Date().toISOString(), earlyReturnReason: "Đồng ý trả sớm" }),
   });
   assert.equal(requestRow.response.status, 201);
   const approval = await request(`/api/v1/requests/${requestRow.body.data.ma_yeu_cau}`, {
-    method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET" }),
+    method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET", earlyReturnReason: "Đồng ý trả sớm" }),
   });
   assert.equal(approval.response.status, 200);
+  await moveOutRequestService.processDueMoveOuts({ now: new Date() });
   const incomplete = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {
     method: "POST", headers: headers(landlord), body: JSON.stringify({ deduction: 0 }),
   });

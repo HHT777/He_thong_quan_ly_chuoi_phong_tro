@@ -1,6 +1,7 @@
 const cron = require("node-cron");
 const hopDongService = require("../services/hopDong.service");
 const { ThongBao, TaiKhoan, KhachThue, DatCoc } = require("../models");
+const moveOutRequestService = require("../services/moveOutRequest.service");
 
 /**
  * Initialize all cron jobs
@@ -169,8 +170,9 @@ const initCronJobs = () => {
       console.error("[CRON] Error in monthly bill generation:", error);
     }
   });
+  cron.schedule("5 0 * * *", () => moveOutRequestService.processDueMoveOuts().catch((error) => console.error("[CRON] Move-out due job failed:", error)), { timezone: "Asia/Ho_Chi_Minh" });
 
   console.log("✓ Cron jobs initialized successfully");
 };
 
-module.exports = { initCronJobs };
+module.exports = { initCronJobs, processDueMoveOuts: moveOutRequestService.processDueMoveOuts };

@@ -11,6 +11,10 @@ const moveOutSource = fs.readFileSync(
   path.resolve(__dirname, "../src/services/moveOut.service.js"),
   "utf8",
 );
+const moveOutRequestSource = fs.readFileSync(
+  path.resolve(__dirname, "../src/services/moveOutRequest.service.js"),
+  "utf8",
+);
 const ddlSource = fs.readFileSync(
   path.resolve(__dirname, "../../data2.md"),
   "utf8",
@@ -32,10 +36,10 @@ function statusDomain(constraintName) {
   return [...constraint.matchAll(/'([^']+)'/g)].map((item) => item[1]);
 }
 
-test("CT-001 move-out approval keeps the contract valid and only transitions the room", () => {
+test("CT-001 move-out approval keeps contract and room unchanged until the due job", () => {
   const approval = routeBlock(
     'router.patch("/requests/:id"',
-    'router.post(["/requests/:id/withdraw"',
+    'router.post("/requests/:id/revoke"',
   );
 
   assert.deepEqual(statusDomain("ck_HopDong_4"), [
@@ -45,10 +49,9 @@ test("CT-001 move-out approval keeps the contract valid and only transitions the
     "DA_THANH_LY",
   ]);
   assert.doesNotMatch(approval, /contract\.update\(\{\s*trang_thai:/);
-  assert.match(
-    approval,
-    /PhongTro\.update\(\{\s*trang_thai:\s*"DANG_XU_LY_TRA_PHONG"/,
-  );
+  assert.doesNotMatch(approval, /DANG_XU_LY_TRA_PHONG/);
+  assert.match(moveOutRequestSource, /room\.update\(\{ trang_thai: "DANG_XU_LY_TRA_PHONG"/);
+  assert.doesNotMatch(routeSource, /requests\/:id\/withdraw/);
 });
 
 test("CT-002 settlement leaves the approved move-out request in its valid state", () => {
@@ -62,6 +65,7 @@ test("CT-002 settlement leaves the approved move-out request in its valid state"
     "CHO_XU_LY",
     "DA_PHE_DUYET",
     "TU_CHOI",
+    "DA_RUT",
   ]);
   assert.doesNotMatch(settlement, /DA_HOAN_TAT/);
   assert.match(

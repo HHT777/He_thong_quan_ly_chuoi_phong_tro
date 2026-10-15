@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ChiSoDien, TaiKhoan } = require("../src/models");
+const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
 
 test("UC-13/14/16/15 request approval and move-out settlement", async () => {
@@ -21,6 +22,7 @@ test("UC-13/14/16/15 request approval and move-out settlement", async () => {
     body: JSON.stringify({ status: "DA_DUYET", reason: "Da tiep nhan", earlyReturnReason: "Da thong nhat tra som" }),
   });
   assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+  await moveOutRequestService.processDueMoveOuts({ now: new Date() });
   const settled = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {
     method: "POST", headers: headers(landlord),
     body: JSON.stringify({ assetsChecked: true, debtReviewed: true, roomCondition: "Dat yeu cau", deduction: 100000, finalElectricityReading: 123 }),
