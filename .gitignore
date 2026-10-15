@@ -1,0 +1,21 @@
+# Local editor/agent state
+/.agent
+/.vscode/
+/promt/
+
+# Secrets and local runtime configuration
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated outputs
+**/node_modules/
+/phong-tro-backend/uploads/
+/phong-tro-frontend/dist/
+**/build/
+**/__pycache__/
+*.py[cod]
+
+# Local archives and logs
+*.zip
+*.log
