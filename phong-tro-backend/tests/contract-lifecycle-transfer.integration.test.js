@@ -1,0 +1,93 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const {
+  HopDong, PhongTro, ChiSoDien, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan,
+} = require("../src/models");
+const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
+
+async function createTargetRoom(landlord, label) {
+  const base = await createBaseRental(landlord, label);
+  return base.room;
+}
+
+test("FR-042 contract creation is recorded and history respects tenant ownership", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "history");
+  const own = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/history`, { headers: { Authorization: `Bearer ${fresh.tenantToken}` } });
+  assert.equal(own.response.status, 200, JSON.stringify(own.body));
+  assert.ok(own.body.data.some((entry) => entry.type === "CHANGE" && JSON.stringify(entry.data.sau_json).includes("CREATED")));
+  const updated = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}`, {
+    method: "PUT", headers: headers(landlord), body: JSON.stringify({ phi_dich_vu: 150000, reason: "Thỏa thuận phí dịch vụ" }),
+  });
+  assert.equal(updated.response.status, 200, JSON.stringify(updated.body));
+  const renewalRequest = await request("/api/v1/requests", {
+    method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ type: "GIA_HAN", content: "Gia hạn 6 tháng", requestedEndDate: "2028-03-30" }),
+  });
+  assert.equal(renewalRequest.response.status, 201, JSON.stringify(renewalRequest.body));
+  const approved = await request(`/api/v1/requests/${renewalRequest.body.data.ma_yeu_cau}`, {
+    method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET" }),
+  });
+  assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+  const afterChanges = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/history`, { headers: { Authorization: `Bearer ${fresh.tenantToken}` } });
+  assert.ok(afterChanges.body.data.some((entry) => entry.type === "CHANGE" && JSON.stringify(entry.data.sau_json).includes("UPDATED")));
+  assert.ok(afterChanges.body.data.some((entry) => entry.type === "RENEWAL" && Number(entry.data.so_thang) === 6));
+  const other = await login(integration.otherTenant);
+  const forbidden = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/history`, { headers: { Authorization: `Bearer ${other}` } });
+  assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-195 transfers a contract and all dependent state atomically", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "transfer");
+  const target = await createTargetRoom(landlord, "transfer-target");
+  const response = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/transfers`, {
+    method: "POST", headers: headers(landlord), body: JSON.stringify({
+      targetRoomId: target.ma_phong, transferDate: "2026-11-15", newRent: 2700000,
+      finalElectricityReading: 145, initialElectricityReading: 12, reason: "Hai bên thống nhất chuyển phòng",
+    }),
+  });
+  assert.equal(response.response.status, 201, JSON.stringify(response.body));
+  const [contract, source, destination, history, readings, audit] = await Promise.all([
+    HopDong.findByPk(fresh.contract.ma_hop_dong), PhongTro.findByPk(fresh.room.ma_phong), PhongTro.findByPk(target.ma_phong),
+    LichSuChuyenPhong.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } }),
+    ChiSoDien.findAll({ where: { nam: 2026, thang: 11, ma_phong: [fresh.room.ma_phong, target.ma_phong] } }),
+    AuditLog.findOne({ where: { action: "ROOM_TRANSFERRED", entity_type: "LichSuChuyenPhong" } }),
+  ]);
+  assert.equal(contract.ma_phong, target.ma_phong);
+  assert.equal(source.trang_thai, "TRONG");
+  assert.equal(destination.trang_thai, "DANG_THUE");
+  assert.ok(history);
+  assert.equal(readings.length, 2);
+  assert.ok(readings.every((row) => row.trang_thai_xac_nhan === "DA_XAC_NHAN"));
+  assert.ok(audit);
+  const forbidden = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/transfers`, { method: "POST", headers: headers(fresh.tenantToken), body: "{}" });
+  assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-195 rolls back the old-room meter close when the target meter conflicts", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "transfer-rollback", { createAccount: false });
+  const target = await createTargetRoom(landlord, "transfer-conflict");
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  await ChiSoDien.create({
+    nam: 2026, thang: 12, chi_so_moi: 99, don_gia_ap_dung: 3500, trang_thai_xac_nhan: "DA_XAC_NHAN",
+    nguoi_ghi_nhan_id: actor.ma_tai_khoan, nguoi_xac_nhan_id: actor.ma_tai_khoan, ngay_xac_nhan: new Date(), ma_phong: target.ma_phong,
+  });
+  const response = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/transfers`, {
+    method: "POST", headers: headers(landlord), body: JSON.stringify({
+      targetRoomId: target.ma_phong, transferDate: "2026-12-15", newRent: 2600000,
+      finalElectricityReading: 200, initialElectricityReading: 10, reason: "Kiểm tra rollback",
+    }),
+  });
+  assert.equal(response.response.status, 409, JSON.stringify(response.body));
+  const [contract, oldReading, history, lifecycle] = await Promise.all([
+    HopDong.findByPk(fresh.contract.ma_hop_dong),
+    ChiSoDien.findOne({ where: { ma_phong: fresh.room.ma_phong, nam: 2026, thang: 12 } }),
+    LichSuChuyenPhong.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } }),
+    LichSuSuaHopDong.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, ly_do: "Kiểm tra rollback" } }),
+  ]);
+  assert.equal(contract.ma_phong, fresh.room.ma_phong);
+  assert.equal(oldReading, null);
+  assert.equal(history, null);
+  assert.equal(lifecycle, null);
+});

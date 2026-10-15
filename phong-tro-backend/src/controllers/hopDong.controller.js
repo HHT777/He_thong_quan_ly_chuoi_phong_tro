@@ -13,7 +13,7 @@ class HopDongController {
         return next(error);
       }
 
-      const hopDong = await hopDongService.createHopDong(value);
+      const hopDong = await hopDongService.createHopDong(value, req.user.ma_tai_khoan);
 
       res.status(201).json({
         success: true,
@@ -89,7 +89,7 @@ class HopDongController {
         return next(error);
       }
 
-      const hopDong = await hopDongService.updateHopDong(req.params.id, value);
+      const hopDong = await hopDongService.updateHopDong(req.params.id, value, req.user.ma_tai_khoan);
 
       res.json({
         success: true,
@@ -99,6 +99,19 @@ class HopDongController {
     } catch (error) {
       next(error);
     }
+  }
+
+  async getHistory(req, res, next) {
+    try {
+      res.json({ success: true, data: await hopDongService.getHistory(req.params.id, req.user), message: "Lấy lịch sử hợp đồng thành công" });
+    } catch (error) { next(error); }
+  }
+
+  async transferRoom(req, res, next) {
+    try {
+      const result = await require("../services/roomTransfer.service").transfer(req.params.id, req.body, req.user.ma_tai_khoan);
+      res.status(201).json({ success: true, data: result, message: "Chuyển phòng thành công" });
+    } catch (error) { next(error); }
   }
 
   async renewHopDong(req, res, next) {
