@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { date } from "../../shared/components/view.js";
+export default listTab({ id: "co-tenants", route: "/residents-contracts/co-tenants", title: "Người ở cùng", tabLabel: "Người ở cùng", group: "residents-contracts", order: 33, roles: ["CHU_TRO"] }, { title: "Người ở cùng", description: "Danh sách thành viên đang cư trú theo phòng.", endpoint: "/v1/co-tenants", columns: [{ label: "Họ tên", key: "ho_ten" }, { label: "Điện thoại", key: "so_dien_thoai" }, { label: "Ngày vào", format: (row) => date(row.ngay_vao) }, { label: "Trạng thái", key: "trang_thai_cu_tru" }] });

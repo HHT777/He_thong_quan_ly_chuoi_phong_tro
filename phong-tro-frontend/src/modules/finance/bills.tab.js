@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { money } from "../../shared/components/view.js";
+export default listTab({ id: "bills", route: "/finance/bills", title: "Hóa đơn", tabLabel: "Hóa đơn", group: "finance", order: 40, roles: ["CHU_TRO"] }, { title: "Hóa đơn", description: "Khoản phải thu theo kỳ và phòng.", endpoint: "/khoan-phai-thu?limit=100", columns: [{ label: "Khách thuê", format: (row) => row.hopDong?.khachThue?.ho_ten || "—" }, { label: "Kỳ", format: (row) => `${row.thang || "—"}/${row.nam || "—"}` }, { label: "Phải trả", format: (row) => money(row.tong_phai_tra) }, { label: "Còn nợ", format: (row) => money(row.so_tien_con_no) }, { label: "Trạng thái", key: "trang_thai" }] });

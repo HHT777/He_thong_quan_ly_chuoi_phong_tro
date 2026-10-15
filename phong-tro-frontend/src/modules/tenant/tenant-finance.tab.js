@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { money } from "../../shared/components/view.js";
+export default listTab({ id: "tenant-finance", route: "/tenant/finance", title: "Tài chính", tabLabel: "Khoản phải trả", group: "tenant-finance", order: 20, roles: ["KHACH_THUE"] }, { title: "Khoản phải trả", description: "Hóa đơn và số tiền còn nợ thuộc hợp đồng của bạn.", endpoint: "/khoan-phai-thu?limit=100", columns: [{ label: "Kỳ", format: (row) => `${row.thang}/${row.nam}` }, { label: "Phải trả", format: (row) => money(row.tong_phai_tra) }, { label: "Đã trả", format: (row) => money(row.tong_da_thanh_toan) }, { label: "Còn nợ", format: (row) => money(row.so_tien_con_no) }, { label: "Trạng thái", key: "trang_thai" }] });

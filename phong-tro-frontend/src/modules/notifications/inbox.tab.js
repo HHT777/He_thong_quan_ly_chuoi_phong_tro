@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { date } from "../../shared/components/view.js";
+export default listTab({ id: "inbox", route: "/notifications/inbox", title: "Thông báo", tabLabel: "Hộp thư", group: "notifications", order: 60, roles: ["CHU_TRO", "KHACH_THUE"] }, { title: "Hộp thư", description: "Thông báo nghiệp vụ và nhắc việc dành cho tài khoản hiện tại.", endpoint: "/v1/notifications", columns: [{ label: "Nội dung", key: "noi_dung" }, { label: "Loại", key: "loai_thong_bao" }, { label: "Thời điểm", format: (row) => date(row.thoi_diem_tao) }, { label: "Đã đọc", format: (row) => row.da_doc ? "Đã đọc" : "Chưa đọc" }] });

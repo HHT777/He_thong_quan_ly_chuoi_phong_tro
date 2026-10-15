@@ -1,0 +1,494 @@
+/**
+ * ISK19 SaaS Modern Dashboard Styles
+ * High-end SaaS layout inspired by Afghan Product Dashboard
+ */
+
+.dashboard-view {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+/* 6-Card Stat Grid */
+.stat-grid-6 {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1400px) {
+  .stat-grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .stat-grid-6 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Revenue & Activity Grid (8 cols + 4 cols) */
+.dashboard-grid-8-4 {
+  display: grid;
+  grid-template-columns: 8fr 4fr;
+  gap: 20px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-grid-8-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 3-Column Grid for Occupancy Donut, Quick Actions, and Top Buildings */
+.dashboard-grid-3col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid-3col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card Headers */
+.dashboard-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.dashboard-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-card-subtitle {
+  margin: 3px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.card-action-link {
+  font-size: 12.5px;
+  font-weight: var(--font-bold);
+  color: var(--brand-primary);
+  text-decoration: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-action-link:hover {
+  text-decoration: underline;
+}
+
+/* Toggle Tabs (Tháng này / 3 tháng / Năm nay) */
+.segmented-toggle {
+  display: inline-flex;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+.segmented-toggle-btn {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.segmented-toggle-btn.is-active {
+  background: var(--brand-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(11, 92, 168, 0.2);
+}
+
+/* Monthly Horizontal Bars (like sample image) */
+.monthly-bars-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.monthly-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.monthly-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.monthly-bar-title {
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.monthly-bar-sub {
+  font-weight: var(--font-normal);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.monthly-bar-val-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthly-bar-val {
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.monthly-bar-track {
+  width: 100%;
+  height: 28px;
+  background-color: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  position: relative;
+}
+
+.monthly-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, #0b5ca8 0%, #1976d2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: var(--font-bold);
+  font-variant-numeric: tabular-nums;
+  transition: width 800ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 4 Pastel Summary Boxes at the bottom of Revenue Analytics */
+.revenue-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .revenue-mini-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.revenue-mini-card {
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.revenue-mini-card--blue { background: var(--blue-surface); border-color: var(--blue-border); }
+.revenue-mini-card--green { background: var(--green-surface); border-color: var(--green-border); }
+.revenue-mini-card--purple { background: var(--purple-surface); border-color: var(--purple-border); }
+.revenue-mini-card--orange { background: var(--orange-surface); border-color: var(--orange-border); }
+
+.revenue-mini-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.revenue-mini-card__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.revenue-mini-card--blue .revenue-mini-card__icon { background: #dbeafe; color: var(--blue-text); }
+.revenue-mini-card--green .revenue-mini-card__icon { background: #d1fae5; color: var(--green-text); }
+.revenue-mini-card--purple .revenue-mini-card__icon { background: #ede9fe; color: var(--purple-text); }
+.revenue-mini-card--orange .revenue-mini-card__icon { background: #ffedd5; color: var(--orange-text); }
+
+.revenue-mini-card__val {
+  font-size: 17px;
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.revenue-mini-card__label {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: var(--font-medium);
+}
+
+/* Live Activity Timeline */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: var(--green-surface);
+  color: var(--green-text);
+  font-size: 11px;
+  font-weight: var(--font-bold);
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--green-primary);
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseLive 1.8s infinite;
+}
+
+@keyframes pulseLive {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.activity-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.activity-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-title {
+  margin: 0 0 2px 0;
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.activity-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.activity-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Occupancy Donut Chart Box */
+.donut-center-box {
+  position: relative;
+  width: 170px;
+  height: 170px;
+  margin: 0 auto 16px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-inner-content {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-inner-rate {
+  font-size: 26px;
+  font-weight: var(--font-extrabold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.donut-inner-label {
+  font-size: 11px;
+  font-weight: var(--font-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
+.donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.donut-legend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+}
+
+.donut-legend-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.donut-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.donut-legend-val {
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Top Buildings List */
+.top-buildings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-building-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-fast);
+}
+
+.top-building-item:hover {
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  transform: translateX(2px);
+}
+
+.top-building-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.top-building-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-extrabold);
+  font-size: 13px;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.top-building-badge--1 { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.top-building-badge--2 { background: linear-gradient(135deg, #94a3b8, #64748b); }
+.top-building-badge--3 { background: linear-gradient(135deg, #b45309, #78350f); }
+
+.top-building-info h6 {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.top-building-info p {
+  margin: 2px 0 0 0;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.top-building-right {
+  text-align: right;
+}
+
+.top-building-rate {
+  font-size: 14px;
+  font-weight: var(--font-bold);
+  color: var(--green-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.top-building-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Pending Actions Section */
+.pending-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
+  .pending-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}

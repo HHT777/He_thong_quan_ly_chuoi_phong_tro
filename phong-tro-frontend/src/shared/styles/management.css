@@ -1,0 +1,302 @@
+/**
+ * ISK19 Management Pages Styles (Căn & Phòng, Bảng, Phân trang, Lọc)
+ */
+
+/* ==========================================================================
+   MANAGEMENT STAT STRIP (DẢI THỐNG KÊ PHÍA TRÊN)
+   ========================================================================== */
+.mgmt-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .mgmt-stat-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.mgmt-stat-pill {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+
+.mgmt-stat-pill:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.mgmt-stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.mgmt-stat-label {
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mgmt-stat-val {
+  font-size: 22px;
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+
+.mgmt-stat-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   UNIFIED TOOLBAR (THANH CÔNG CỤ THỐNG NHẤT)
+   ========================================================================== */
+.mgmt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+
+.mgmt-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 280px;
+  flex-wrap: wrap;
+}
+
+.mgmt-search-wrap {
+  position: relative;
+  min-width: 220px;
+  max-width: 340px;
+  width: 100%;
+}
+
+.mgmt-filter-select {
+  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  background-color: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.mgmt-filter-select:focus {
+  border-color: var(--brand-primary);
+  background-color: #ffffff;
+}
+
+.mgmt-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* View Mode Switcher (Bảng / Thẻ) */
+.view-mode-toggle {
+  display: inline-flex;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+.view-mode-btn {
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: var(--font-semibold);
+  transition: all var(--transition-fast);
+}
+
+.view-mode-btn.is-active {
+  background: #ffffff;
+  color: var(--brand-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Filter Chips Bar */
+.mgmt-filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fafbfc;
+  border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: #eff6ff;
+  color: var(--blue-text);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-full);
+  font-weight: var(--font-medium);
+}
+
+.filter-chip-remove {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.filter-chip-clear {
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  margin-left: 4px;
+}
+
+/* ==========================================================================
+   CARD GRID VIEW (XEM DẠNG THẺ CHO PHÒNG)
+   ========================================================================== */
+.card-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.grid-card-item {
+  background: #ffffff;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all var(--transition-normal);
+}
+
+.grid-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+.grid-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.grid-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+}
+
+.grid-card-building {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.grid-card-price {
+  font-size: 17px;
+  font-weight: var(--font-bold);
+  color: var(--brand-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.grid-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-light);
+  padding-top: 10px;
+}
+
+/* Tooltip / Badges in Table */
+.tag-truncated {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tag-badge {
+  background: var(--bg-subtle);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.tag-more {
+  background: #eff6ff;
+  color: var(--brand-primary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: var(--font-bold);
+  cursor: help;
+}
+
+/* Page Intro & Subtitle */
+.module-page__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.module-page__subtitle {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}

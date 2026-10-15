@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { money } from "../../shared/components/view.js";
+export default listTab({ id: "debts", route: "/finance/debts", title: "Công nợ", tabLabel: "Công nợ", group: "finance", order: 42, roles: ["CHU_TRO"] }, { title: "Công nợ", description: "Các khoản còn nợ cần theo dõi.", endpoint: "/v1/debt", columns: [{ label: "Khách thuê", format: (row) => row.hopDong?.khachThue?.ho_ten || "—" }, { label: "Kỳ", format: (row) => `${row.thang}/${row.nam}` }, { label: "Còn nợ", format: (row) => money(row.so_tien_con_no) }, { label: "Trạng thái", key: "trang_thai" }] });

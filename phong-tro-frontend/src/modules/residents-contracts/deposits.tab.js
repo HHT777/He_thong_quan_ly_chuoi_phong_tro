@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { money, date } from "../../shared/components/view.js";
+export default listTab({ id: "deposits", route: "/residents-contracts/deposits", title: "Tiền cọc", tabLabel: "Tiền cọc", group: "residents-contracts", order: 32, roles: ["CHU_TRO"] }, { title: "Tiền cọc", description: "Theo dõi tiền cọc, hoàn cọc và khấu trừ.", endpoint: "/dat-coc?limit=100", columns: [{ label: "Khách thuê", format: (row) => row.hopDong?.khachThue?.ho_ten || "—" }, { label: "Số tiền", format: (row) => money(row.so_tien_coc) }, { label: "Ngày nhận", format: (row) => date(row.ngay_nhan_coc) }, { label: "Trạng thái", key: "trang_thai" }] });

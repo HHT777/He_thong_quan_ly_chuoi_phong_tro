@@ -1,0 +1,3 @@
+import { listTab } from "../../shared/components/tab-factory.js";
+import { money, date } from "../../shared/components/view.js";
+export default listTab({ id: "cashflow", route: "/finance/cashflow", title: "Thu chi", tabLabel: "Thu chi", group: "finance", order: 43, roles: ["CHU_TRO"] }, { title: "Thu chi", description: "Các khoản chi phí vận hành.", endpoint: "/management/thu-chi", columns: [{ label: "Loại khoản chi", key: "loai_khoan_chi" }, { label: "Số tiền", format: (row) => money(row.so_tien) }, { label: "Ngày phát sinh", format: (row) => date(row.ngay_phat_sinh) }, { label: "Ghi chú", key: "ghi_chu" }] });
