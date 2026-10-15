@@ -2,6 +2,7 @@
 /.agent
 /.vscode/
 /promt/
+/OCR/
 
 # Secrets and local runtime configuration
 .env
