@@ -19,9 +19,20 @@ test("Sequelize maps every documented table and physical column", () => {
   const expected = ddlTables();
   assert.ok(expected.size >= 25);
   assert.deepEqual(
-    ["LichSuGiaHanHopDong", "LichSuSuaHopDong", "LichSuChuyenPhong"].filter((table) => !expected.has(table)),
+    ["LichSuGiaHanHopDong", "LichSuSuaHopDong", "LichSuChuyenPhong", "GiaoDichHoanCoc"].filter((table) => !expected.has(table)),
     [],
     "Migration 010/011 tables must be represented in data2.md",
+  );
+  assert.equal(expected.size, 36, "Migration 012 must keep data2.md at 36 mapped tables");
+  assert.deepEqual(
+    ["loaiChiSo", "khoaNghiepVu"].filter((column) => !expected.get("ChiSoDien")?.includes(column)),
+    [],
+    "Migration 012 meter business key must be documented",
+  );
+  assert.deepEqual(
+    ["loaiThanhToan", "maBienBanTraPhong"].filter((column) => !expected.get("ThanhToan")?.includes(column)),
+    [],
+    "Migration 012 payment classification must be documented",
   );
   assert.deepEqual(
     ["daCoBanGiayKy", "phiDichVu", "goiGiaHanChoPhep"].filter((column) => !expected.get("HopDong")?.includes(column)),

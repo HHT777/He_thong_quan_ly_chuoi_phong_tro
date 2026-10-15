@@ -29,7 +29,7 @@ set session sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_F
 create database `quan_ly_phong_tro_demo` character set utf8mb4 collate utf8mb4_unicode_ci;
 use `quan_ly_phong_tro_demo`;
 
--- 1. TẠO 25 BẢNG
+-- 1. TẠO 36 BẢNG
 
 create table `TaiKhoan` (
 `maTaiKhoan` varchar(36) not null,
@@ -202,6 +202,8 @@ create table `ChiSoDien` (
 `maChiSo` varchar(36) not null,
 `thang` integer not null,
 `nam` integer not null,
+`loaiChiSo` varchar(30) not null default 'DINH_KY',
+`khoaNghiepVu` varchar(100) not null default 'DINH_KY',
 `chiSoMoi` decimal(18,2) not null,
 `anhCongToUrl` varchar(500) null,
 `donGiaApDung` decimal(18,2) not null,
@@ -220,7 +222,7 @@ constraint `fk_ChiSoDien_maPhong` foreign key (`maPhong`) references `PhongTro` 
 `nguoiXoaId` varchar(36) null,
 constraint `fk_ChiSoDien_nguoiXoaId` foreign key (`nguoiXoaId`) references `TaiKhoan` (`maTaiKhoan`),
 primary key (`maChiSo`),
-unique key `uq_ChiSoDien_ky1` (`maPhong`, `thang`, `nam`),
+-- uq_ChiSoDien_nghiepVu is added after legacy seed keys are normalized.
 constraint `ck_ChiSoDien_1` check (`thang` between 1 and 12),
 constraint `ck_ChiSoDien_2` check (`donGiaApDung` >= 0),
 constraint `ck_ChiSoDien_3` check (`trangThaiXacNhan` in ('CHO_XAC_NHAN', 'DA_XAC_NHAN')),
@@ -258,8 +260,11 @@ create table `ThanhToan` (
 `trangThai` varchar(30) not null,
 `maHopDong` varchar(36) not null,
 constraint `fk_ThanhToan_maHopDong` foreign key (`maHopDong`) references `HopDong` (`maHopDong`),
+`loaiThanhToan` varchar(30) not null default 'DINH_KY',
+`maBienBanTraPhong` varchar(36) null,
 primary key (`maThanhToan`),
-unique key `uq_ThanhToan_ky1` (`maHopDong`, `thang`, `nam`),
+unique key `uq_ThanhToan_ky_loai` (`maHopDong`, `thang`, `nam`, `loaiThanhToan`),
+unique key `uq_ThanhToan_maBienBanTraPhong` (`maBienBanTraPhong`),
 key `ix_ThanhToan_1` (`trangThai`, `nam`, `thang`),
 constraint `ck_ThanhToan_1` check (`thang` between 1 and 12),
 constraint `ck_ThanhToan_2` check (`soTienConNo` >= 0),
@@ -361,6 +366,7 @@ create table `GiaoDichThanhToan` (
 constraint `fk_GiaoDichThanhToan_nguoiHuyId` foreign key (`nguoiHuyId`) references `TaiKhoan` (`maTaiKhoan`),
 `maThanhToan` varchar(36) not null,
 constraint `fk_GiaoDichThanhToan_maThanhToan` foreign key (`maThanhToan`) references `ThanhToan` (`maThanhToan`),
+`nguonThanhToan` varchar(30) not null default 'THU_TIEN',
 primary key (`maGiaoDich`),
 key `ix_GiaoDichThanhToan_1` (`maThanhToan`, `trangThaiXacNhan`),
 constraint `ck_GiaoDichThanhToan_1` check (`soTien` >= 0),
@@ -445,6 +451,14 @@ unique key `uq_BienBanTraPhong_maYeuCauTraPhong` (`maYeuCauTraPhong`),
 constraint `fk_BienBanTraPhong_maYeuCauTraPhong` foreign key (`maYeuCauTraPhong`) references `YeuCauTraPhong` (`maYeuCau`),
 `nguoiLapId` varchar(36) not null,
 constraint `fk_BienBanTraPhong_nguoiLapId` foreign key (`nguoiLapId`) references `TaiKhoan` (`maTaiKhoan`),
+`laDuLieuLegacy` boolean not null default false,
+`ngayQuyetToan` date null,
+`tienCocBanDau` decimal(18,2) null,
+`tienPhongTraTruocDuocHoan` decimal(18,2) null,
+`giaTriQuyetToanRong` decimal(18,2) null,
+`soTienNoSauThanhLy` decimal(18,2) null,
+`congThucQuyetToan` varchar(255) null,
+`snapshotJson` json null,
 primary key (`maBienBan`),
 constraint `ck_BienBanTraPhong_1` check (`soTienCocDuocHoan` >= 0),
 constraint `ck_BienBanTraPhong_2` check (`tongKhoanKhauTru` >= 0)
@@ -481,10 +495,31 @@ create table `KhoanKhauTru` (
 constraint `fk_KhoanKhauTru_maBienBanTraPhong` foreign key (`maBienBanTraPhong`) references `BienBanTraPhong` (`maBienBan`),
 `maTaiSan` varchar(36) null,
 constraint `fk_KhoanKhauTru_maTaiSan` foreign key (`maTaiSan`) references `TaiSan` (`maTaiSan`),
+`soLuongTaiSan` integer null,
 `maViPham` varchar(36) null,
+unique key `uq_KhoanKhauTru_maViPham` (`maViPham`),
 constraint `fk_KhoanKhauTru_maViPham` foreign key (`maViPham`) references `ViPhamHopDong` (`maViPham`),
+`maChiPhiSuCo` varchar(36) null,
+unique key `uq_KhoanKhauTru_maChiPhiSuCo` (`maChiPhiSuCo`),
 primary key (`maKhauTru`),
 constraint `ck_KhoanKhauTru_1` check (`soTien` >= 0)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table `GiaoDichHoanCoc` (
+`maGiaoDichHoanCoc` varchar(36) not null,
+`maBienBanTraPhong` varchar(36) not null,
+constraint `fk_GiaoDichHoanCoc_bienBan` foreign key (`maBienBanTraPhong`) references `BienBanTraPhong` (`maBienBan`),
+`maTienCoc` varchar(36) not null,
+constraint `fk_GiaoDichHoanCoc_tienCoc` foreign key (`maTienCoc`) references `TienCoc` (`maTienCoc`),
+`ngayHoan` date not null,
+`soTien` decimal(18,2) not null,
+`nguoiGhiNhanId` varchar(36) not null,
+constraint `fk_GiaoDichHoanCoc_nguoiGhiNhan` foreign key (`nguoiGhiNhanId`) references `TaiKhoan` (`maTaiKhoan`),
+`khoaChongTrung` varchar(100) not null,
+`thoiDiemTao` timestamp not null default current_timestamp,
+primary key (`maGiaoDichHoanCoc`),
+unique key `uq_GiaoDichHoanCoc_khoaChongTrung` (`khoaChongTrung`),
+constraint `ck_GiaoDichHoanCoc_1` check (`soTien` > 0)
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table `LichSuGiaHanHopDong` (
@@ -616,6 +651,9 @@ constraint `fk_LichSuGiaHanGiuPhong_maDatGiu` foreign key (`maDatGiu`) reference
 primary key (`maLichSu`),
 constraint `ck_LichSuGiaHanGiuPhong_1` check (`hanMoi` > `hanCu`)
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+alter table `ThanhToan` add constraint `fk_ThanhToan_maBienBanTraPhong` foreign key (`maBienBanTraPhong`) references `BienBanTraPhong` (`maBienBan`);
+alter table `KhoanKhauTru` add constraint `fk_KhoanKhauTru_maChiPhiSuCo` foreign key (`maChiPhiSuCo`) references `ChiPhiSuCoKhachThue` (`maChiPhiSuCo`);
 
 -- 2. NẠP DỮ LIỆU: nếu có lỗi, rollback; không commit tiếp phần dữ liệu lỗi.
 create table `CauHinhHeThong` (
@@ -1349,6 +1387,12 @@ insert into `KhoanKhauTru` (`maKhauTru`, `loaiKhauTru`, `lyDo`, `soTien`, `ghiCh
 ('6b3e340a-20df-51cd-83fb-47eb7d173407', 'VI_PHAM_HOP_DONG', 'Phạt vệ sinh khi bàn giao', 150000, null, 'f9b290ed-2ab1-5837-8054-bec5ac8c4893', null, '0c8f878a-905b-53a0-a5e5-22020b88e830');
 
 commit;
+
+-- Chuẩn hóa khóa nghiệp vụ của dữ liệu chỉ số cũ rồi mới bật unique index.
+update `ChiSoDien` set `khoaNghiepVu`=concat('DINH_KY:', `nam`, '-', lpad(`thang`, 2, '0')) where `loaiChiSo`='DINH_KY';
+create unique index `uq_ChiSoDien_nghiepVu` on `ChiSoDien` (`maPhong`, `loaiChiSo`, `khoaNghiepVu`);
+update `BienBanTraPhong` b left join `TienCoc` c on c.`maHopDong`=b.`maHopDong`
+set b.`laDuLieuLegacy`=true, b.`tienCocBanDau`=c.`soTienCoc`;
 
 -- 3. KIỂM TRA TỔNG QUAN
 select 'TaiKhoan' as bang, count(*) as so_ban_ghi from `TaiKhoan`

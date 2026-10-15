@@ -6,8 +6,21 @@ const {
   TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc,
   ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo,
   GiaoDichThanhToan, ChiTietThanhToan, KhoanChi, ThongBao,
-  BienBanTraPhong, KhoanThu, KhoanKhauTru, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo,
+  BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo,
 } = models;
+
+function ensureMeterBusinessKey(reading) {
+  const type = reading.loai_chi_so || "DINH_KY";
+  reading.setDataValue("loai_chi_so", type);
+  if (!reading.khoa_nghiep_vu && type === "DINH_KY" && reading.nam && reading.thang) {
+    reading.setDataValue("khoa_nghiep_vu", `DINH_KY:${reading.nam}-${String(reading.thang).padStart(2, "0")}`);
+  }
+  if (!reading.khoa_nghiep_vu) {
+    throw Object.assign(new Error("Thiếu khóa nghiệp vụ của chỉ số điện"), { status: 422, code: "METER_BUSINESS_KEY_REQUIRED" });
+  }
+}
+ChiSoDien.beforeValidate(ensureMeterBusinessKey);
+ChiSoDien.beforeBulkCreate((readings) => readings.forEach(ensureMeterBusinessKey));
 
 TaiKhoan.prototype.checkPassword = function checkPassword(password) {
   return bcrypt.compare(password, this.mat_khau);
@@ -60,6 +73,7 @@ KhachThue.hasMany(YeuCau, { foreignKey: "ma_khach_thue", as: "yeuCaus" });
 YeuCau.belongsTo(KhachThue, { foreignKey: "ma_khach_thue", as: "khachThue" });
 HopDong.hasMany(ThanhToan, { foreignKey: "ma_hop_dong", as: "thanhToans" });
 ThanhToan.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+ThanhToan.belongsTo(BienBanTraPhong, { foreignKey: "ma_bien_ban_tra_phong", as: "bienBanTraPhong" });
 ThanhToan.hasMany(GiaoDichThanhToan, { foreignKey: "ma_thanh_toan", as: "giaoDichs" });
 GiaoDichThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });
 ThanhToan.hasMany(ChiTietThanhToan, { foreignKey: "ma_thanh_toan", as: "chiTiets" });
@@ -74,6 +88,10 @@ HopDong.hasOne(BienBanTraPhong, { foreignKey: "ma_hop_dong", as: "bienBanTraPhon
 BienBanTraPhong.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
 BienBanTraPhong.hasMany(KhoanKhauTru, { foreignKey: "ma_bien_ban_tra_phong", as: "khoanKhauTrus" });
 KhoanKhauTru.belongsTo(BienBanTraPhong, { foreignKey: "ma_bien_ban_tra_phong", as: "bienBanTraPhong" });
+BienBanTraPhong.hasMany(GiaoDichHoanCoc, { foreignKey: "ma_bien_ban_tra_phong", as: "giaoDichHoanCocs" });
+GiaoDichHoanCoc.belongsTo(BienBanTraPhong, { foreignKey: "ma_bien_ban_tra_phong", as: "bienBanTraPhong" });
+TienCoc.hasMany(GiaoDichHoanCoc, { foreignKey: "ma_tien_coc", as: "giaoDichHoanCocs" });
+GiaoDichHoanCoc.belongsTo(TienCoc, { foreignKey: "ma_tien_coc", as: "tienCoc" });
 GiaoDichThanhToan.hasOne(KhoanThu, { foreignKey: "ma_giao_dich_thanh_toan", as: "khoanThu" });
 KhoanThu.belongsTo(GiaoDichThanhToan, { foreignKey: "ma_giao_dich_thanh_toan", as: "giaoDich" });
 SuCo.hasOne(ChiPhiSuCoKhachThue, { foreignKey: "ma_su_co", as: "chiPhiKhachThue" });

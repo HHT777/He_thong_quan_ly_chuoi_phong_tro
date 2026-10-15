@@ -59,9 +59,19 @@ async function run() {
   try {
     await connection.query(baselineSql());
     const [beforeRows] = await connection.query("SELECT (SELECT COUNT(*) FROM HopDong) contracts, (SELECT COUNT(*) FROM PhongTro) rooms, (SELECT COUNT(*) FROM TaiKhoan) accounts");
-    await connection.query("SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS LichSuChuyenPhong, LichSuGiaHanHopDong, LichSuSuaHopDong; ALTER TABLE HopDong DROP COLUMN goiGiaHanChoPhep, DROP COLUMN phiDichVu, DROP COLUMN daCoBanGiayKy; SET FOREIGN_KEY_CHECKS=1;");
+    await connection.query(`
+      SET FOREIGN_KEY_CHECKS=0;
+      DROP TABLE IF EXISTS GiaoDichHoanCoc, LichSuChuyenPhong, LichSuGiaHanHopDong, LichSuSuaHopDong;
+      ALTER TABLE KhoanKhauTru DROP FOREIGN KEY fk_KhoanKhauTru_maChiPhiSuCo, DROP INDEX uq_KhoanKhauTru_maChiPhiSuCo, DROP INDEX uq_KhoanKhauTru_maViPham, DROP COLUMN maChiPhiSuCo, DROP COLUMN soLuongTaiSan;
+      ALTER TABLE ThanhToan DROP FOREIGN KEY fk_ThanhToan_maBienBanTraPhong, DROP INDEX uq_ThanhToan_maBienBanTraPhong, DROP INDEX uq_ThanhToan_ky_loai, ADD UNIQUE INDEX uq_ThanhToan_ky1 (maHopDong, thang, nam), DROP COLUMN maBienBanTraPhong, DROP COLUMN loaiThanhToan;
+      ALTER TABLE ChiSoDien DROP INDEX uq_ChiSoDien_nghiepVu, ADD UNIQUE INDEX uq_ChiSoDien_ky1 (maPhong, thang, nam), DROP COLUMN khoaNghiepVu, DROP COLUMN loaiChiSo;
+      ALTER TABLE GiaoDichThanhToan DROP COLUMN nguonThanhToan;
+      ALTER TABLE BienBanTraPhong DROP COLUMN snapshotJson, DROP COLUMN congThucQuyetToan, DROP COLUMN soTienNoSauThanhLy, DROP COLUMN giaTriQuyetToanRong, DROP COLUMN tienPhongTraTruocDuocHoan, DROP COLUMN tienCocBanDau, DROP COLUMN ngayQuyetToan, DROP COLUMN laDuLieuLegacy;
+      ALTER TABLE HopDong DROP COLUMN goiGiaHanChoPhep, DROP COLUMN phiDichVu, DROP COLUMN daCoBanGiayKy;
+      SET FOREIGN_KEY_CHECKS=1;
+    `);
     const migrations = fs.readdirSync(path.resolve(__dirname, "../migrations"))
-      .filter((name) => /^(00[4-9]|010|011)_.*\.sql$/.test(name))
+      .filter((name) => /^(00[4-9]|01[0-2])_.*\.sql$/.test(name))
       .sort();
     for (let pass = 1; pass <= 2; pass += 1) {
       for (const name of migrations) {
