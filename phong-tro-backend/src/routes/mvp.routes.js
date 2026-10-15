@@ -253,6 +253,12 @@ router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) =>
     return data(res, result, 200);
   } catch (e) { next(e); }
 });
+router.get("/move-outs/:contractId/context", landlord, async (req, res, next) => {
+  try { return data(res, await moveOutService.getContext(req.params.contractId)); } catch (e) { next(e); }
+});
+router.post("/move-outs/:id/deposit-refunds", landlord, async (req, res, next) => {
+  try { return data(res, await moveOutService.recordDepositRefund(req.params.id, req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
+});
 
 router.post("/incidents", async (req, res, next) => {
   try {

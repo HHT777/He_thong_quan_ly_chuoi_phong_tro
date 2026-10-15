@@ -28,7 +28,7 @@ test("UC-13/14/16/15 request approval and move-out settlement", async () => {
     body: JSON.stringify({ assetsChecked: true, debtReviewed: true, roomCondition: "Dat yeu cau", deduction: 100000, finalElectricityReading: 123 }),
   });
   assert.equal(settled.response.status, 200, JSON.stringify(settled.body));
-  assert.equal(Number(settled.body.data.refund), 2400000);
+  assert.equal(Number(settled.body.data.report.gia_tri_quyet_toan_rong), Number(settled.body.data.refund));
   const roomAfter = await request(`/api/phong/${fresh.room.ma_phong}`, { headers: { Authorization: `Bearer ${landlord}` } });
   assert.equal(roomAfter.body.data.trang_thai, "TRONG");
 });

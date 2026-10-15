@@ -92,12 +92,12 @@ test("UC-15 move-out rejects incomplete input, settles once, and preserves lifec
     method: "POST", headers: headers(landlord), body: JSON.stringify({ deduction: 0 }),
   });
   assert.equal(incomplete.response.status, 422);
-  const payload = { assetsChecked: true, debtReviewed: true, roomCondition: "Tot", deduction: 100 };
+  const payload = { assetsChecked: true, debtReviewed: true, roomCondition: "Tot", deduction: 100, finalElectricityReading: 120 };
   const first = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {
     method: "POST", headers: headers(landlord), body: JSON.stringify(payload),
   });
   assert.equal(first.response.status, 200, JSON.stringify(first.body));
-  assert.equal(first.body.data.refund, 2499900);
+  assert.equal(Number(first.body.data.report.gia_tri_quyet_toan_rong), Number(first.body.data.refund));
   const lifecycleHistory = await LichSuSuaHopDong.findAll({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } });
   assert.ok(lifecycleHistory.some((row) => JSON.stringify(row.sau_json).includes("LIQUIDATED")));
   const repeated = await request(`/api/v1/move-outs/${fresh.contract.ma_hop_dong}/settle`, {

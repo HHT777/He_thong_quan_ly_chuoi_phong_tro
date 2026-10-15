@@ -28,7 +28,7 @@ test("CT-004 settlement coordinates every lifecycle write in one transaction", (
   const service = source("services/moveOut.service.js");
   const route = source("routes/mvp.routes.js");
 
-  assert.equal((service.match(/sequelize\.transaction\(/g) || []).length, 1);
+  assert.equal((service.match(/sequelize\.transaction\(/g) || []).length, 2);
   for (const operation of [
     "ChiSoDien.findOne",
     "TienCoc.findOne",

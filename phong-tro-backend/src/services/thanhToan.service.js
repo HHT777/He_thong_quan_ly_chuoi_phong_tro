@@ -27,7 +27,7 @@ class ThanhToanService {
       const row = await GiaoDichThanhToan.create({
         ma_giao_dich: paymentId, ma_thanh_toan: bill.ma_thanh_toan, so_tien: amount,
         thoi_diem_ghi_nhan: data.ngay_thanh_toan || new Date(), minh_chung_url: data.minh_chung_url || null,
-        trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(),
+        trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(), nguon_thanh_toan: "THU_TIEN",
       }, { transaction });
       await KhoanThu.create({
         loai_khoan_thu: "THANH_TOAN", so_tien: amount,

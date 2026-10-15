@@ -22,7 +22,7 @@ class KhoanPhaiThuService {
         ? await HopDong.findByPk(data.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE })
         : await HopDong.findOne({ where: { ma_phong: data.ma_phong, ma_khach_thue: data.ma_khach_thue, trang_thai: { [Op.ne]: "DA_THANH_LY" } }, transaction, lock: transaction.LOCK.UPDATE });
       if (!contract) throw { status: 404, message: "Không tìm thấy hợp đồng phù hợp" };
-      if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam }, transaction })) throw { status: 409, message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
+      if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
       const positiveComponents = [
         ["TIEN_PHONG", data.tien_phong, "Tiền phòng"], ["TIEN_DIEN", data.tien_dien, "Tiền điện"],
         ["TIEN_NUOC", data.tien_nuoc, "Tiền nước"], ["PHI_DICH_VU", data.phi_dich_vu, "Phí dịch vụ"],
@@ -31,7 +31,7 @@ class KhoanPhaiThuService {
       const calculated = positiveComponents.reduce((sum, [, value]) => sum + Number(value), 0) - Math.abs(Number(data.khoan_giam_tru || 0));
       const total = data.tong_phai_thanh_toan === undefined ? calculated : Number(data.tong_phai_thanh_toan);
       if (!Number.isFinite(total) || total < 0 || Math.abs(total - calculated) > 0.001) throw { status: 422, message: "Tổng phải trả không khớp tổng chi tiết", details: { calculated } };
-      const bill = await ThanhToan.create({ ma_hop_dong: contract.ma_hop_dong, thang, nam, tong_phai_tra: total, tong_da_thanh_toan: 0, so_tien_con_no: total, trang_thai: "CHUA_THANH_TOAN" }, { transaction });
+      const bill = await ThanhToan.create({ ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY", tong_phai_tra: total, tong_da_thanh_toan: 0, so_tien_con_no: total, trang_thai: "CHUA_THANH_TOAN" }, { transaction });
       for (const [type, amount, description] of positiveComponents) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: type, so_tien: amount, dien_giai: description }, { transaction });
       if (actorId) await writeAuditLog({ transaction, actorId, action: "BILL_CREATED", entityType: "ThanhToan", entityId: bill.ma_thanh_toan, after: { period: data.ky, total } });
       return bill;
@@ -39,7 +39,7 @@ class KhoanPhaiThuService {
   }
 
   buildWhere(filters = {}) {
-    const where = {};
+    const where = { loai_thanh_toan: "DINH_KY" };
     if (filters.ky) Object.assign(where, splitPeriod(filters.ky));
     if (filters.trang_thai_thanh_toan) where.trang_thai = filters.trang_thai_thanh_toan;
     const contractWhere = {};
@@ -77,7 +77,7 @@ class KhoanPhaiThuService {
   async getOverdueBills() {
     const local = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
     const currentKey = local.getFullYear() * 12 + local.getMonth() + 1;
-    return (await ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 } }, include: billInclude }))
+    return (await ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, include: billInclude }))
       .filter((bill) => bill.nam * 12 + bill.thang < currentKey || (bill.nam * 12 + bill.thang === currentKey && local.getDate() > 10));
   }
 }
