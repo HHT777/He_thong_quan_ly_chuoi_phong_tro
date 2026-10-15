@@ -57,6 +57,48 @@ npm start
 
 Server sẽ chạy trên http://localhost:3001
 
+## Chạy kiểm thử
+
+Unit test không cần database riêng:
+
+```bash
+npm run test:unit
+```
+
+Integration test tự tạo schema từ `../data2.md`, chạy server trên cổng test rồi xóa database test khi hoàn tất. Không dùng tên database thật. `TEST_DB_NAME` chỉ được chấp nhận khi kết thúc bằng `_test` hoặc `_ci` và phải khác `DB_NAME`.
+
+Thiết lập các biến sau trong phiên terminal. Tên đăng nhập test phải khác nhau và dài tối đa 15 ký tự:
+
+```env
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=phong_tro
+JWT_SECRET=replace_with_test_jwt_secret
+JWT_EXPIRE=1h
+
+TEST_DB_NAME=qlpt_integration_ci
+TEST_LANDLORD_USERNAME=owner_ci
+TEST_LANDLORD_PASSWORD=replace_with_test_password
+TEST_TENANT_USERNAME=tenant_ci
+TEST_TENANT_PASSWORD=replace_with_test_password
+TEST_OTHER_TENANT_USERNAME=tenant2_ci
+TEST_OTHER_TENANT_PASSWORD=replace_with_test_password
+TEST_NEW_ACCOUNT_PASSWORD=replace_with_test_password
+```
+
+Nếu DB test chạy trên máy chủ khác, có thể đặt thêm `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`. Tài khoản DB test cần quyền tạo và xóa đúng database test.
+
+Chạy integration hoặc toàn bộ test:
+
+```bash
+npm run test:integration
+npm test
+```
+
+Runner mặc định xóa database test kể cả khi test lỗi. Chỉ dùng `TEST_KEEP_DATABASE=true` khi cần điều tra thủ công và tự xóa database sau đó.
+
 ### MVP versioned API and OCR
 
 Keep `DB_SYNC=false`. Configure `OCR_BASE_URL` in `.env` for the internal
