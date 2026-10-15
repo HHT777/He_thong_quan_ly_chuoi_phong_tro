@@ -1,9 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  HopDong, PhongTro, ChiSoDien, TienCoc, LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan, YeuCau,
+  HopDong, PhongTro, ChiSoDien, TienCoc, ThanhVienPhong, ChiTietThanhToan,
+  LichSuChuyenPhong, LichSuSuaHopDong, AuditLog, TaiKhoan, YeuCau,
 } = require("../src/models");
 const hopDongService = require("../src/services/hopDong.service");
+const billGenerationService = require("../src/services/billGeneration.service");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
 async function createTargetRoom(landlord, label) {
@@ -74,6 +76,26 @@ test("FR-183 creates the initial meter reading atomically with the contract", as
   const reading = await ChiSoDien.findOne({ where: { ma_phong: base.room.ma_phong, loai_chi_so: "DAU_HOP_DONG" } });
   assert.equal(reading.khoa_nghiep_vu, contract.ma_hop_dong);
   assert.equal(Number(reading.chi_so_moi), 321);
+  await ThanhVienPhong.create({
+    ho_ten: base.tenant.ho_ten,
+    so_dien_thoai: base.tenant.so_dien_thoai,
+    ngay_vao: "2026-10-15",
+    trang_thai_cu_tru: "DANG_O",
+    ma_phong: base.room.ma_phong,
+    ma_hop_dong: contract.ma_hop_dong,
+  });
+  await ChiSoDien.create({
+    ma_phong: base.room.ma_phong, nam: 2026, thang: 10,
+    loai_chi_so: "DINH_KY", khoa_nghiep_vu: "DINH_KY:2026-10",
+    chi_so_moi: 351, don_gia_ap_dung: 3500, trang_thai_xac_nhan: "DA_XAC_NHAN",
+    ngay_ghi_nhan: new Date("2026-10-31T12:00:00Z"), nguoi_ghi_nhan_id: actor.ma_tai_khoan,
+    nguoi_xac_nhan_id: actor.ma_tai_khoan, ngay_xac_nhan: new Date(), da_xoa: false,
+  });
+  const generated = await billGenerationService.generate("2026-10", actor.ma_tai_khoan);
+  const firstBill = generated.created.find((row) => row.ma_hop_dong === contract.ma_hop_dong);
+  assert.ok(firstBill, JSON.stringify(generated.skipped));
+  const electricityLine = await ChiTietThanhToan.findOne({ where: { ma_thanh_toan: firstBill.ma_thanh_toan, loai_khoan: "TIEN_DIEN" } });
+  assert.equal(Number(electricityLine.so_tien), 30 * 3500);
 
   const rollbackBase = await createBaseRental(landlordToken, "initial-meter-rollback");
   await assert.rejects(() => hopDongService.createHopDong({
