@@ -17,36 +17,58 @@ function initSidebar() {
     }
   })();
   const isTenant = user?.vai_tro === "KHACH_THUE";
+  const ownerItems = [
+    ["dashboard", "dashboard.html", "Tổng quan", "TQ"],
+    ["tai-san", "can-tro.html", "Căn trọ", "CT"],
+    ["phong", "phong.html", "Phòng", "P"],
+    ["cu-dan", "khach-thue.html", "Cư dân", "CD"],
+    ["hop-dong", "hop-dong.html", "Hợp đồng", "HĐ"],
+    ["coc", "coc.html", "Tiền cọc", "C"],
+    ["dien-nuoc", "dien-nuoc.html", "Chỉ số điện", "Đ"],
+    ["tien-phong", "tien-phong.html", "Hóa đơn tiền phòng", "HĐ"],
+    ["thanh-toan", "thanh-toan.html", "Thanh toán", "TT"],
+    ["cong-no", "cong-no.html", "Công nợ", "CN"],
+    ["thu-chi", "thu-chi.html", "Thu chi", "TC"],
+    ["su-co", "su-co.html", "Sự cố", "SC"],
+    ["tra-phong", "tra-phong.html", "Trả phòng", "TP"],
+    ["thong-bao", "thong-bao.html", "Thông báo", "TB"],
+    ["bao-cao", "bao-cao.html", "Báo cáo", "BC"],
+  ];
   const tenantItems = [
     [
       "thong-tin-thue",
-      "/pages/khach-thue/thong-tin-thue.html",
+      "khach-thue/thong-tin-thue.html",
       "Thông tin thuê",
+      "TT",
     ],
-    ["tien-phai-tra", "/pages/khach-thue/tien-phai-tra.html", "Tiền phải trả"],
+    ["tien-phai-tra", "khach-thue/tien-phai-tra.html", "Tiền phải trả", "T"],
     [
       "thanh-toan-thue",
-      "/pages/khach-thue/thanh-toan.html",
+      "khach-thue/thanh-toan.html",
       "Theo dõi thanh toán",
+      "TT",
     ],
-    ["hop-dong-thue", "/pages/khach-thue/hop-dong.html", "Hợp đồng"],
+    ["hop-dong-thue", "khach-thue/hop-dong.html", "Hợp đồng", "HĐ"],
     [
       "nhap-chi-so-dien",
-      "/pages/khach-thue/nhap-chi-so-dien.html",
+      "khach-thue/nhap-chi-so-dien.html",
       "Nhập chỉ số điện",
+      "Đ",
     ],
     [
       "yeu-cau-gia-han",
-      "/pages/khach-thue/yeu-cau-gia-han.html",
+      "khach-thue/yeu-cau-gia-han.html",
       "Yêu cầu gia hạn",
+      "GH",
     ],
     [
       "yeu-cau-tra-phong",
-      "/pages/khach-thue/yeu-cau-tra-phong.html",
+      "khach-thue/yeu-cau-tra-phong.html",
       "Yêu cầu trả phòng",
+      "TP",
     ],
-    ["thong-bao-thue", "/pages/khach-thue/thong-bao.html", "Thông báo"],
-    ["su-co-thue", "/pages/khach-thue/su-co.html", "Gửi sự cố"],
+    ["thong-bao-thue", "khach-thue/thong-bao.html", "Thông báo", "TB"],
+    ["su-co-thue", "khach-thue/su-co.html", "Gửi sự cố", "SC"],
   ];
   const adminPages = new Set([
     "dashboard",
@@ -67,15 +89,21 @@ function initSidebar() {
   ]);
   const currentPage = document.body.getAttribute("data-active-page");
 
-  if (isTenant) {
-    const nav = sidebar.querySelector(".sidebar__nav");
-    if (nav) {
-      nav.innerHTML = tenantItems
-        .map(
-          ([page, href, label]) =>
-            `<a href="${href}" class="nav-item" data-page="${page}"><span>${label}</span></a>`,
-        )
-        .join("");
+  const navs = sidebar.querySelectorAll(".sidebar__nav");
+  const primaryNav = navs[0];
+  if (primaryNav) {
+    primaryNav.innerHTML = (isTenant ? tenantItems : ownerItems)
+      .map(
+        ([page, path, label, icon]) =>
+          `<a href="${window.ApiClient?.pagePath?.(path) || path}" class="nav-item" data-page="${page}"><span class="nav-item__icon" aria-hidden="true">${icon}</span><span>${label}</span></a>`,
+      )
+      .join("");
+  }
+  if (isTenant && navs[1]) {
+    navs[1].hidden = true;
+    const settingsLabel = navs[1].previousElementSibling;
+    if (settingsLabel?.classList.contains("sidebar__group-label")) {
+      settingsLabel.hidden = true;
     }
   }
 
@@ -89,14 +117,12 @@ function initSidebar() {
       return href;
     }
 
-    let cleaned = href.trim().replace(/^\.?\/+/, "");
-    while (cleaned.toLowerCase().startsWith("pages/")) {
-      cleaned = cleaned.slice("pages/".length);
-    }
-    cleaned = cleaned.replace(/^\.?\/+/, "");
-
-    const safePath = cleaned.replace(/^(?:pages\/)+/i, "");
-    return `/pages/${safePath}`;
+    const marker = "/pages/";
+    const markerIndex = href.toLowerCase().indexOf(marker);
+    const relativePath = markerIndex >= 0
+      ? href.slice(markerIndex + marker.length)
+      : href.trim().replace(/^\.?\/+/, "").replace(/^(?:pages\/)+/i, "");
+    return window.ApiClient?.pagePath?.(relativePath) || `/pages/${relativePath}`;
   };
 
   const normalizeCurrentPath = (value) => {
@@ -135,7 +161,7 @@ function initSidebar() {
         return;
       close();
 
-      const normalized = normalizePageUrl(target);
+      const normalized = target;
       const currentPath = normalizeCurrentPath(window.location.pathname);
       if (normalized !== currentPath) {
         event.preventDefault();

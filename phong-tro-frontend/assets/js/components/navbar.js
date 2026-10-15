@@ -44,10 +44,10 @@ function initNavbar() {
       .querySelector("[data-user-role]")
       ?.replaceChildren(document.createTextNode(role));
     if (profileLink && user.vai_tro === "KHACH_THUE") {
-      profileLink.href = "/pages/khach-thue/thong-tin-thue.html";
+      profileLink.href = window.ApiClient?.pagePath?.("khach-thue/thong-tin-thue.html") || "./khach-thue/thong-tin-thue.html";
     }
     if (directProfileLink && user.vai_tro === "KHACH_THUE") {
-      directProfileLink.href = "/pages/khach-thue/thong-tin-thue.html";
+      directProfileLink.href = window.ApiClient?.pagePath?.("khach-thue/thong-tin-thue.html") || "./khach-thue/thong-tin-thue.html";
     }
   }
 
@@ -70,12 +70,12 @@ function initNavbar() {
     window.ApiClient?.logout?.();
     localStorage.removeItem("trohub_token");
     localStorage.removeItem("trohub_user");
-    window.location.href = "/";
+    window.location.href = `${window.ApiClient?.appRoot?.() || "/"}index.html`;
   });
   directLogoutButton?.addEventListener("click", () => {
     window.ApiClient?.logout?.();
     localStorage.removeItem("trohub_token");
     localStorage.removeItem("trohub_user");
-    window.location.href = "/";
+    window.location.href = `${window.ApiClient?.appRoot?.() || "/"}index.html`;
   });
 }

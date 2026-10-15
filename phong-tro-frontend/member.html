@@ -1420,7 +1420,7 @@
         var slides = Array.prototype.slice.call(track.children);
         var dots = Array.prototype.slice.call(dotsWrap.children);
         var current = 0;
-        var AUTOPLAY_MS = 4800;
+        var AUTOPLAY_MS = 4000;
         var autoplayTimer = null;
         var viewportEl = document.querySelector(".carousel-viewport");
         var slideH = 0;
@@ -1849,7 +1849,9 @@
 
         measureSlides();
         goTo(0, { silent: true });
-        startAutoplay();
+        setTimeout(function () {
+          startAutoplay();
+        }, 7100);
       })();
     </script>
   </body>
