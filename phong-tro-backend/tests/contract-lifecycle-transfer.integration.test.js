@@ -93,7 +93,7 @@ test("FR-195 rolls back the old-room meter close when the target meter conflicts
   const target = await createTargetRoom(landlord, "transfer-conflict");
   const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
   await ChiSoDien.create({
-    nam: 2026, thang: 12, chi_so_moi: 99, don_gia_ap_dung: 3500, trang_thai_xac_nhan: "DA_XAC_NHAN",
+    nam: 2026, thang: 12, loai_chi_so: "CHUYEN_PHONG", khoa_nghiep_vu: `${fresh.contract.ma_hop_dong}:2026-12-15:MOI`, chi_so_moi: 99, don_gia_ap_dung: 3500, trang_thai_xac_nhan: "DA_XAC_NHAN",
     nguoi_ghi_nhan_id: actor.ma_tai_khoan, nguoi_xac_nhan_id: actor.ma_tai_khoan, ngay_xac_nhan: new Date(), ma_phong: target.ma_phong,
   });
   const response = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/transfers`, {

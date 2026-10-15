@@ -12,10 +12,11 @@ function positiveReading(value, field) {
   return number;
 }
 
-async function closeOrCreateReading({ roomId, date, value, unitPrice, actorId, transaction, initial }) {
+async function closeOrCreateReading({ roomId, date, value, unitPrice, actorId, transaction, initial, contractId }) {
   const parsed = new Date(`${date}T00:00:00Z`);
   const period = { nam: parsed.getUTCFullYear(), thang: parsed.getUTCMonth() + 1 };
-  const existing = await ChiSoDien.findOne({ where: { ma_phong: roomId, ...period, da_xoa: false }, transaction, lock: transaction.LOCK.UPDATE });
+  const businessKey = `${contractId}:${date}:${initial ? "MOI" : "CU"}`;
+  const existing = await ChiSoDien.findOne({ where: { ma_phong: roomId, loai_chi_so: "CHUYEN_PHONG", khoa_nghiep_vu: businessKey, da_xoa: false }, transaction, lock: transaction.LOCK.UPDATE });
   if (existing) {
     if (Number(existing.chi_so_moi) !== value) {
       throw fail(409, initial ? "Phòng đích đã có chỉ số khác trong kỳ chuyển" : "Phòng cũ đã có chỉ số khác trong kỳ chuyển", "TRANSFER_METER_PERIOD_CONFLICT");
@@ -27,6 +28,8 @@ async function closeOrCreateReading({ roomId, date, value, unitPrice, actorId, t
   }
   return ChiSoDien.create({
     ...period,
+    loai_chi_so: "CHUYEN_PHONG",
+    khoa_nghiep_vu: businessKey,
     chi_so_moi: value,
     don_gia_ap_dung: unitPrice,
     trang_thai_xac_nhan: "DA_XAC_NHAN",
@@ -61,11 +64,11 @@ async function transfer(contractId, payload, actorId) {
     if (targetRoom.trang_thai !== "TRONG") throw fail(409, "Phòng đích phải đang trống", "TARGET_ROOM_NOT_EMPTY");
     const occupants = await ThanhVienPhong.count({ where: { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" }, transaction });
     if (occupants > Number(targetRoom.so_nguoi_toi_da)) throw fail(409, "Phòng đích không đủ sức chứa", "TARGET_ROOM_CAPACITY_EXCEEDED");
-    const latestSource = await ChiSoDien.findOne({ where: { ma_phong: sourceRoom.ma_phong, da_xoa: false }, order: [["nam", "DESC"], ["thang", "DESC"]], transaction });
+    const latestSource = await ChiSoDien.findOne({ where: { ma_phong: sourceRoom.ma_phong, da_xoa: false }, order: [["ngay_ghi_nhan", "DESC"], ["ma_chi_so", "DESC"]], transaction });
     if (latestSource && finalReading < Number(latestSource.chi_so_moi)) throw fail(422, "Chỉ số điện cuối nhỏ hơn chỉ số gần nhất", "TRANSFER_READING_DECREASED");
 
-    await closeOrCreateReading({ roomId: sourceRoom.ma_phong, date: transferDate, value: finalReading, unitPrice: contract.don_gia_dien, actorId, transaction, initial: false });
-    await closeOrCreateReading({ roomId: targetRoom.ma_phong, date: transferDate, value: initialReading, unitPrice: contract.don_gia_dien, actorId, transaction, initial: true });
+    await closeOrCreateReading({ roomId: sourceRoom.ma_phong, date: transferDate, value: finalReading, unitPrice: contract.don_gia_dien, actorId, transaction, initial: false, contractId });
+    await closeOrCreateReading({ roomId: targetRoom.ma_phong, date: transferDate, value: initialReading, unitPrice: contract.don_gia_dien, actorId, transaction, initial: true, contractId });
 
     const before = contract.get({ plain: true });
     await contract.update({ ma_phong: targetRoom.ma_phong, gia_thue: newRent }, { transaction });

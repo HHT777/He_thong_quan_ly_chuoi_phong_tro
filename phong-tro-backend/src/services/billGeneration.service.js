@@ -30,14 +30,14 @@ async function generate(period, actorId) {
   for (const contract of contracts) {
     try {
       const meter = await ChiSoDien.findOne({
-        where: { ma_phong: contract.ma_phong, nam, thang, trang_thai_xac_nhan: "DA_XAC_NHAN" },
+        where: { ma_phong: contract.ma_phong, nam, thang, loai_chi_so: "DINH_KY", da_xoa: false, trang_thai_xac_nhan: "DA_XAC_NHAN" },
       });
       if (!meter) {
         skipped.push({ roomId: contract.ma_phong, reason: "MISSING_CONFIRMED_METER" });
         continue;
       }
       const [previous, occupantCount] = await Promise.all([
-        meterReadingService.previousReading(contract.ma_phong, period),
+        meterReadingService.previousReading(contract.ma_phong, period, undefined, meter.ngay_ghi_nhan),
         ThanhVienPhong.count({
           where: { ma_hop_dong: contract.ma_hop_dong, trang_thai_cu_tru: "DANG_O" },
         }),

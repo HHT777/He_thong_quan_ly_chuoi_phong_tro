@@ -53,22 +53,28 @@ function requirePreviousReading(row, period, roomId) {
   }
   return Number(row.chi_so_moi);
 }
-async function previousReading(roomId, period, transaction) {
+async function previousReading(roomId, period, transaction, beforeDate) {
   const { nam, thang } = parsePeriod(period);
+  const periodEnd = new Date(Date.UTC(nam, thang, 1));
   const row = await ChiSoDien.findOne({
-    where: { ma_phong: roomId, trang_thai_xac_nhan: "DA_XAC_NHAN", [Op.or]: [{ nam: { [Op.lt]: nam } }, { nam, thang: { [Op.lt]: thang } }] },
-    order: [["nam", "DESC"], ["thang", "DESC"]], transaction,
+    where: {
+      ma_phong: roomId,
+      da_xoa: false,
+      trang_thai_xac_nhan: "DA_XAC_NHAN",
+      ngay_ghi_nhan: { [Op.lt]: beforeDate || periodEnd },
+    },
+    order: [["ngay_ghi_nhan", "DESC"], ["ma_chi_so", "DESC"]], transaction,
   });
   return requirePreviousReading(row, period, roomId);
 }
 async function getContext(tenantId, period) {
   const parsed = parsePeriod(period);
   const contract = await tenantContract(tenantId);
-  const [room, current, previous] = await Promise.all([
+  const [room, current] = await Promise.all([
     PhongTro.findByPk(contract.ma_phong, { include: [{ model: CanTro, as: "canTro" }] }),
     ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, include }),
-    previousReading(contract.ma_phong, period),
   ]);
+  const previous = await previousReading(contract.ma_phong, period, undefined, current?.ngay_ghi_nhan);
   return { period, submissionWindowOpen: true, room: { id: room.ma_phong, code: room.so_phong, buildingName: room.canTro?.ten_can || null }, previousReading: { value: previous, recordedAt: null }, current: current ? toDto(current) : null, imagePolicy: { mimeTypes: ["image/jpeg", "image/png"], maxBytes: Number(process.env.MAX_FILE_SIZE || 10485760) } };
 }
 async function callOcr(filePath) {
@@ -117,9 +123,9 @@ async function submit(tenantId, payload, actorId) {
   return sequelize.transaction(async (transaction) => {
     const existing = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, transaction, lock: transaction.LOCK.UPDATE });
     if (existing?.trang_thai_xac_nhan === "DA_XAC_NHAN") throw { status: 409, code: "READING_ALREADY_CONFIRMED", message: "Kỳ này đã được xác nhận" };
-    const previous = await previousReading(contract.ma_phong, payload.period, transaction);
+    const previous = await previousReading(contract.ma_phong, payload.period, transaction, existing?.ngay_ghi_nhan);
     if (value < previous) throw { status: 422, code: "READING_BELOW_PREVIOUS", message: "Chỉ số điện không được nhỏ hơn kỳ trước", details: { previousReading: previous } };
-    const values = { ...parsed, ma_phong: contract.ma_phong, chi_so_moi: value, anh_cong_to_url: preview?.filePath || existing?.anh_cong_to_url || null, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "CHO_XAC_NHAN", ngay_ghi_nhan: new Date(), nguoi_ghi_nhan_id: actorId };
+    const values = { ...parsed, ma_phong: contract.ma_phong, loai_chi_so: "DINH_KY", khoa_nghiep_vu: `DINH_KY:${parsed.nam}-${String(parsed.thang).padStart(2, "0")}`, chi_so_moi: value, anh_cong_to_url: preview?.filePath || existing?.anh_cong_to_url || null, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "CHO_XAC_NHAN", ngay_ghi_nhan: new Date(), nguoi_ghi_nhan_id: actorId };
     const row = existing ? await existing.update(values, { transaction }) : await ChiSoDien.create(values, { transaction });
     if (payload.uploadToken) previews.delete(payload.uploadToken);
     const result = toDto(await row.reload({ include, transaction }));
