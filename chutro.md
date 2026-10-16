@@ -369,7 +369,7 @@ Phạm vi là kiểm tra sau các commit D.4/E; không thực hiện F và khôn
 |---|---|---|
 | 1. Config table/consumer | **ĐÃ CÓ**. | `CauHinhHeThong` + GET/PUT landlord; consumer gồm contract, reservation, move-out due, debt milestones, billing windows và `MAX_FILE_SIZE`. Danh mục sự cố là bảng riêng (không nhét vào key-value). Env/default fallback, range validation, test FR-200. |
 | 2. Upload token | **ĐÃ CÓ**. | HMAC/JWT stateless dùng `UPLOAD_TOKEN_SECRET || JWT_SECRET`, chống sai actor/tenant, tamper, expired, reload module; cleanup file >15 phút. Multi-instance yêu cầu deploy mount chung `UPLOAD_DIR` (code không thể tự đảm bảo volume). Test unit `E.1.2 signed upload token survives module reload and enforces claims`. |
-| 3. Notification FR-159 | **THIẾU/SÁI Ở race residual**. | Billing/debt/move-out/payment phần chính nằm trong transaction và có row/cron lock; contract có app-check theo content, chưa có unique DB. Nhánh reservation expiry và broadcast fan-out có create ngoài transaction/check-then-create, có thể trùng khi hai process cạnh tranh. Đề xuất sau khi duyệt: event key duy nhất (outbox/unique) hoặc đưa toàn bộ create vào transaction; chưa thêm DDL. |
+| 3. Notification FR-159 | **ĐÃ CÓ**. | Toàn bộ producer dùng `createIdempotent` với `khoaSuKien`; unique DB 014 xử lý race, broadcast chia lô transaction, cron/reservation/contract/debt có lock hoặc transaction. Test `FR-159 event key schema...`, `FR-159 reservation expiry race...`, `FR-159 contract expiry race...`, `FR-159 broadcast retry...`, `FR-159 idempotent insert race...`. |
 
 ### E.2 – ma trận audit
 
@@ -417,6 +417,16 @@ Audit helper bắt buộc transaction; DTO không ghi password/hash/token (test 
 2. Bổ sung test building cho từng status `DA_GIU`, `DANG_XU_LY_TRA_PHONG`, asset settlement link, và wildcard escaping.
 3. Bổ sung bộ audit count=1/rollback đồng nhất cho từng operation E.2.
 4. Khi Docker MySQL8/MariaDB sẵn sàng, chạy lại toàn bộ cổng trên; sau đó mới xem xét chuyển sang F.
+
+## F.0 – đóng tồn đọng sau E
+
+- Commit producer thông báo: `3202fb4 fix(FR-159): key all notification producers`.
+- Commit test contract: `d753177 test(FR-159): assert keyed notification transactions`.
+- Commit cron legacy: `b5154c0 test(FR-151): verify legacy cron idempotency`.
+- Unit: **48/48 → 48/48 pass**. Integration: **40/40 → 41/41 pass** trên MySQL 8.0.46; `check-invariants`: bill detail 0, duplicate bill 0, capacity 0, deposit 0, incident branch 0, notification key 0, deposit refund 0.
+- Test `00-legacy-cron.integration.test.js`: seed đúng 18 hợp đồng, 30 phòng, 21 tài khoản; toàn bộ cron chạy hai lượt, số bill/thông báo kỳ cũ trước/sau không đổi và lượt hai phát sinh 0.
+- Phép thử phủ định: tạm bỏ bắt `ER_DUP_ENTRY` trong `notification.service.js`; suite đỏ với `SequelizeUniqueConstraintError`/`ER_DUP_ENTRY` tại reservation/contract/concurrent insert (5 test fail trong 41); helper đã khôi phục, không commit trạng thái hỏng.
+- Frontend build theo chỉ thị F.0: **chưa chạy**.
 
 ## Xác minh lại sau migration 014
 
