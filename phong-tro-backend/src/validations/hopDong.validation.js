@@ -16,6 +16,7 @@ const hopDongValidation = {
     phi_dich_vu: Joi.number().min(0).default(0),
     goi_gia_han_cho_phep: Joi.string().valid("6", "12", "6,12").allow(null),
     ngay_nhan_coc: Joi.date().allow(null),
+    ma_dat_giu: Joi.string().max(36).allow(null),
   }),
 
   updateHopDong: Joi.object({

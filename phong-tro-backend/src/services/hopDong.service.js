@@ -3,6 +3,7 @@ const {
   KhachThue,
   PhongTro,
   TienCoc,
+  DatGiuPhong,
   ChiSoDien,
   ThongBao,
   TaiKhoan,
@@ -49,6 +50,14 @@ class HopDongService {
       };
     }
 
+    let reservation = null;
+    if (data.ma_dat_giu) {
+      reservation = await DatGiuPhong.findByPk(data.ma_dat_giu, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!reservation || reservation.trang_thai !== "DANG_GIU" || reservation.ma_phong !== data.ma_phong) throw { status: 409, code: "RESERVATION_NOT_CONVERTIBLE", message: "Giữ phòng không còn hiệu lực hoặc không khớp phòng" };
+      if (String(reservation.so_dien_thoai) !== String(khachThue.so_dien_thoai)) throw { status: 409, code: "RESERVATION_HOLDER_MISMATCH", message: "Người ký hợp đồng không đúng người giữ phòng" };
+      if (new Date(data.ngay_bat_dau).toISOString().slice(0, 10) > String(reservation.han_giu)) throw { status: 409, code: "RESERVATION_EXPIRED", message: "Giữ phòng đã quá hạn" };
+    }
+
     // Create contract
     const { tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, chi_so_dien_ban_dau: initialElectricityReading, ...contractData } = data;
     const hopDong = await HopDong.create({ ...contractData, trang_thai: "DANG_HIEU_LUC" }, { transaction });
@@ -79,6 +88,11 @@ class HopDongService {
 
     // Update room status to DA_GIU
     await phong.update({ trang_thai: "DANG_THUE" }, { transaction });
+    if (reservation) {
+      const hold = Number(reservation.so_tien_giu); const deposit = Number(tienCoc);
+      const excess = Math.max(0, hold - deposit);
+      await reservation.update({ trang_thai: "DA_CHUYEN_THANH_HOP_DONG", so_tien_hoan: excess, ghi_chu: `${reservation.ghi_chu || ""}${reservation.ghi_chu ? " | " : ""}Đã chuyển vào hợp đồng ${hopDong.ma_hop_dong}; khấu trừ tiền giữ ${Math.min(hold, deposit)}` }, { transaction });
+    }
 
     // Send notification to customer
     const taiKhoanKhach = khachThue.ma_tai_khoan
