@@ -28,8 +28,7 @@ async function updateContractStates() {
       const recipients = [contract.khachThue?.ma_tai_khoan, landlord?.ma_tai_khoan].filter(Boolean);
       for (const accountId of recipients) {
         const content = `Hợp đồng ${locked.ma_hop_dong} ${expired ? "đã hết hạn" : "sắp hết hạn"} ngày ${locked.ngay_ket_thuc}`;
-        const exists = await ThongBao.findOne({ where: { ma_tai_khoan: accountId, loai_thong_bao: "HOP_DONG", noi_dung: content }, transaction });
-        if (!exists) await require("../services/notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: "HOP_DONG", noi_dung: content, khoa_su_kien: `HOP_DONG:${contract.ma_hop_dong}:${localDate(now, config.timezone)}`, thoi_diem_tao: now, da_doc: false }, { transaction });
+        await require("../services/notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: "HOP_DONG", noi_dung: content, khoa_su_kien: `HOP_DONG:${contract.ma_hop_dong}:${localDate(now, config.timezone)}`, thoi_diem_tao: now, da_doc: false }, { transaction });
       }
     });
   }
