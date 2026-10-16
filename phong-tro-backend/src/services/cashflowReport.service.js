@@ -4,6 +4,7 @@ const {
   KhoanChi,
   GiaoDichThanhToan,
   ThanhToan,
+  ChiTietThanhToan,
   BienBanTraPhong,
   HopDong,
   PhongTro,
@@ -75,6 +76,7 @@ async function getCashflow(filters) {
           model: ThanhToan,
           as: "thanhToan",
           required: false,
+          include: [{ model: ChiTietThanhToan, as: "chiTiets", required: false }],
           include: [{
             model: HopDong,
             as: "hopDong",
@@ -100,20 +102,23 @@ async function getCashflow(filters) {
       order: [["ngay_quyet_toan", "DESC"]],
     }),
   ]);
+  const allocations = allocateReceipts(receipts);
   const cashReceipts = receipts.reduce((sum, row) => sum + Number(row.so_tien), 0);
+  const grossCashRevenue = allocations.reduce((sum, row) => sum + row.gross, 0);
+  const discounts = allocations.reduce((sum, row) => sum + row.discount, 0);
   const depositDeductions = reports.reduce(
     (sum, row) => sum + Math.min(Number(row.tien_coc_ban_dau || 0), Number(row.tong_khoan_khau_tru || 0)),
     0,
   );
-  const totalRevenue = cashReceipts + depositDeductions;
+  const totalRevenue = grossCashRevenue + depositDeductions;
   const totalExpenses = expenses.reduce((sum, row) => sum + Number(row.so_tien), 0);
-  const revenueByType = Object.values(receipts.reduce((all, row) => { const key = row.loai_khoan_thu; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
+  const revenueByType = Object.values(allocations.reduce((all, row) => { for (const [key, amount] of Object.entries(row.byType)) { all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += amount; } return all; }, {}));
   if (depositDeductions > 0) revenueByType.push({ type: "KHAU_TRU_COC", amount: depositDeductions });
   const expensesByType = Object.values(expenses.reduce((all, row) => { const key = row.loai_khoan_chi; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
   const receiptDetails = [
     ...receipts.map((row) => ({
       source: "THU_TIEN",
-      amount: Number(row.so_tien),
+      amount: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.gross || 0,
       date: row.ngay_ghi_nhan,
       receiptId: row.ma_khoan_thu,
       reportId: null,
@@ -132,11 +137,12 @@ async function getCashflow(filters) {
   ];
   return {
     cashReceipts,
+    discounts,
     depositDeductions,
     totalRevenue,
     totalCollected: totalRevenue,
     totalExpenses,
-    profit: totalRevenue - totalExpenses,
+    profit: totalRevenue - discounts - totalExpenses,
     revenueByType, expensesByType,
     receiptDetails,
     receipts,
@@ -144,4 +150,36 @@ async function getCashflow(filters) {
   };
 }
 
-module.exports = { parseDate, buildDateCondition, buildWhere, getCashflow };
+function allocateReceipts(receipts) {
+  const groups = new Map();
+  for (const row of receipts) {
+    const bill = row.giaoDich?.thanhToan;
+    const key = bill?.ma_thanh_toan || `receipt:${row.ma_khoan_thu}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ row, bill });
+  }
+  const result = [];
+  for (const entries of groups.values()) {
+    entries.sort((a, b) => new Date(a.row.ngay_ghi_nhan) - new Date(b.row.ngay_ghi_nhan));
+    const lines = entries[0].bill?.chiTiets || [];
+    const grossTotal = lines.filter((line) => line.loai_khoan !== "GIAM_TRU").reduce((sum, line) => sum + Math.max(0, Number(line.so_tien)), 0);
+    const discountTotal = lines.filter((line) => line.loai_khoan === "GIAM_TRU").reduce((sum, line) => sum + Math.abs(Number(line.so_tien)), 0);
+    const netTotal = entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
+    let grossAssigned = 0; let discountAssigned = 0;
+    entries.forEach((item, index) => {
+      const last = index === entries.length - 1;
+      const gross = last ? grossTotal - grossAssigned : Math.round(Number(item.row.so_tien) * grossTotal / (netTotal || 1));
+      const discount = last ? discountTotal - discountAssigned : Math.round(Number(item.row.so_tien) * discountTotal / (netTotal || 1));
+      grossAssigned += gross; discountAssigned += discount;
+      const byType = {};
+      for (const line of lines.filter((line) => line.loai_khoan !== "GIAM_TRU")) {
+        const amount = last ? Math.max(0, Number(line.so_tien)) : Math.round(Math.max(0, Number(line.so_tien)) * gross / (grossTotal || 1));
+        byType[line.loai_khoan] = (byType[line.loai_khoan] || 0) + amount;
+      }
+      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType });
+    });
+  }
+  return result;
+}
+
+module.exports = { parseDate, buildDateCondition, buildWhere, getCashflow, allocateReceipts };
