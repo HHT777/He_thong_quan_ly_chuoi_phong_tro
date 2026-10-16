@@ -9,7 +9,8 @@
     "seed": "node scripts/seed.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "node scripts/run-test-suite.js unit",
-    "test:integration": "node scripts/run-test-suite.js integration"
+    "test:integration": "node scripts/run-test-suite.js integration",
+    "verify:mysql8": "node scripts/verify-migrations.js"
   },
   "keywords": [
     "phong-tro",

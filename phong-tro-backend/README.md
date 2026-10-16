@@ -37,7 +37,7 @@ JWT_SECRET=replace_with_a_long_random_secret
 
 ### 3. Database
 
-Backend dùng schema 25 bảng trong `../data2.md` và từ điển dữ liệu
+Backend dùng schema 37 bảng trong `../data2.md` và từ điển dữ liệu
 `../data1.md`. Cấu hình `DB_NAME=phong_tro` trỏ tới database đã import schema
 này. Không bật Sequelize auto-sync để tránh tự ý đổi cấu trúc.
 
@@ -98,6 +98,50 @@ npm test
 ```
 
 Runner mặc định xóa database test kể cả khi test lỗi. Chỉ dùng `TEST_KEEP_DATABASE=true` khi cần điều tra thủ công và tự xóa database sau đó.
+
+## Kiểm chứng trên MySQL 8
+
+Mọi migration mới phải được chạy trên MySQL thật phiên bản từ 8.0.16 trở lên,
+ngoài lượt kiểm chứng MariaDB. Không dùng `CASE` làm biểu thức `CHECK` và không
+dùng `ADD COLUMN IF NOT EXISTS`; hãy guard DDL bằng `INFORMATION_SCHEMA` và
+prepared statement như các migration 004–013.
+
+Tạo và kiểm tra container MySQL 8:
+
+```powershell
+docker run --name qlpt-mysql8 -e MYSQL_ALLOW_EMPTY_PASSWORD=yes -p 3307:3306 -d mysql:8.0
+docker logs qlpt-mysql8 --tail 3
+docker exec qlpt-mysql8 mysql -uroot -e "SELECT VERSION();"
+```
+
+Thiết lập kết nối test trong phiên PowerShell. Chỉ dùng database có hậu tố
+`_test` hoặc `_ci`; tuyệt đối không đặt bằng `DB_NAME` của hệ thống thật:
+
+```powershell
+$env:TEST_DB_HOST='127.0.0.1'
+$env:TEST_DB_PORT='3307'
+$env:TEST_DB_USER='root'
+$env:TEST_DB_PASSWORD=''
+$env:MIGRATION_TEST_DB_NAME='qlpt_migration_ci'
+$env:TEST_DB_NAME='qlpt_test'
+```
+
+Chạy migration 004–013 hai lượt, sau đó chạy unit và integration:
+
+```powershell
+npm run verify:mysql8
+npm run test:unit
+npm run test:integration
+```
+
+Integration còn cần các tài khoản fixture trong `test.env.template`. Script
+migration và runner test đều tự xóa database tạm khi hoàn tất. Khi không còn
+cần container, dừng và xóa thủ công:
+
+```powershell
+docker stop qlpt-mysql8
+docker rm qlpt-mysql8
+```
 
 ### MVP versioned API and OCR
 
@@ -185,7 +229,7 @@ Các lỗi validation và database sẽ trả về với status code phù hợp:
 
 ## Database Schema
 
-Backend ánh xạ đúng 25 bảng PascalCase/camelCase trong `data2.md`. Một số bảng
+Backend ánh xạ đúng 37 bảng PascalCase/camelCase trong `data2.md`. Một số bảng
 nghiệp vụ chính:
 
 - `TaiKhoan`, `ChuTro`, `KhachThue`
