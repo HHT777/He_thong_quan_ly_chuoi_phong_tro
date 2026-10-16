@@ -86,11 +86,12 @@ class HopDongService {
       : null;
 
     if (taiKhoanKhach) {
-      await ThongBao.create({
+      await require("./notification.service").createIdempotent({
         ma_tai_khoan: taiKhoanKhach.ma_tai_khoan,
         loai_thong_bao: "HOP_DONG",
         noi_dung: "Hợp đồng thuê phòng của bạn đã được tạo",
         thoi_diem_tao: new Date(),
+        khoa_su_kien: `HOP_DONG_TAO:${hopDong.ma_hop_dong}`,
       }, { transaction });
     }
 

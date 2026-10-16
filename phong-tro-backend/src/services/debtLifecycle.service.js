@@ -33,8 +33,8 @@ async function notify(bill, type, content, now, transaction) {
   const contract = await HopDong.findByPk(bill.ma_hop_dong, { include: [{ model: KhachThue, as: "khachThue" }], transaction });
   const accountId = contract?.khachThue?.ma_tai_khoan;
   if (!accountId) return false;
-  await ThongBao.create({ ma_tai_khoan: accountId, loai_thong_bao: type, noi_dung: content, thoi_diem_tao: now, da_doc: false }, { transaction });
-  return true;
+  const result = await require("./notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: type, noi_dung: content, thoi_diem_tao: now, da_doc: false, khoa_su_kien: `CONG_NO:${type}:${bill.ma_thanh_toan}:${bill.nam}-${String(bill.thang).padStart(2, "0")}` }, { transaction });
+  return result.created;
 }
 async function processOne(id, local, config, now, userId) {
   return sequelize.transaction(async (transaction) => {

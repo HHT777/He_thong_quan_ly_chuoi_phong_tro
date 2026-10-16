@@ -78,10 +78,11 @@ async function revoke(requestId, reasonValue, actorId) {
     if (room && room.trang_thai !== "DANG_THUE") await room.update({ trang_thai: "DANG_THUE" }, { transaction });
     const tenant = await KhachThue.findByPk(request.ma_khach_thue, { transaction });
     if (tenant?.ma_tai_khoan) {
-      await ThongBao.create({
+      await require("./notification.service").createIdempotent({
         loai_thong_bao: "RUT_DUYET_TRA_PHONG",
         noi_dung: `Chủ trọ đã rút duyệt yêu cầu trả phòng. Lý do: ${reason}`,
         thoi_diem_tao: new Date(), ma_tai_khoan: tenant.ma_tai_khoan,
+        khoa_su_kien: `RUT_DUYET_TRA_PHONG:${request.ma_yeu_cau}`,
       }, { transaction });
     }
     await writeAuditLog({
@@ -106,10 +107,11 @@ async function processOneDueRequest(requestId, today, actorId) {
     await room.update({ trang_thai: "DANG_XU_LY_TRA_PHONG" }, { transaction });
     const tenant = await KhachThue.findByPk(request.ma_khach_thue, { transaction });
     if (tenant?.ma_tai_khoan) {
-      await ThongBao.create({
+      await require("./notification.service").createIdempotent({
         loai_thong_bao: "BAT_DAU_TRA_PHONG",
         noi_dung: `Phòng đã chuyển sang xử lý trả phòng theo ngày được duyệt ${detail.ngay_tra_da_duyet}.`,
         thoi_diem_tao: new Date(), ma_tai_khoan: tenant.ma_tai_khoan,
+        khoa_su_kien: `BAT_DAU_TRA_PHONG:${request.ma_yeu_cau}:${detail.ngay_tra_da_duyet}`,
       }, { transaction });
     }
     await writeAuditLog({

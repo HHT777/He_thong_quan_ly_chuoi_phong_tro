@@ -42,12 +42,13 @@ async function confirm(id, actorId) {
       after: { billId: bill.ma_thanh_toan, amount },
     });
     if (bill.hopDong.khachThue?.ma_tai_khoan) {
-      await ThongBao.create({
+      await require("./notification.service").createIdempotent({
         ma_tai_khoan: bill.hopDong.khachThue.ma_tai_khoan,
         loai_thong_bao: "THANH_TOAN",
         noi_dung: `Minh chứng ${amount.toLocaleString("vi-VN")}đ đã được xác nhận`,
         thoi_diem_tao: new Date(),
         da_doc: false,
+        khoa_su_kien: `THANH_TOAN_XAC_NHAN:${payment.ma_giao_dich}`,
       }, { transaction });
     }
     return payment;

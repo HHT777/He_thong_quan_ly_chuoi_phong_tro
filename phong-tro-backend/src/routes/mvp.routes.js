@@ -229,7 +229,7 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         };
       }
       const tenantRow = await KhachThue.findByPk(row.ma_khach_thue, { transaction });
-      if (tenantRow?.ma_tai_khoan) await ThongBao.create({ loai_thong_bao: "KET_QUA_YEU_CAU", noi_dung: status === "DA_PHE_DUYET" ? `Yêu cầu ${row.loai_yeu_cau} của bạn đã được phê duyệt.` : `Yêu cầu ${row.loai_yeu_cau} của bạn đã bị từ chối.`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }, { transaction });
+      if (tenantRow?.ma_tai_khoan) await require("../services/notification.service").createIdempotent({ loai_thong_bao: "KET_QUA_YEU_CAU", noi_dung: status === "DA_PHE_DUYET" ? `Yêu cầu ${row.loai_yeu_cau} của bạn đã được phê duyệt.` : `Yêu cầu ${row.loai_yeu_cau} của bạn đã bị từ chối.`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan, khoa_su_kien: `YEU_CAU_KET_QUA:${row.ma_yeu_cau}:${status}` }, { transaction });
       await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "REQUEST_DECIDED", entityType: "YeuCau", entityId: row.ma_yeu_cau, after: { status, reason: req.body.reason || null } });
       return { request: row, automation };
     });

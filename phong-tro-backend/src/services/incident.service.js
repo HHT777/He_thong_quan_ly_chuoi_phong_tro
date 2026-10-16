@@ -110,12 +110,13 @@ async function update(incidentId, payload, actorId) {
         thiet_bi_thay_the: payload.replacement || null,
         ngay_hoan_tat: new Date(),
       });
-      await ThongBao.create({
+      await require("./notification.service").createIdempotent({
         loai_thong_bao: "KET_QUA_SU_CO",
         noi_dung: `Sự cố đã được xử lý: ${String(payload.note).trim()}`,
         thoi_diem_tao: new Date(),
         ma_su_co: incident.ma_su_co,
         ma_tai_khoan: incident.ma_nguoi_gui,
+        khoa_su_kien: `KET_QUA_SU_CO:${incident.ma_su_co}`,
       }, { transaction });
     }
     await incident.update(patch, { transaction });

@@ -49,7 +49,7 @@ class ThanhToanService {
         after: { billId: bill.ma_thanh_toan, amount }, reason: data.ghi_chu || null,
       });
       const accountId = bill.hopDong?.khachThue?.ma_tai_khoan;
-      if (accountId) await ThongBao.create({ ma_tai_khoan: accountId, loai_thong_bao: "THANH_TOAN", noi_dung: `Đã ghi nhận thanh toán ${amount.toLocaleString("vi-VN")}đ`, thoi_diem_tao: new Date(), da_doc: false }, { transaction });
+      if (accountId) await require("./notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: "THANH_TOAN", noi_dung: `Đã ghi nhận thanh toán ${amount.toLocaleString("vi-VN")}đ`, thoi_diem_tao: new Date(), da_doc: false, khoa_su_kien: `THANH_TOAN_GHI_NHAN:${row.ma_giao_dich}` }, { transaction });
       return row;
     });
     return payment;

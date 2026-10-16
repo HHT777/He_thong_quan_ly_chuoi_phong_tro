@@ -83,7 +83,7 @@ async function transfer(contractId, payload, actorId) {
     await lifecycle.recordChange({ contract, before, after: contract, reason, actorId, transaction, action: "ROOM_TRANSFERRED" });
     await writeAuditLog({ transaction, actorId, action: "ROOM_TRANSFERRED", entityType: "LichSuChuyenPhong", entityId: history.ma_lich_su, before: { roomId: sourceRoom.ma_phong }, after: { roomId: targetRoom.ma_phong }, reason });
     const tenant = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
-    if (tenant?.ma_tai_khoan) await ThongBao.create({ ma_tai_khoan: tenant.ma_tai_khoan, loai_thong_bao: "CHUYEN_PHONG", noi_dung: `Hợp đồng đã chuyển sang phòng ${targetRoom.so_phong} từ ngày ${transferDate}.`, thoi_diem_tao: new Date() }, { transaction });
+    if (tenant?.ma_tai_khoan) await require("./notification.service").createIdempotent({ ma_tai_khoan: tenant.ma_tai_khoan, loai_thong_bao: "CHUYEN_PHONG", noi_dung: `Hợp đồng đã chuyển sang phòng ${targetRoom.so_phong} từ ngày ${transferDate}.`, thoi_diem_tao: new Date(), khoa_su_kien: `CHUYEN_PHONG:${contract.ma_hop_dong}:${transferDate}` }, { transaction });
     return { contract, history };
   });
 }
