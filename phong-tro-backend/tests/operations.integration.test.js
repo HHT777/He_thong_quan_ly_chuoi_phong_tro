@@ -29,6 +29,14 @@ test("UC-08/17/18/19/25 operations flow and ownership", async () => {
   assert.equal(coTenant.response.status, 201);
   const approved = await request(`/api/v1/requests/${coTenant.body.data.request.ma_yeu_cau}`, { method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "DA_DUYET" }) });
   assert.equal(approved.response.status, 200);
+  const rejectedProposal = await request("/api/v1/co-tenants", { method: "POST", headers: headers(tenant), body: JSON.stringify({
+    name: "Nguoi Bi Tu Choi", phone: "0909000001", identityNumber: "079203009998", birthDate: "2004-06-15", gender: "NU",
+    permanentAddress: "TP Ho Chi Minh", relationship: "BAN", startDate: "2026-11-01",
+  }) });
+  assert.equal(rejectedProposal.response.status, 201);
+  const rejected = await request(`/api/v1/requests/${rejectedProposal.body.data.request.ma_yeu_cau}`, { method: "PATCH", headers: headers(landlord), body: JSON.stringify({ status: "TU_CHOI", reason: "Thiếu giấy xác nhận cư trú" }) });
+  assert.equal(rejected.response.status, 200, JSON.stringify(rejected.body));
+  assert.match((await request("/api/v1/notifications", { headers: { Authorization: `Bearer ${tenant}` } })).body.data.find((row) => row.khoa_su_kien?.includes(rejectedProposal.body.data.request.ma_yeu_cau))?.noi_dung || "", /Thiếu giấy xác nhận cư trú/);
   const notifications = await request("/api/v1/notifications", { headers: { Authorization: `Bearer ${tenant}` } });
   assert.equal(notifications.response.status, 200);
   const report = await request("/api/v1/reports/cashflow", { headers: { Authorization: `Bearer ${landlord}` } });

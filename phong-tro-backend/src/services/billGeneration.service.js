@@ -18,7 +18,7 @@ async function buildPreview(contract, period) {
   if (!meter) throw Object.assign(new Error("Phòng chưa có chỉ số điện đã xác nhận"), { status: 422, code: "MISSING_CONFIRMED_METER" });
   const [previous, occupantCount, definitions] = await Promise.all([
     meterReadingService.previousReading(contract.ma_phong, period, undefined, meter.ngay_ghi_nhan),
-    countBillableOccupants(contract.ma_hop_dong),
+    countBillableOccupants(contract.ma_hop_dong, { atDate: `${period}-${String(daysInMonth(year, month)).padStart(2, "0")}` }),
     adjustmentDefinitionService.applicable(contract.ma_hop_dong, period),
   ]);
   const electricity = Math.round((Number(meter.chi_so_moi) - previous) * Number(meter.don_gia_ap_dung));

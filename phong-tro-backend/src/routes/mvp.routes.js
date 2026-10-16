@@ -197,6 +197,10 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
       if (row.trang_thai !== "CHO_XU_LY") throw fail(409, "Yêu cầu này đã được xử lý");
       if (status === "TU_CHOI" && !String(req.body.reason || "").trim()) throw fail(422, "Lý do từ chối là bắt buộc", "REQUEST_REJECTION_REASON_REQUIRED");
       await row.update({ trang_thai: status, ly_do_xu_ly: req.body.reason || null, ngay_duyet: new Date(), nguoi_xu_ly_id: req.user.ma_tai_khoan }, { transaction });
+      if (status === "TU_CHOI" && row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG") {
+        const proposal = await DeXuatBanCungPhong.findByPk(row.ma_yeu_cau, { transaction, lock: transaction.LOCK.UPDATE });
+        if (proposal) await proposal.update({ ly_do_tu_choi: String(req.body.reason).trim(), nguoi_xu_ly_id: req.user.ma_tai_khoan, ngay_xu_ly: new Date() }, { transaction });
+      }
       let automation = null;
       if (status === "DA_PHE_DUYET" && row.loai_yeu_cau === "GIA_HAN") {
         const detail = await YeuCauGiaHan.findOne({ where: { ma_yeu_cau: row.ma_yeu_cau }, transaction, lock: transaction.LOCK.UPDATE });
@@ -229,7 +233,7 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         };
       }
       const tenantRow = await KhachThue.findByPk(row.ma_khach_thue, { transaction });
-      if (tenantRow?.ma_tai_khoan) await require("../services/notification.service").createIdempotent({ loai_thong_bao: "KET_QUA_YEU_CAU", noi_dung: status === "DA_PHE_DUYET" ? `Yêu cầu ${row.loai_yeu_cau} của bạn đã được phê duyệt.` : `Yêu cầu ${row.loai_yeu_cau} của bạn đã bị từ chối.`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan, khoa_su_kien: `YEU_CAU_KET_QUA:${row.ma_yeu_cau}:${status}` }, { transaction });
+      if (tenantRow?.ma_tai_khoan) await require("../services/notification.service").createIdempotent({ loai_thong_bao: "KET_QUA_YEU_CAU", noi_dung: status === "DA_PHE_DUYET" ? `Yêu cầu ${row.loai_yeu_cau} của bạn đã được phê duyệt.` : `Yêu cầu ${row.loai_yeu_cau} của bạn đã bị từ chối. Lý do: ${String(req.body.reason || "").trim()}`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan, khoa_su_kien: `YEU_CAU_KET_QUA:${row.ma_yeu_cau}:${status}` }, { transaction });
       await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "REQUEST_DECIDED", entityType: "YeuCau", entityId: row.ma_yeu_cau, after: { status, reason: req.body.reason || null } });
       return { request: row, automation };
     });

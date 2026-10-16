@@ -1,8 +1,15 @@
+const { Op } = require("sequelize");
 const { ThanhVienPhong } = require("../models");
 
 async function countBillableOccupants(contractId, options = {}) {
+  const where = { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" };
+  if (options.atDate) {
+    const date = String(options.atDate).slice(0, 10);
+    where.ngay_vao = { [Op.lte]: date };
+    where[Op.or] = [{ ngay_roi: null }, { ngay_roi: { [Op.gt]: date } }];
+  }
   const coTenants = await ThanhVienPhong.count({
-    where: { ma_hop_dong: contractId, trang_thai_cu_tru: "DANG_O" },
+    where,
     transaction: options.transaction,
   });
   return 1 + coTenants;
