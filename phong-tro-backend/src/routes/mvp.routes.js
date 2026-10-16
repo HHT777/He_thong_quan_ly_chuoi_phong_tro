@@ -334,8 +334,28 @@ router.post("/notifications/broadcast", landlord, async (req, res, next) => {
     const where = { vai_tro: "KHACH_THUE", trang_thai: "HOAT_DONG" };
     if (Array.isArray(req.body.recipientIds) && req.body.recipientIds.length) where.ma_tai_khoan = { [Op.in]: req.body.recipientIds };
     const recipients = await TaiKhoan.findAll({ where, attributes: ["ma_tai_khoan"] });
-    await ThongBao.bulkCreate(recipients.map((account) => ({ loai_thong_bao: "THONG_BAO_CHU_TRO", noi_dung: `[${subject}] ${content}`, thoi_diem_tao: new Date(), ma_tai_khoan: account.ma_tai_khoan })));
-    return data(res, { recipients: recipients.length }, 201);
+    const crypto = require("node:crypto");
+    const maBroadcast = String(req.body.maBroadcast || crypto.randomUUID());
+    let sent = 0; let skipped = 0;
+    for (let i = 0; i < recipients.length; i += 100) {
+      const batch = recipients.slice(i, i + 100);
+      try {
+        const result = await sequelize.transaction(async (transaction) => {
+          let batchSent = 0;
+          for (const account of batch) {
+            const created = await require("../services/notification.service").createIdempotent({ ma_tai_khoan: account.ma_tai_khoan, loai_thong_bao: "THONG_BAO_CHU_TRO", noi_dung: `[${subject}] ${content}`, khoa_su_kien: `BROADCAST:${maBroadcast}`, thoi_diem_tao: new Date() }, { transaction });
+            if (created.created) batchSent += 1;
+          }
+          return batchSent;
+        });
+        sent += result;
+        skipped += batch.length - result;
+      } catch (error) {
+        skipped += batch.length;
+        console.error("[BROADCAST] batch failed", { maBroadcast, batchSize: batch.length, error: error.message });
+      }
+    }
+    return data(res, { maBroadcast, recipients: recipients.length, sent, skipped }, 201);
   } catch (e) { next(e); }
 });
 router.get("/reports/cashflow", landlord, async (req, res, next) => {

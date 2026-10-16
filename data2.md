@@ -476,8 +476,10 @@ create table `ThongBao` (
 constraint `fk_ThongBao_maSuCo` foreign key (`maSuCo`) references `SuCo` (`maSuCo`),
 `maTaiKhoan` varchar(36) not null,
 constraint `fk_ThongBao_maTaiKhoan` foreign key (`maTaiKhoan`) references `TaiKhoan` (`maTaiKhoan`),
+`khoaSuKien` varchar(150) null,
 primary key (`maThongBao`),
-key `ix_ThongBao_1` (`maTaiKhoan`, `daDoc`, `thoiDiemTao`)
+key `ix_ThongBao_1` (`maTaiKhoan`, `daDoc`, `thoiDiemTao`),
+unique key `uq_ThongBao_maTaiKhoan_khoaSuKien` (`maTaiKhoan`, `khoaSuKien`)
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table `SuCoTaiSan` (

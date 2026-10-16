@@ -182,6 +182,7 @@ const ThongBao = sequelize.define("ThongBao", {
   ma_thong_bao: id("maThongBao"), loai_thong_bao: { type: DataTypes.STRING(50), field: "loaiThongBao", allowNull: false },
   noi_dung: { type: DataTypes.STRING(1000), field: "noiDung", allowNull: false }, thoi_diem_tao: { type: DataTypes.DATE, field: "thoiDiemTao", allowNull: false, defaultValue: DataTypes.NOW },
   da_doc: { type: DataTypes.BOOLEAN, field: "daDoc", allowNull: false, defaultValue: false }, ma_su_co: ref("maSuCo", true), ma_tai_khoan: ref("maTaiKhoan"),
+  khoa_su_kien: { type: DataTypes.STRING(150), field: "khoaSuKien", allowNull: true },
 }, opts("ThongBao"));
 const SuCoTaiSan = sequelize.define("SuCoTaiSan", { ma_su_co: { ...ref("maSuCo"), primaryKey: true }, ma_tai_san: { ...ref("maTaiSan"), primaryKey: true } }, opts("SuCoTaiSan"));
 const BienBanTraPhong = sequelize.define("BienBanTraPhong", {

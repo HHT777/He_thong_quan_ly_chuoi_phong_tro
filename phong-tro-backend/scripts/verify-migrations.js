@@ -78,7 +78,7 @@ async function run() {
       SET FOREIGN_KEY_CHECKS=1;
     `);
     const migrations = fs.readdirSync(path.resolve(__dirname, "../migrations"))
-      .filter((name) => /^(00[4-9]|01[0-3])_.*\.sql$/.test(name))
+      .filter((name) => /^(00[4-9]|01[0-4])_.*\.sql$/.test(name))
       .sort();
     for (let pass = 1; pass <= 2; pass += 1) {
       for (const name of migrations) {

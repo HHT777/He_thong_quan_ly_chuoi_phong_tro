@@ -66,15 +66,17 @@ async function cancel(id, payload, actorId) {
 }
 
 async function notifyExpired({ now = new Date() } = {}) {
-  const overdue = await DatGiuPhong.findAll({ where: { trang_thai: "DANG_GIU", han_giu: { [Op.lt]: dateOnly(now) } } });
-  const landlords = await TaiKhoan.findAll({ where: { vai_tro: "CHU_TRO", trang_thai: "HOAT_DONG" } });
-  let created = 0;
-  for (const item of overdue) for (const landlord of landlords) {
-    const content = `Giữ phòng ${item.ma_dat_giu} đã quá hạn ${item.han_giu}.`;
-    const exists = await ThongBao.findOne({ where: { ma_tai_khoan: landlord.ma_tai_khoan, loai_thong_bao: "GIU_PHONG_QUA_HAN", noi_dung: content } });
-    if (!exists) { await ThongBao.create({ ma_tai_khoan: landlord.ma_tai_khoan, loai_thong_bao: "GIU_PHONG_QUA_HAN", noi_dung: content, thoi_diem_tao: new Date() }); created += 1; }
-  }
-  return { overdue: overdue.length, created };
+  return sequelize.transaction(async (transaction) => {
+    const overdue = await DatGiuPhong.findAll({ where: { trang_thai: "DANG_GIU", han_giu: { [Op.lt]: dateOnly(now) } }, transaction, lock: transaction.LOCK.UPDATE });
+    const landlords = await TaiKhoan.findAll({ where: { vai_tro: "CHU_TRO", trang_thai: "HOAT_DONG" }, transaction, lock: transaction.LOCK.UPDATE });
+    let created = 0;
+    for (const item of overdue) for (const landlord of landlords) {
+      const content = `Giữ phòng ${item.ma_dat_giu} đã quá hạn ${item.han_giu}.`;
+      const result = await require("./notification.service").createIdempotent({ ma_tai_khoan: landlord.ma_tai_khoan, loai_thong_bao: "GIU_PHONG_QUA_HAN", noi_dung: content, khoa_su_kien: `GIU_PHONG_HET_HAN:${item.ma_dat_giu}:${dateOnly(now)}`, thoi_diem_tao: new Date() }, { transaction });
+      if (result.created) created += 1;
+    }
+    return { overdue: overdue.length, created };
+  });
 }
 
 module.exports = { create, extend, cancel, notifyExpired, validate };

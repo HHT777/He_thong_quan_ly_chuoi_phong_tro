@@ -18,7 +18,7 @@ async function sendOne(billId, actorId, now) {
     const contract = await HopDong.findByPk(bill.ma_hop_dong, { transaction });
     const tenant = contract && await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
     if (!tenant?.ma_tai_khoan) return false;
-    await ThongBao.create({ ma_tai_khoan: tenant.ma_tai_khoan, loai_thong_bao: "PHIEU_THU", noi_dung: `Phiếu thu kỳ ${bill.nam}-${String(bill.thang).padStart(2, "0")} có tổng ${bill.tong_phai_tra}đ.`, thoi_diem_tao: now, da_doc: false }, { transaction });
+    await require("./notification.service").createIdempotent({ ma_tai_khoan: tenant.ma_tai_khoan, loai_thong_bao: "PHIEU_THU", noi_dung: `Phiếu thu kỳ ${bill.nam}-${String(bill.thang).padStart(2, "0")} có tổng ${bill.tong_phai_tra}đ.`, khoa_su_kien: `PHIEU_THU:${bill.ma_thanh_toan}:${bill.nam}-${String(bill.thang).padStart(2, "0")}`, thoi_diem_tao: now, da_doc: false }, { transaction });
     await bill.update({ da_gui: true, ngay_gui: now }, { transaction });
     await writeAuditLog({ transaction, actorId, action: "BILL_SENT", entityType: "ThanhToan", entityId: bill.ma_thanh_toan, after: { sentAt: now } });
     return true;

@@ -23,8 +23,9 @@ test("Sequelize maps every documented table and physical column", () => {
     [],
     "Migration 010/011 tables must be represented in data2.md",
   );
-  assert.equal(expected.size, 37, "Migration 013 must map 37 documented tables");
+  assert.equal(expected.size, 37, "Migration 014 must map 37 documented tables");
   assert.ok(expected.has("KhoanDieuChinh"), "Migration 013 adjustment table must be documented");
+  assert.ok(expected.get("ThongBao")?.includes("khoaSuKien"), "Migration 014 notification event key must be documented");
   assert.deepEqual(
     ["loaiChiSo", "khoaNghiepVu"].filter((column) => !expected.get("ChiSoDien")?.includes(column)),
     [],
