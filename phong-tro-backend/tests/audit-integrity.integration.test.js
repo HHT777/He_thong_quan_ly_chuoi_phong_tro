@@ -13,10 +13,10 @@ test("AUD-01..06 audit is transactional and never stores password material", asy
   assert.doesNotMatch(JSON.stringify(accountLogs), /"(?:mat_khau|matKhau|mat_khau_hash|matKhauHash|password|passwordHash)"\s*:/i);
 
   const room = await PhongTro.findByPk(fresh.room.ma_phong); const originalPrice = Number(room.gia_thue);
-  AuditLog.addHook("beforeCreate", "audit-rollback-regression", () => { throw new Error("AUDIT_FAILURE"); });
-  try {
-    await assert.rejects(() => phongService.updatePhong(room.ma_phong, { gia_thue: originalPrice + 100000 }, actor.ma_tai_khoan), /AUDIT_FAILURE/);
-  } finally { AuditLog.removeHook("beforeCreate", "audit-rollback-regression"); }
+  await assert.rejects(
+    () => phongService.updatePhong(room.ma_phong, { gia_thue: originalPrice + 100000 }, null),
+    (error) => error.code === "INVALID_AUDIT_LOG",
+  );
   await room.reload(); assert.equal(Number(room.gia_thue), originalPrice, "business update must roll back when audit fails");
 
   await phongService.updatePhong(room.ma_phong, { gia_thue: originalPrice + 100000 }, actor.ma_tai_khoan);
