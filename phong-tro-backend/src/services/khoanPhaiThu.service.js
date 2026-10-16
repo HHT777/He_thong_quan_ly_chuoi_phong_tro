@@ -98,10 +98,7 @@ class KhoanPhaiThuService {
   }
 
   async getOverdueBills() {
-    const local = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }));
-    const currentKey = local.getFullYear() * 12 + local.getMonth() + 1;
-    return (await ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, include: billInclude }))
-      .filter((bill) => bill.nam * 12 + bill.thang < currentKey || (bill.nam * 12 + bill.thang === currentKey && local.getDate() > 10));
+    return ThanhToan.findAll({ where: { qua_han: true, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, include: billInclude });
   }
 }
 

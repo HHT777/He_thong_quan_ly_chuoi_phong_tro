@@ -5,6 +5,7 @@ const { getSystemConfig } = require("../services/systemConfig.service");
 const reservationService = require("../services/reservation.service");
 const moveOutRequestService = require("../services/moveOutRequest.service");
 const billingCronService = require("../services/billingCron.service");
+const debtLifecycleService = require("../services/debtLifecycle.service");
 
 async function updateContractStates() {
   const now = new Date();
@@ -34,7 +35,8 @@ const initCronJobs = () => {
   cron.schedule(getSystemConfig().contractStatusJobCron, () => reservationService.notifyExpired().catch((error) => console.error("[CRON] Reservation expiry job failed:", error)));
   cron.schedule("5 0 * * *", () => moveOutRequestService.processDueMoveOuts().catch((error) => console.error("[CRON] Move-out due job failed:", error)), { timezone: "Asia/Ho_Chi_Minh" });
   cron.schedule("0 * * * *", () => billingCronService.run().catch((error) => console.error("[CRON] Billing job failed:", error)), { timezone: "Asia/Ho_Chi_Minh" });
+  cron.schedule("15 * * * *", () => debtLifecycleService.run().catch((error) => console.error("[CRON] Debt lifecycle job failed:", error)), { timezone: "Asia/Ho_Chi_Minh" });
   console.log("✓ Cron jobs initialized successfully");
 };
 
-module.exports = { initCronJobs, updateContractStates, processDueMoveOuts: moveOutRequestService.processDueMoveOuts, runBilling: billingCronService.run };
+module.exports = { initCronJobs, updateContractStates, processDueMoveOuts: moveOutRequestService.processDueMoveOuts, runBilling: billingCronService.run, runDebtLifecycle: debtLifecycleService.run };

@@ -90,6 +90,8 @@ test("CT-015 move-out tab exposes the complete settlement checklist for approved
 test("C.2 frontend consumes settlement, debt and cashflow response contracts", () => {
   const moveOut = frontend("modules/operations/move-outs.tab.js");
   const debts = frontend("modules/finance/debts.tab.js");
+  assert.match(debts, /row\.isOverdue/);
+  assert.match(debts, /row\.debtAgeDays/);
   const reports = frontend("modules/finance/reports.tab.js");
   const legacyForms = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/assets/js/pages/mvpForms.page.js"), "utf8");
   assert.match(moveOut, /name: "finalElectricityReading"/);

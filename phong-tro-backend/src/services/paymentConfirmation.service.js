@@ -7,6 +7,9 @@ async function confirm(id, actorId) {
   return sequelize.transaction(async (transaction) => {
     const payment = await GiaoDichThanhToan.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
     if (!payment) throw { status: 404, code: "PAYMENT_NOT_FOUND", message: "Không tìm thấy giao dịch thanh toán" };
+    if (payment.trang_thai_xac_nhan === "DA_HUY") {
+      throw { status: 409, code: "PAYMENT_CANCELLED", message: "Không thể xác nhận giao dịch đã hủy" };
+    }
     if (payment.trang_thai_xac_nhan !== "CHO_XAC_NHAN") {
       throw { status: 409, code: "PAYMENT_NOT_PENDING", message: "Chỉ minh chứng chờ xác nhận mới được duyệt" };
     }

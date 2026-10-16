@@ -1,9 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao } = require("../src/models");
+const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao, GiaoDichThanhToan, KhoanThu } = require("../src/models");
 const billingCronService = require("../src/services/billingCron.service");
+const paymentLifecycleService = require("../src/services/paymentLifecycle.service");
 const { sumSignedLineAmounts } = require("../src/utils/billLine.util");
-const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
+const { integration, request, headers, login, createFreshRental, uniqueValues } = require("./helpers/integration-api");
 
 async function confirmedReading(fresh, period, value) {
   const [year, month] = period.split("-").map(Number);
@@ -54,4 +55,56 @@ test("FR-151/153/155/156 billing cron sends each persisted bill once", async () 
   assert.ok(bill?.da_gui); assert.ok(bill.ngay_gui); assert.ok(first.sent >= 1); assert.equal(second.sent, 0);
   assert.equal(await ThongBao.count({ where: { ma_tai_khoan: fresh.account.ma_tai_khoan, loai_thong_bao: "PHIEU_THU" } }), 1);
   const forbidden = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ force: true }) }); assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-078/172/173 debt milestones catch up once and expose derived overdue state", async () => {
+  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "debt-cron");
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY", tong_phai_tra: 900000, tong_da_thanh_toan: 0, so_tien_con_no: 900000, trang_thai: "CHUA_THANH_TOAN", da_gui: true, ngay_gui: new Date("2026-10-02T01:00:00Z") });
+  const day5 = await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2026-10-05T08:00:00+07:00" }) });
+  assert.equal(day5.response.status, 200, JSON.stringify(day5.body)); await bill.reload(); assert.equal(bill.da_nhac_han, true); assert.equal(bill.qua_han, false); assert.equal(bill.da_chot_cong_no, false);
+  await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2026-10-06T08:00:00+07:00" }) });
+  await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2026-10-11T00:15:00+07:00" }) });
+  const repeated = await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2026-10-11T00:20:00+07:00" }) });
+  assert.equal(repeated.body.data.processed.some((row) => row.billId === bill.ma_thanh_toan), false);
+  await bill.reload(); assert.equal(bill.qua_han, true); assert.equal(bill.da_chot_cong_no, true); assert.equal(Number(bill.so_tien_chot_cong_no), 900000);
+  assert.equal(await ThongBao.count({ where: { ma_tai_khoan: fresh.account.ma_tai_khoan, loai_thong_bao: ["NHAC_THANH_TOAN", "CONG_NO"] } }), 2);
+  const debt = await request("/api/v1/debt", { headers: headers(landlord) }); const item = debt.body.data.find((row) => row.ma_thanh_toan === bill.ma_thanh_toan);
+  assert.equal(item.isOverdue, true); assert.equal(item.debtGroup.buildingId, fresh.building.ma_can); assert.ok(item.debtAgeDays >= 0);
+  const forbidden = await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(fresh.tenantToken), body: "{}" }); assert.equal(forbidden.response.status, 403);
+  assert.ok(actor);
+});
+
+test("FR-074/075/079 mark paid and cancellation are idempotent, reversible and audited", async () => {
+  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "payment-lifecycle");
+  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 12, loai_thanh_toan: "DINH_KY", tong_phai_tra: 700000, tong_da_thanh_toan: 0, so_tien_con_no: 700000, trang_thai: "CHUA_THANH_TOAN", qua_han: true, ngay_qua_han: new Date() });
+  const key = `mark-paid-${Date.now()}`; const first = await request(`/api/v1/bills/${bill.ma_thanh_toan}/mark-paid`, { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: "{}" });
+  const again = await request(`/api/v1/bills/${bill.ma_thanh_toan}/mark-paid`, { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: "{}" });
+  assert.equal(first.response.status, 201, JSON.stringify(first.body)); assert.equal(again.response.status, 201); assert.equal(await GiaoDichThanhToan.count({ where: { ma_thanh_toan: bill.ma_thanh_toan } }), 1);
+  await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 0);
+  const debtPaid = await request("/api/v1/debt", { headers: headers(landlord) }); assert.equal(debtPaid.body.data.some((row) => row.ma_thanh_toan === bill.ma_thanh_toan), false);
+  const paymentId = first.body.data.payment.ma_giao_dich; const noReason = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(landlord), body: "{}" }); assert.equal(noReason.response.status, 422);
+  const forbidden = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ reason: "x" }) }); assert.equal(forbidden.response.status, 403);
+  const cancelled = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Ghi nhận nhầm" }) }); assert.equal(cancelled.response.status, 200, JSON.stringify(cancelled.body));
+  const twice = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Lần hai" }) }); assert.equal(twice.response.status, 409);
+  const confirmCancelled = await request(`/api/khoan-phai-thu/payment/${paymentId}/confirm`, { method: "POST", headers: headers(landlord), body: "{}" }); assert.equal(confirmCancelled.response.status, 409);
+  await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 700000); assert.equal((await KhoanThu.findOne({ where: { ma_giao_dich_thanh_toan: paymentId } })).trang_thai_ghi_nhan, "DA_HUY");
+  const debtAgain = await request("/api/v1/debt", { headers: headers(landlord) }); assert.equal(debtAgain.body.data.find((row) => row.ma_thanh_toan === bill.ma_thanh_toan).isOverdue, true);
+  const deposit = await GiaoDichThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, so_tien: 1, trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(), nguon_thanh_toan: "KHAU_TRU_COC" });
+  const rejectDeposit = await request(`/api/v1/payments/${deposit.ma_giao_dich}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Không hợp lệ" }) }); assert.equal(rejectDeposit.response.status, 409);
+  await deposit.destroy();
+});
+
+test("FR-075 marks every periodic bill in one building/period atomically", async () => {
+  const landlord = await login(integration.landlord); const first = await createFreshRental(landlord, "mark-all", { createAccount: false }); const unique = uniqueValues();
+  const room = await request("/api/phong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ma_can: first.building.ma_can, so_phong: `ALL-${unique.suffix}`, dien_tich: 20, gia_thue: 2200000, so_nguoi_toi_da: 2, trang_thai: "TRONG" }) }); assert.equal(room.response.status, 201, JSON.stringify(room.body));
+  const tenant = await request("/api/management/khach-thue", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ho_ten: `All ${unique.suffix}`, so_dien_thoai: unique.phone, cccd_giay_to: unique.identity }) }); assert.equal(tenant.response.status, 201, JSON.stringify(tenant.body));
+  const contract = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ma_khach_thue: tenant.body.data.ma_khach_thue, ma_phong: room.body.data.ma_phong, ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30", gia_thue: 2200000, tien_coc: 2200000, don_gia_dien: 3500, don_gia_nuoc: 100000, chi_so_dien_ban_dau: 0, dieu_khoan: "Mark all", ngay_nhan_coc: "2026-10-01", da_co_ban_giay_ky: true }) }); assert.equal(contract.response.status, 201, JSON.stringify(contract.body));
+  const bills = await Promise.all([first.contract.ma_hop_dong, contract.body.data.ma_hop_dong].map((contractId) => ThanhToan.create({ ma_hop_dong: contractId, nam: 2027, thang: 1, loai_thanh_toan: "DINH_KY", tong_phai_tra: 500000, tong_da_thanh_toan: 0, so_tien_con_no: 500000, trang_thai: "CHUA_THANH_TOAN" })));
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  await assert.rejects(() => paymentLifecycleService.markAllPaid({ buildingId: first.building.ma_can, period: "2027-01", key: `rollback-${Date.now()}`, actorId: actor.ma_tai_khoan, failAfter: 1 }), (error) => error.code === "INJECTED_FAILURE");
+  for (const bill of bills) { await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 500000); assert.equal(await GiaoDichThanhToan.count({ where: { ma_thanh_toan: bill.ma_thanh_toan } }), 0); }
+  const key = `all-${Date.now()}`; const marked = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(marked.response.status, 201, JSON.stringify(marked.body)); assert.equal(marked.body.data.processed, 2);
+  const repeated = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(repeated.response.status, 201); assert.equal(repeated.body.data.processed, 0);
+  const tenant = await login(integration.tenant); const forbidden = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(tenant, { "Idempotency-Key": `forbidden-${Date.now()}` }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(forbidden.response.status, 403);
 });

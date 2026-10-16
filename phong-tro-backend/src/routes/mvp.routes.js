@@ -4,7 +4,6 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const auth = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
-const billService = require("../services/khoanPhaiThu.service");
 const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
@@ -13,6 +12,8 @@ const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
 const billingAdjustmentDefinitionService = require("../services/billingAdjustmentDefinition.service");
 const billingCronService = require("../services/billingCron.service");
+const debtLifecycleService = require("../services/debtLifecycle.service");
+const paymentLifecycleService = require("../services/paymentLifecycle.service");
 const tenantAccountService = require("../services/tenantAccount.service");
 const reservationService = require("../services/reservation.service");
 const contractViolationService = require("../services/contractViolation.service");
@@ -128,22 +129,15 @@ router.post("/bills/generate", landlord, async (req, res, next) => {
 });
 router.get("/debt", async (req, res, next) => {
   try {
-    const where = { so_tien_con_no: { [Op.gt]: 0 } };
-    const include = [{
-      model: HopDong,
-      as: "hopDong",
-      required: req.user.vai_tro === "KHACH_THUE",
-      where: req.user.vai_tro === "KHACH_THUE" ? { ma_khach_thue: req.user.ma_khach_thue } : undefined,
-      include: [
-        { model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] },
-        { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "ma_can"] },
-      ],
-    }];
-    return data(res, await ThanhToan.findAll({ where, include, order: [["nam", "ASC"], ["thang", "ASC"]] }));
+    return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined }));
   } catch (e) { next(e); }
 });
-router.post("/jobs/close-overdue-debt", landlord, async (req, res, next) => { try { return data(res, { processed: (await billService.getOverdueBills()).length }); } catch (e) { next(e); } });
-router.post("/jobs/remind-due-bills", landlord, async (req, res, next) => { try { const bills = await billService.getOverdueBills(); let created = 0; for (const bill of bills) { const tenantRow = await KhachThue.findByPk(bill.hopDong.ma_khach_thue); if (tenantRow?.ma_tai_khoan) { await ThongBao.create({ loai_thong_bao: "NHAC_THANH_TOAN", noi_dung: `Khoản kỳ ${bill.nam}-${String(bill.thang).padStart(2, "0")} còn ${bill.so_tien_con_no}đ`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }); created += 1; } } return data(res, { created }); } catch (e) { next(e); } });
+router.post("/bills/:id/mark-paid", landlord, async (req, res, next) => { try { return data(res, await paymentLifecycleService.markPaid(req.params.id, req.get("Idempotency-Key"), req.user.ma_tai_khoan), 201); } catch (e) { next(e); } });
+router.post("/bills/mark-all-paid", landlord, async (req, res, next) => { try { return data(res, await paymentLifecycleService.markAllPaid({ buildingId: req.body.buildingId, period: req.body.period, key: req.get("Idempotency-Key"), actorId: req.user.ma_tai_khoan }), 201); } catch (e) { next(e); } });
+router.post("/payments/:id/cancel", landlord, async (req, res, next) => { try { return data(res, await paymentLifecycleService.cancel(req.params.id, req.body.reason, req.user.ma_tai_khoan)); } catch (e) { next(e); } });
+router.post("/jobs/debt-lifecycle", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
+router.post("/jobs/close-overdue-debt", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
+router.post("/jobs/remind-due-bills", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
 router.post("/jobs/billing", landlord, async (req, res, next) => { try { return data(res, await billingCronService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan, force: req.body.force === true })); } catch (e) { next(e); } });
 
 // Tài sản được quản lý theo thứ bậc Căn trọ → Phòng → Tài sản.
