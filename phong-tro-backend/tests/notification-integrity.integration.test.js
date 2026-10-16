@@ -15,6 +15,7 @@ test("FR-159 event key schema permits legacy NULL rows without collisions", asyn
 test("FR-159 reservation expiry race creates exactly one event-key notification", async () => {
   const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "notification-reservation-race", { createAccount: false });
   const owner = await TaiKhoan.findOne({ where: { vai_tro: "CHU_TRO" } });
+  await fresh.room.update({ trang_thai: "DA_GIU" });
   const reservation = await DatGiuPhong.create({ ho_ten_nguoi_giu: "Race", so_dien_thoai: fresh.unique.phone, so_tien_giu: 1, ngay_nhan: "2026-01-01", han_giu: "2026-01-02", dieu_kien: "race", ma_phong: fresh.room.ma_phong, nguoi_thuc_hien_id: owner.ma_tai_khoan });
   const eventKey = `GIU_PHONG_HET_HAN:${reservation.ma_dat_giu}:2026-10-16`;
   const [a, b] = await Promise.all([

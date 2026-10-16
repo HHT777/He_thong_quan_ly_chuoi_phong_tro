@@ -66,7 +66,11 @@ router.post("/accounts/reset-password", landlord, async (req, res, next) => {
 });
 
 router.get("/reservations", landlord, async (req, res, next) => {
-  try { return data(res, await DatGiuPhong.findAll({ include: [{ model: PhongTro, as: "phongTro" }], order: [["han_giu", "ASC"]] })); } catch (e) { next(e); }
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = await DatGiuPhong.findAll({ include: [{ model: PhongTro, as: "phongTro" }], order: [["han_giu", "ASC"]] });
+    return data(res, rows.map((row) => ({ ...row.toJSON(), quaHan: row.trang_thai === "DANG_GIU" && String(row.han_giu) < today })));
+  } catch (e) { next(e); }
 });
 router.post("/reservations", landlord, async (req, res, next) => {
   try { return data(res, await reservationService.create(req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
