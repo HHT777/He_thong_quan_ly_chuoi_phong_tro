@@ -110,24 +110,36 @@ async function getCashflow(filters) {
     (sum, row) => sum + Math.min(Number(row.tien_coc_ban_dau || 0), Number(row.tong_khoan_khau_tru || 0)),
     0,
   );
-  const totalRevenue = grossCashRevenue + depositDeductions;
+  // API contract: totalRevenue/totalCollected are effective cash received
+  // (KhoanThu, already net of discount) plus deposit deductions/other
+  // non-refundable income. grossRevenue is the explicit pre-discount view.
+  const totalRevenue = cashReceipts + depositDeductions;
+  const grossRevenue = totalRevenue + discounts;
   const totalExpenses = expenses.reduce((sum, row) => sum + Number(row.so_tien), 0);
-  const revenueByType = Object.values(allocations.reduce((all, row) => { for (const [key, amount] of Object.entries(row.byType)) { all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += amount; } return all; }, {}));
+  const revenueByType = Object.values(allocations.reduce((all, row) => {
+    for (const [key, amount] of Object.entries(row.netByType || row.byType)) {
+      all[key] = all[key] || { type: key, amount: 0 };
+      all[key].amount += amount;
+    }
+    return all;
+  }, {}));
   if (depositDeductions > 0) revenueByType.push({ type: "KHAU_TRU_COC", amount: depositDeductions });
   const expensesByType = Object.values(expenses.reduce((all, row) => { const key = row.loai_khoan_chi; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
   const expenseDetails = expenses.map((row) => ({ source: "CHI_PHI", amount: Number(row.so_tien), date: row.ngay_phat_sinh, expenseId: row.ma_khoan_chi, buildingId: row.ma_can || null, roomId: null, incidentId: row.ma_su_co || null }));
   const comparison = {};
   for (const item of allocations) {
     const key = item.buildingId || "TOAN_CHUOI";
-    comparison[key] = comparison[key] || { buildingId: item.buildingId || null, revenue: 0, discounts: 0, expenses: 0 };
-    comparison[key].revenue += item.gross; comparison[key].discounts += item.discount;
+    comparison[key] = comparison[key] || { buildingId: item.buildingId || null, revenue: 0, grossRevenue: 0, discounts: 0, expenses: 0 };
+    comparison[key].revenue += item.gross - item.discount;
+    comparison[key].grossRevenue = (comparison[key].grossRevenue || 0) + item.gross;
+    comparison[key].discounts += item.discount;
   }
   for (const row of expenses) {
     const key = row.ma_can || "TOAN_CHUOI";
-    comparison[key] = comparison[key] || { buildingId: row.ma_can || null, revenue: 0, discounts: 0, expenses: 0 };
+    comparison[key] = comparison[key] || { buildingId: row.ma_can || null, revenue: 0, grossRevenue: 0, discounts: 0, expenses: 0 };
     comparison[key].expenses += Number(row.so_tien);
   }
-  const byBuilding = Object.values(comparison).map((row) => ({ ...row, profit: row.revenue - row.discounts - row.expenses }));
+  const byBuilding = Object.values(comparison).map((row) => ({ ...row, profit: row.revenue - row.expenses }));
   const receiptDetails = [
     ...receipts.map((row) => ({
       source: "THU_TIEN",
@@ -155,7 +167,9 @@ async function getCashflow(filters) {
     totalRevenue,
     totalCollected: totalRevenue,
     totalExpenses,
-    profit: totalRevenue - discounts - totalExpenses,
+    grossRevenue,
+    grossCashRevenue,
+    profit: totalRevenue - totalExpenses,
     revenueByType, expensesByType,
     byBuilding, receiptDetails: [...receiptDetails, ...expenseDetails], expenseDetails,
     receipts,
@@ -198,7 +212,17 @@ function allocateReceipts(receipts) {
         byType[line.loai_khoan] = (byType[line.loai_khoan] || 0) + amount;
       }
       if (!grossLines.length) byType.THANH_TOAN = gross;
-      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType, buildingId: item.row.ma_can || null });
+      const typeEntries = Object.entries(byType);
+      const netByType = {};
+      let netAssigned = 0;
+      typeEntries.forEach(([type, amount], typeIndex) => {
+        const net = typeIndex === typeEntries.length - 1
+          ? (gross - discount) - netAssigned
+          : Math.round((gross - discount) * amount / (gross || 1));
+        netByType[type] = net;
+        netAssigned += net;
+      });
+      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType, netByType, buildingId: item.row.ma_can || null });
     });
   }
   return result;

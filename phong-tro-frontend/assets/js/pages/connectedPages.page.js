@@ -171,11 +171,12 @@
   async function loadReport() {
     const { data = {} } = await api().get("/v1/reports/cashflow");
     const revenue = Number(data.totalRevenue ?? data.totalCollected ?? 0);
+    const grossRevenue = Number(data.grossRevenue ?? revenue);
     const expenses = Number(data.totalExpenses || 0);
-    const profit = revenue - expenses;
+    const profit = Number(data.profit ?? (revenue - expenses));
     const margin = revenue ? Math.round((profit / revenue) * 100) : 0;
     setStats([currency(profit), `${margin}%`, currency(expenses), currency(revenue)]);
-    renderTable([["Tổng hiện tại", currency(revenue), currency(expenses), currency(profit), `${margin}%`]]);
+    renderTable([["Tổng hiện tại", currency(revenue), currency(grossRevenue), currency(expenses), currency(profit), `${margin}%`]]);
   }
 
   async function loadMoveOuts() {

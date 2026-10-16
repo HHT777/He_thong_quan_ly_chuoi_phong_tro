@@ -100,3 +100,31 @@ test("BR-44 keeps an earlier receipt allocation immutable when later payment arr
   assert.equal(cancelled.discount, before.discount);
   assert.equal(cancelled.gross - cancelled.discount, 60);
 });
+
+test("BR-44 report contract exposes net and gross totals without changing legacy aliases", () => {
+  const service = fs.readFileSync(path.resolve(__dirname, "../src/services/cashflowReport.service.js"), "utf8");
+  assert.match(service, /const totalRevenue = cashReceipts \+ depositDeductions/);
+  assert.match(service, /const grossRevenue = totalRevenue \+ discounts/);
+  assert.match(service, /totalCollected: totalRevenue/);
+  assert.match(service, /profit: totalRevenue - totalExpenses/);
+});
+
+test("BR-44 allocates 3,000,000 gross with 300,000 discount over 1,000,000 and 1,700,000 receipts", () => {
+  const bill = { ma_thanh_toan: "b-arithmetic", tong_phai_tra: 2700000, chiTiets: [
+    { loai_khoan: "TIEN_PHONG", so_tien: 3000000 },
+    { loai_khoan: "GIAM_TRU", so_tien: -300000 },
+  ] };
+  const rows = [1000000, 1700000].map((amount, index) => ({ ma_khoan_thu: `r${index}`, so_tien: amount, ngay_ghi_nhan: `2026-10-0${index + 1}`, giaoDich: { thanhToan: bill } }));
+  const result = reportService.allocateReceipts(rows);
+  assert.equal(result.reduce((sum, row) => sum + row.gross, 0), 3000000);
+  assert.equal(result.reduce((sum, row) => sum + row.discount, 0), 300000);
+  assert.equal(result.reduce((sum, row) => sum + row.gross - row.discount, 0), 2700000);
+});
+
+test("BR-44 allocation preserves exact net total under thirds rounding", () => {
+  const bill = { ma_thanh_toan: "b-round", tong_phai_tra: 300000, chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 400000 }, { loai_khoan: "GIAM_TRU", so_tien: -100000 }] };
+  const rows = [100000, 100000, 100000].map((amount, index) => ({ ma_khoan_thu: `rr${index}`, so_tien: amount, ngay_ghi_nhan: `2026-10-0${index + 1}`, giaoDich: { thanhToan: bill } }));
+  const result = reportService.allocateReceipts(rows);
+  assert.equal(result.reduce((sum, row) => sum + row.discount, 0), 100000);
+  assert.equal(result.reduce((sum, row) => sum + row.gross - row.discount, 0), 300000);
+});
