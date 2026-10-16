@@ -435,6 +435,13 @@ Audit helper bắt buộc transaction; DTO không ghi password/hash/token (test 
 - Test mới `BR-44 allocates gross revenue and discount across partial receipts with final rounding`; unit **49/49**, integration **41/41**, invariants **0** sau thay đổi.
 - Commit: `f87b28b feat(FR-133): allocate gross revenue and discounts`, `8787516 fix(FR-133): preserve revenue for detailless receipts`, `536e429 feat(FR-136): add building report comparison details`.
 
+## F.2 – người ở cùng
+
+- FR-177/N-10: từ chối bắt buộc lý do; lưu vào `DeXuatBanCungPhong.lyDoTuChoi`, người xử lý/ngày xử lý; thông báo khách chứa lý do và có `khoaSuKien`; audit quyết định vẫn trong transaction. Test mở rộng trong `operations.integration.test.js`.
+- FR-178: trường ngày vào/ngày rời đã có trong schema; helper `countBillableOccupants` nhận ngày hiệu lực, loại người đã rời trước/ngày chốt kỳ khỏi số người tính nước. Không cần DDL.
+- BR-23/BR-43: đề xuất vẫn kiểm tra đủ hồ sơ, trùng SĐT, sức chứa và khóa phòng/hợp đồng trong transaction; unit 49/49, integration 41/41, invariants 0.
+- Commit: `3bc8e88 feat(FR-177): record co-tenant rejection and effective departure`.
+
 ## Xác minh lại sau migration 014
 
 - TCP MySQL `127.0.0.1:3307`: `8.0.46`; MariaDB `127.0.0.1:3306`: `10.4.32-MariaDB`.
