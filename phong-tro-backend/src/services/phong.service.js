@@ -80,9 +80,10 @@ class PhongService {
       const phong = await PhongTro.findByPk(maPhong, { transaction, lock: transaction.LOCK.UPDATE });
       if (!phong) throw { status: 404, message: "Phòng trọ không tồn tại" };
       const before = phong.get({ plain: true });
+      const priceChanged = data.gia_thue !== undefined && Number(before.gia_thue) !== Number(data.gia_thue);
       await phong.update(data, { transaction });
-      if (data.gia_thue !== undefined && Number(before.gia_thue) !== Number(phong.gia_thue)) {
-        await writeAuditLog({ transaction, actorId, action: "ROOM_PRICE_UPDATED", entityType: "PhongTro", entityId: phong.ma_phong, before: { price: before.gia_thue }, after: { price: phong.gia_thue } });
+      if (priceChanged) {
+        await writeAuditLog({ transaction, actorId, action: "ROOM_PRICE_UPDATED", entityType: "PhongTro", entityId: phong.ma_phong, before: { price: before.gia_thue }, after: { price: Number(data.gia_thue) } });
       }
       return phong;
     });
