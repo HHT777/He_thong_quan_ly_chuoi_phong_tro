@@ -144,7 +144,10 @@ async function runIntegration() {
     await resetAndSeed(databaseName);
     server = spawn(process.execPath, ["src/index.js"], { cwd: root, env, stdio: "inherit" });
     await waitUntilReady(baseUrl, server);
-    return runNodeTests(testFiles(true), env);
+    const testStatus = runNodeTests(testFiles(true), env);
+    if (testStatus !== 0) return testStatus;
+    const invariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
+    return invariant.status ?? 1;
   } finally {
     if (server && server.exitCode === null) server.kill();
     fs.rmSync(uploadDir, { recursive: true, force: true });
