@@ -459,3 +459,73 @@ Audit helper bắt buộc transaction; DTO không ghi password/hash/token (test 
 - `audit-matrix.integration.test.js`: 25 operation audit count=1, snapshot không secret, rollback khi audit lỗi. Phép thử ban đầu phát hiện snapshot còn password/hash; đã vá trong commit `d5b5a0c`.
 - `scripts/check-invariants.js` được hook vào integration trước khi dọn DB; kết quả cuối: bill detail **0**, duplicate bill **0**, capacity **0**, deposit **0**, notification key **0**, incident branch bị trùng **0**.
 - Commit test: `ec0d2d5`, `e1b58c6`, `586e500`, `ac17b97`; fix audit: `d5b5a0c`; invariants: `b6a16f8`.
+
+## G.1 – ma trận kiểm thử khoảng trống F.0/F.1/F.2 (16/10/2026)
+
+Mốc Git trước đợt bổ sung: tag `checkpoint-before-f-gap`. Phạm vi không bao gồm F.5, in hợp đồng, Excel, liên kết sự cố cũ/mới, npm audit, dọn cọc legacy hoặc thu hồi token server.
+
+| Nhóm | Kịch bản bắt buộc | Đã có / trạng thái | Test phủ định | Ghi chú |
+|---|---|---|---|---|
+| F.0 | Cron trên seed cũ, chạy lần 1 và lần 2 | ĐÃ CÓ | Có | `00-legacy-cron.integration.test.js`, không phát sinh bill/thông báo kỳ cũ |
+| F.0 | Race notification reservation/hợp đồng/broadcast | ĐÃ CÓ | Có | Integration + phép thử bỏ bắt duplicate làm suite đỏ |
+| F.1 | Doanh thu trước giảm trừ, lợi nhuận trừ giảm trừ và chi phí | ĐÃ CÓ | Có | `cashflowReport.service.js` và finance integration |
+| F.1 | Nhiều lần thu, tổng theo loại = tổng, làm tròn 3 lần thu | ĐÃ CÓ | Có | BR-44 unit; phân bổ theo `tong_phai_tra`, dồn residual ở lần cuối |
+| F.1 | Phân bổ bất biến khi thêm lần thu sau | ĐÃ CÓ | Có | Regression unit mới; thanh toán bị hủy chỉ loại phần của lần đó |
+| F.1 | Phân bổ giảm trừ chưa cấp, không trừ hai lần | ĐÃ CÓ | Có | BR-44 unit/report fields `discounts` |
+| F.1 | Lọc tháng/quý/năm/khoảng ngày | ĐÃ CÓ | Có | Unit + API cashflow |
+| F.1 | Không có dữ liệu trả tổng 0 | ĐÃ CÓ | Có | Integration report trên căn/kỳ rỗng |
+| F.1 | Query kỳ sai hoặc đảo ngày trả 400 | ĐÃ CÓ | Có | Regression unit `f-gap-regression.test.js` |
+| F.1 | Lọc theo căn và so sánh từng căn/toàn chuỗi | ĐÃ CÓ | Có | `byBuilding`, integration building filter |
+| F.1 | Phân quyền khách/ngoài phạm vi gọi report | ĐÃ CÓ | Có | Route dùng `landlord`; integration 403 |
+| F.2 | Từ chối thiếu lý do trả 400 | ĐÃ CÓ | Có | Route đổi sang 400 + regression unit |
+| F.2 | Từ chối có lý do: lưu DB, thông báo đúng lý do, audit | ĐÃ CÓ | Có | `operations.integration.test.js` |
+| F.2 | Race approve/reject cùng yêu cầu, chỉ một thông báo | ĐÃ CÓ | Có | Khóa dòng + event key; integration notification/request |
+| F.2 | Người rời có hiệu lực kỳ sau; hóa đơn kỳ cũ không đổi | ĐÃ CÓ | Có | Occupancy helper nhận `atDate`; billing period dùng ngày cuối kỳ |
+| F.2 | Rời giữa kỳ, chỉ tính người còn ở tại ngày chốt | ĐÃ CÓ | Có | Unit/source regression + occupancy integration |
+| F.2 | Quá sức chứa và đề xuất trùng | ĐÃ CÓ | Có | `coTenant.service.js`, UC-28 integration |
+| F.2 | Chỉ còn người đứng tên sau khi người ở cùng rời | ĐÃ CÓ | Có | Helper luôn cộng 1 người đứng tên |
+| F.2 | RBAC khách/Chủ trọ khác tài sản | ĐÃ CÓ một phần | Có | Khách bị 403; fixture chưa có Chủ trọ thứ hai nên chưa có test cross-landlord riêng |
+| F.2 | Audit đúng một bản ghi và rollback khi audit lỗi | ĐÃ CÓ | Có | Audit matrix 25 thao tác; route co-tenant riêng chưa có fixture lỗi audit |
+| F.2 | Preview/generate/settlement dùng cùng helper | ĐÃ CÓ một phần | Có | Generate/settlement đã dùng helper; preview chưa có assertion occupancy riêng |
+
+### Các vá trong G.1
+
+- `cashflowReport.service.js`: dùng tổng phải trả bất biến của `ThanhToan` làm mẫu số phân bổ; không để lần thu sau làm thay đổi doanh thu đã phân bổ của lần trước. Lỗi kỳ báo cáo trả HTTP 400.
+- `mvp.routes.js`: từ chối người ở cùng thiếu lý do trả HTTP 400 (`REQUEST_REJECTION_REASON_REQUIRED`).
+- `tests/stage4-finance-rules.test.js`: thêm kiểm thử thêm/hủy lần thu sau và kiểm tra bất biến phân bổ.
+- `tests/f-gap-regression.test.js`: thêm kiểm thử kỳ báo cáo, phân quyền báo cáo, lý do từ chối và dùng helper occupancy theo ngày.
+
+### Kết quả chạy thật sau G.1
+
+| Bước | Kết quả |
+|---|---|
+| Unit backend | **54/54 pass** |
+| Integration MySQL 8.0.46 qua TCP `127.0.0.1:3307` | **41/41 pass** |
+| Invariants sau integration | **0 lỗi**: bill detail, duplicate bill, capacity, deposit, incident branch, notification key, deposit refund |
+| Clone sạch/`npm ci`/Vite build | Chưa chạy trong đợt này; không ghi nhận là đạt |
+| Verify migration 004→014 | Mốc trước đã ghi MySQL 2/2 và MariaDB 2/2 pass; chưa chạy lại sau G.1 vì không có DDL |
+| MariaDB 10.4 trong đợt này | Chưa chạy lại; không ghi nhận là đạt |
+
+### Việc còn thiếu sau G.1
+
+1. Bổ sung fixture/test cross-landlord cho người ở cùng.
+2. Bổ sung test route preview kiểm tra trực tiếp occupancy theo ngày và test audit lỗi riêng cho route người ở cùng.
+3. Chưa chạy clone sạch, `npm ci`, Vite build và verify migration lặp lại sau thay đổi code (không có migration mới).
+
+Không phát sinh DDL hoặc migration mới trong G.1.
+
+## F.3 – giữ phòng integration (FR-167…170, UC-26, BR-41)
+
+| FR/UC | File | Mô tả | Test | Trạng thái |
+|---|---|---|---|---|
+| FR-167/UC26-AC1 | `reservation.service.js` | Giữ phòng `TRONG → DA_GIU`, lưu người giữ, tiền, hạn, điều kiện; phòng không trống bị từ chối | `reservation-lifecycle.integration.test.js` | ĐÃ CÓ |
+| FR-168/UC26-AC2 | `reservation.service.js`, `cron.jobs.js` | Cron quá hạn giải phóng phòng theo chỉ thị F.3 và gửi một thông báo có khóa sự kiện; chạy lại không trùng | `reservation-lifecycle.integration.test.js` | ĐÃ CÓ |
+| FR-169/UC26-AC3 | `reservation.service.js` | Hủy giữ trong transaction, hoàn 0…tiền đã nhận, phần không hoàn tạo `KhoanThu` `GIU_PHONG_KHONG_HOAN`, audit một lần | `reservation-lifecycle.integration.test.js` | ĐÃ CÓ |
+| FR-170/UC26 | `hopDong.service.js`, `hopDong.validation.js` | Hợp đồng nhận `ma_dat_giu`, khóa bản ghi giữ, kiểm tra đúng người/phòng/hạn, chuyển `DA_CHUYEN_THANH_HOP_DONG`, phần dư ghi nhận hoàn | `reservation-lifecycle.integration.test.js` | ĐÃ CÓ |
+| BR-41 | `reservation-lifecycle.integration.test.js` | Hai request giữ đồng thời chỉ một thành công; khách gọi route nhận 403 | `reservation-lifecycle.integration.test.js` | ĐÃ CÓ |
+
+Đối chiếu SRS: công thức BR-44 được nêu nguyên văn ở `SRS.md:228`, `SRS.md:562-566`: “tổng hợp **tiền thực thu** theo ngày thu + thu khác (tiền giữ chỗ không hoàn) − giảm trừ − chi phí”; UC19-AC1 nêu thực thu 10.000.000, giảm trừ 500.000, chi 3.000.000, doanh thu hiển thị 10.500.000 và lợi nhuận 7.000.000. Cách hiểu triển khai: `grossRevenue` là phần trước giảm trừ phân bổ theo từng lần thu; `discounts` là phần giảm trừ đã phân bổ; `depositDeductions` là khấu trừ cọc; `totalRevenue = grossCashRevenue + depositDeductions`; `totalCollected` giữ tương thích contract cũ và bằng `totalRevenue`; `profit = totalRevenue - discounts - totalExpenses`. Với phiếu chưa thu đủ, giảm trừ chưa phân bổ không vào kỳ; khi thu đủ, residual dồn vào lần làm `conNo = 0`. Bất biến mới: tổng theo căn = tổng toàn chuỗi; tổng theo loại = tổng doanh thu; giảm trừ đã phân bổ ≤ giảm trừ phiếu.
+
+Commit sau G.1: `5ab87b9` (BR-44 immutable allocation), `897bc76` (FR-177 missing reason 400), `c9dfff8` (FR-167 reservation lifecycle). Unit **54/54**, integration **42/42**, invariants **0**. Lỗi thật trong F.3 là so sánh `Date` với chuỗi làm chuyển giữ hợp lệ trả 409; đã sửa bằng chuẩn hóa ISO date trước khi so sánh. Không thêm migration/DDL.
+
+Quyết định cần xác nhận: `SRS.md:613,615,860` mô tả quá hạn chỉ thông báo và phòng vẫn `Đã giữ`, trong khi chỉ thị F.3 yêu cầu cron đưa phòng về `TRONG`; mã hiện theo chỉ thị F.3 (giải phóng phòng), chưa sửa lại theo SRS.
