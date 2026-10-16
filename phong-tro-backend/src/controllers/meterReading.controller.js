@@ -25,7 +25,7 @@ async function canRead(req, row) {
 
 class MeterReadingController {
   async context(req, res, next) { try { res.apiSuccess(await service.getContext(req.user.ma_khach_thue, req.query.period || new Date().toISOString().slice(0, 7))); } catch (e) { next(e); } }
-  async preview(req, res, next) { try { if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : null, req.body.period, req.file, req.body.roomId)); } catch (e) { next(e); } }
+  async preview(req, res, next) { try { if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : null, req.body.period, req.file, req.body.roomId, req.user.ma_tai_khoan)); } catch (e) { next(e); } }
   async submit(req, res, next) {
     try {
       header(req, "Idempotency-Key");

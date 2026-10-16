@@ -5,7 +5,43 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { ChiSoDien, HopDong, PhongTro, CanTro, KhachThue } = require("../models");
 
-const previews = new Map();
+const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads", "meter");
+const uploadTokenTtlMs = 15 * 60 * 1000;
+function tokenSecret() {
+  const value = process.env.UPLOAD_TOKEN_SECRET || process.env.JWT_SECRET;
+  if (!value) throw Object.assign(new Error("Thiếu khóa ký upload token"), { status: 500, code: "UPLOAD_TOKEN_SECRET_MISSING" });
+  return value;
+}
+function signUploadPayload(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = crypto.createHmac("sha256", tokenSecret()).update(encoded).digest("base64url");
+  return `${encoded}.${signature}`;
+}
+function verifyUploadToken(token, actorId, tenantId, period, now = Date.now()) {
+  try {
+    const [encoded, signature, extra] = String(token || "").split(".");
+    if (!encoded || !signature || extra) throw new Error("malformed");
+    const expected = crypto.createHmac("sha256", tokenSecret()).update(encoded).digest();
+    const actual = Buffer.from(signature, "base64url");
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) throw new Error("signature");
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    if (payload.sub !== actorId || payload.tenantId !== (tenantId || null) || payload.period !== period || Number(payload.exp) <= now) throw new Error("claims");
+    const filePath = path.resolve(uploadDir, payload.fileName);
+    if (!filePath.startsWith(`${uploadDir}${path.sep}`)) throw new Error("path");
+    return { ...payload, filePath };
+  } catch (_) {
+    throw { status: 422, code: "UPLOAD_TOKEN_EXPIRED", message: "Preview upload không hợp lệ hoặc đã hết hạn" };
+  }
+}
+function cleanupExpiredUploads(now = Date.now()) {
+  if (!fs.existsSync(uploadDir)) return 0;
+  let removed = 0;
+  for (const name of fs.readdirSync(uploadDir)) {
+    const filePath = path.resolve(uploadDir, name);
+    try { if (now - fs.statSync(filePath).mtimeMs > uploadTokenTtlMs) { fs.unlinkSync(filePath); removed += 1; } } catch (_) { /* file raced with another worker */ }
+  }
+  return removed;
+}
 const include = [{ model: PhongTro, as: "phongTro", include: [{ model: CanTro, as: "canTro" }] }];
 function parsePeriod(period) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || "");
@@ -91,23 +127,21 @@ async function callOcr(filePath) {
     return { status: "MANUAL_REQUIRED", rawValue: null, numericValue: null, warning: { code: error.name === "AbortError" ? "OCR_TIMEOUT" : "OCR_UNAVAILABLE", message: "OCR không sẵn sàng. Vui lòng nhập tay." } };
   } finally { clearTimeout(timer); }
 }
-async function createPreview(tenantId, period, file, roomId) {
+async function createPreview(tenantId, period, file, roomId, actorId) {
   parsePeriod(period);
   const contract = tenantId ? await tenantContract(tenantId) : null;
   const targetRoomId = roomId || contract?.ma_phong;
   if (!targetRoomId) throw { status: 422, code: "ROOM_REQUIRED", message: "Chủ trọ phải chọn phòng khi OCR" };
   const previous = await previousReading(targetRoomId, period);
   const ocr = await callOcr(file.path);
-  const token = `upl_${crypto.randomUUID()}`;
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-  previews.set(token, { tenantId, roomId: targetRoomId, period, filePath: file.path, ocrValue: ocr.rawValue, ocrStatus: ocr.status, expiresAt });
+  cleanupExpiredUploads();
+  const expiresAt = new Date(Date.now() + uploadTokenTtlMs);
+  const token = signUploadPayload({ sub: actorId, tenantId: tenantId || null, roomId: targetRoomId, period, fileName: path.basename(file.path), ocrValue: ocr.rawValue, ocrStatus: ocr.status, exp: expiresAt.getTime() });
   return { uploadToken: token, expiresAt: expiresAt.toISOString(), ocrStatus: ocr.status, ocrValue: ocr.rawValue, suggestedReading: ocr.numericValue, previousReading: previous, canSubmit: ocr.numericValue !== null && ocr.numericValue >= previous, warnings: ocr.warning ? [ocr.warning] : [] };
 }
-function resolvePreview(tenantId, period, token) {
+function resolvePreview(tenantId, period, token, actorId) {
   if (!token) return null;
-  const value = previews.get(token);
-  if (!value || value.tenantId !== tenantId || value.period !== period || value.expiresAt < new Date()) throw { status: 422, code: "UPLOAD_TOKEN_EXPIRED", message: "Preview upload đã hết hạn" };
-  return value;
+  return verifyUploadToken(token, actorId, tenantId, period);
 }
 async function findReading(id, transaction) {
   const row = await ChiSoDien.findByPk(String(id).replace(/^mr_/, ""), { include, transaction });
@@ -119,7 +153,7 @@ async function submit(tenantId, payload, actorId) {
   const contract = await tenantContract(tenantId);
   const value = Number(payload.readingValue);
   if (!Number.isInteger(value) || value < 0) throw { status: 422, code: "INVALID_READING", message: "Chỉ số điện phải là số nguyên không âm" };
-  const preview = resolvePreview(tenantId, payload.period, payload.uploadToken);
+  const preview = resolvePreview(tenantId, payload.period, payload.uploadToken, actorId);
   return sequelize.transaction(async (transaction) => {
     const existing = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, transaction, lock: transaction.LOCK.UPDATE });
     if (existing?.trang_thai_xac_nhan === "DA_XAC_NHAN") throw { status: 409, code: "READING_ALREADY_CONFIRMED", message: "Kỳ này đã được xác nhận" };
@@ -127,11 +161,10 @@ async function submit(tenantId, payload, actorId) {
     if (value < previous) throw { status: 422, code: "READING_BELOW_PREVIOUS", message: "Chỉ số điện không được nhỏ hơn kỳ trước", details: { previousReading: previous } };
     const values = { ...parsed, ma_phong: contract.ma_phong, loai_chi_so: "DINH_KY", khoa_nghiep_vu: `DINH_KY:${parsed.nam}-${String(parsed.thang).padStart(2, "0")}`, chi_so_moi: value, anh_cong_to_url: preview?.filePath || existing?.anh_cong_to_url || null, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "CHO_XAC_NHAN", ngay_ghi_nhan: new Date(), nguoi_ghi_nhan_id: actorId };
     const row = existing ? await existing.update(values, { transaction }) : await ChiSoDien.create(values, { transaction });
-    if (payload.uploadToken) previews.delete(payload.uploadToken);
     const result = toDto(await row.reload({ include, transaction }));
     result.previousReading = previous;
     return result;
   });
 }
 
-module.exports = { parsePeriod, toDto, include, getContext, createPreview, findReading, submit, tenantContract, requirePreviousReading, previousReading };
+module.exports = { parsePeriod, toDto, include, getContext, createPreview, findReading, submit, tenantContract, requirePreviousReading, previousReading, signUploadPayload, verifyUploadToken, cleanupExpiredUploads };
