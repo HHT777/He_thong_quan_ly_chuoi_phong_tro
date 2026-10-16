@@ -65,8 +65,8 @@ async function cancel(id, payload, actorId) {
   });
 }
 
-async function notifyExpired() {
-  const overdue = await DatGiuPhong.findAll({ where: { trang_thai: "DANG_GIU", han_giu: { [Op.lt]: dateOnly(new Date()) } } });
+async function notifyExpired({ now = new Date() } = {}) {
+  const overdue = await DatGiuPhong.findAll({ where: { trang_thai: "DANG_GIU", han_giu: { [Op.lt]: dateOnly(now) } } });
   const landlords = await TaiKhoan.findAll({ where: { vai_tro: "CHU_TRO", trang_thai: "HOAT_DONG" } });
   let created = 0;
   for (const item of overdue) for (const landlord of landlords) {

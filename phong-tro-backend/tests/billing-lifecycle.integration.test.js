@@ -1,10 +1,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao, GiaoDichThanhToan, KhoanThu } = require("../src/models");
+const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao, GiaoDichThanhToan, KhoanThu, AuditLog } = require("../src/models");
 const billingCronService = require("../src/services/billingCron.service");
 const paymentLifecycleService = require("../src/services/paymentLifecycle.service");
 const { sumSignedLineAmounts } = require("../src/utils/billLine.util");
 const { integration, request, headers, login, createFreshRental, uniqueValues } = require("./helpers/integration-api");
+const { withNamedLock } = require("../src/services/dbNamedLock.service");
+const cronJobs = require("../src/jobs/cron.jobs");
+const reservationService = require("../src/services/reservation.service");
 
 async function confirmedReading(fresh, period, value) {
   const [year, month] = period.split("-").map(Number);
@@ -57,6 +60,24 @@ test("FR-151/153/155/156 billing cron sends each persisted bill once", async () 
   const forbidden = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ force: true }) }); assert.equal(forbidden.response.status, 403);
 });
 
+test("FR-151/153 migration backfill keeps legacy bills inert across all cron workers", async () => {
+  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "legacy-backfill");
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  const protectedAt = new Date("2026-01-01T00:00:00Z");
+  const legacy = await ThanhToan.create({
+    ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2025, thang: 1, loai_thanh_toan: "DINH_KY",
+    tong_phai_tra: 321000, tong_da_thanh_toan: 0, so_tien_con_no: 321000, trang_thai: "CHUA_THANH_TOAN",
+    da_gui: true, ngay_gui: protectedAt, da_nhac_han: true, ngay_nhac_han: protectedAt,
+    qua_han: true, ngay_qua_han: protectedAt, da_chot_cong_no: true, ngay_chot_cong_no: protectedAt, so_tien_chot_cong_no: 321000,
+  });
+  await billingCronService.run({ now: new Date("2026-10-02T08:00:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
+  await request("/api/v1/jobs/debt-lifecycle", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2026-10-11T00:15:00+07:00" }) });
+  await cronJobs.updateContractStates(); await reservationService.notifyExpired({ now: new Date("2026-10-11T00:15:00+07:00") }); await cronJobs.processDueMoveOuts({ now: new Date("2026-10-11T00:15:00+07:00") });
+  await legacy.reload();
+  assert.equal(Number(legacy.so_tien_con_no), 321000); assert.equal(Number(legacy.so_tien_chot_cong_no), 321000);
+  assert.equal(await ThongBao.count({ where: { ma_tai_khoan: fresh.account.ma_tai_khoan, noi_dung: { [require("sequelize").Op.like]: "%2025-01%" } } }), 0);
+});
+
 test("FR-078/172/173 debt milestones catch up once and expose derived overdue state", async () => {
   const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "debt-cron");
   const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
@@ -82,6 +103,8 @@ test("FR-074/075/079 mark paid and cancellation are idempotent, reversible and a
   const again = await request(`/api/v1/bills/${bill.ma_thanh_toan}/mark-paid`, { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: "{}" });
   assert.equal(first.response.status, 201, JSON.stringify(first.body)); assert.equal(again.response.status, 201); assert.equal(await GiaoDichThanhToan.count({ where: { ma_thanh_toan: bill.ma_thanh_toan } }), 1);
   await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 0);
+  const revenueBeforeCancel = await request(`/api/v1/reports/cashflow?buildingId=${fresh.building.ma_can}`, { headers: headers(landlord) });
+  assert.equal(revenueBeforeCancel.response.status, 200); assert.equal(revenueBeforeCancel.body.data.cashReceipts, 700000);
   const debtPaid = await request("/api/v1/debt", { headers: headers(landlord) }); assert.equal(debtPaid.body.data.some((row) => row.ma_thanh_toan === bill.ma_thanh_toan), false);
   const paymentId = first.body.data.payment.ma_giao_dich; const noReason = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(landlord), body: "{}" }); assert.equal(noReason.response.status, 422);
   const forbidden = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ reason: "x" }) }); assert.equal(forbidden.response.status, 403);
@@ -89,6 +112,8 @@ test("FR-074/075/079 mark paid and cancellation are idempotent, reversible and a
   const twice = await request(`/api/v1/payments/${paymentId}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Lần hai" }) }); assert.equal(twice.response.status, 409);
   const confirmCancelled = await request(`/api/khoan-phai-thu/payment/${paymentId}/confirm`, { method: "POST", headers: headers(landlord), body: "{}" }); assert.equal(confirmCancelled.response.status, 409);
   await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 700000); assert.equal((await KhoanThu.findOne({ where: { ma_giao_dich_thanh_toan: paymentId } })).trang_thai_ghi_nhan, "DA_HUY");
+  const revenueAfterCancel = await request(`/api/v1/reports/cashflow?buildingId=${fresh.building.ma_can}`, { headers: headers(landlord) });
+  assert.equal(revenueAfterCancel.response.status, 200); assert.equal(revenueAfterCancel.body.data.cashReceipts, 0);
   const debtAgain = await request("/api/v1/debt", { headers: headers(landlord) }); assert.equal(debtAgain.body.data.find((row) => row.ma_thanh_toan === bill.ma_thanh_toan).isOverdue, true);
   const deposit = await GiaoDichThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, so_tien: 1, trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(), nguon_thanh_toan: "KHAU_TRU_COC" });
   const rejectDeposit = await request(`/api/v1/payments/${deposit.ma_giao_dich}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Không hợp lệ" }) }); assert.equal(rejectDeposit.response.status, 409);
@@ -107,4 +132,26 @@ test("FR-075 marks every periodic bill in one building/period atomically", async
   const key = `all-${Date.now()}`; const marked = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(marked.response.status, 201, JSON.stringify(marked.body)); assert.equal(marked.body.data.processed, 2);
   const repeated = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(repeated.response.status, 201); assert.equal(repeated.body.data.processed, 0);
   const tenantToken = await login(integration.tenant); const forbidden = await request("/api/v1/bills/mark-all-paid", { method: "POST", headers: headers(tenantToken, { "Idempotency-Key": `forbidden-${Date.now()}` }), body: JSON.stringify({ buildingId: first.building.ma_can, period: "2027-01" }) }); assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-200 configuration changes apply without restart and named lock admits one worker", async () => {
+  const landlord = await login(integration.landlord);
+  const changed = await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 9 }) });
+  assert.equal(changed.response.status, 200, JSON.stringify(changed.body));
+  const beforeHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T08:00:00+07:00" }) });
+  assert.equal(beforeHour.body.data.due, false);
+  const configuredHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T09:00:00+07:00" }) });
+  assert.equal(configuredHour.body.data.due, true);
+  const invalid = await request("/api/v1/system-config/billScheduleDay", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 29 }) });
+  assert.equal(invalid.response.status, 422);
+  assert.equal(await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED", entity_id: changed.body.data.ma_cau_hinh } }), 1);
+  let release;
+  const held = new Promise((resolve) => { release = resolve; });
+  const first = withNamedLock("qlpt:test:exclusive", async () => { await held; return { worker: 1 }; });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const second = await withNamedLock("qlpt:test:exclusive", async () => ({ worker: 2 }));
+  release();
+  assert.equal(second.lockAcquired, false);
+  assert.equal((await first).worker, 1);
+  await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 8 }) });
 });

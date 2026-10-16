@@ -4,6 +4,7 @@ const path = require("path");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { ChiSoDien, HopDong, PhongTro, CanTro, KhachThue } = require("../models");
+const { getPersistedSystemConfig } = require("./systemConfig.service");
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads", "meter");
 const uploadTokenTtlMs = 15 * 60 * 1000;
@@ -106,12 +107,13 @@ async function previousReading(roomId, period, transaction, beforeDate) {
 async function getContext(tenantId, period) {
   const parsed = parsePeriod(period);
   const contract = await tenantContract(tenantId);
-  const [room, current] = await Promise.all([
+  const [room, current, config] = await Promise.all([
     PhongTro.findByPk(contract.ma_phong, { include: [{ model: CanTro, as: "canTro" }] }),
     ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, include }),
+    getPersistedSystemConfig(),
   ]);
   const previous = await previousReading(contract.ma_phong, period, undefined, current?.ngay_ghi_nhan);
-  return { period, submissionWindowOpen: true, room: { id: room.ma_phong, code: room.so_phong, buildingName: room.canTro?.ten_can || null }, previousReading: { value: previous, recordedAt: null }, current: current ? toDto(current) : null, imagePolicy: { mimeTypes: ["image/jpeg", "image/png"], maxBytes: Number(process.env.MAX_FILE_SIZE || 10485760) } };
+  return { period, submissionWindowOpen: true, room: { id: room.ma_phong, code: room.so_phong, buildingName: room.canTro?.ten_can || null }, previousReading: { value: previous, recordedAt: null }, current: current ? toDto(current) : null, imagePolicy: { mimeTypes: ["image/jpeg", "image/png"], maxBytes: config.maxFileSizeBytes } };
 }
 async function callOcr(filePath) {
   const controller = new AbortController();

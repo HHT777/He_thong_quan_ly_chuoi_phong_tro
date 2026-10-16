@@ -68,7 +68,7 @@ async function run({ now = new Date(), actorId: explicitActor } = {}) {
       catch (error) { errors.push({ billId: row.ma_thanh_toan, code: error.code || "DEBT_LIFECYCLE_FAILED" }); }
     }
     return { lockAcquired: true, processed, errors };
-  });
+  }, { timeoutSeconds: config.namedLockTimeoutSeconds });
 }
 
 async function listDebt({ tenantId, now = new Date() } = {}) {

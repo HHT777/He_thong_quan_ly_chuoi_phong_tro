@@ -36,7 +36,7 @@ async function run({ now = new Date(), actorId, force = false } = {}) {
     const unsent = await ThanhToan.findAll({ where: { nam: local.year, thang: local.month, loai_thanh_toan: "DINH_KY", da_gui: false }, attributes: ["ma_thanh_toan"], order: [["ma_thanh_toan", "ASC"]] });
     let sent = 0; for (const bill of unsent) if (await sendOne(bill.ma_thanh_toan, systemActor, now)) sent += 1;
     return { lockAcquired: true, due: true, period, created: generated.created.length, sent, skipped: generated.skipped };
-  });
+  }, { timeoutSeconds: config.namedLockTimeoutSeconds });
 }
 
 module.exports = { localParts, sendOne, run };

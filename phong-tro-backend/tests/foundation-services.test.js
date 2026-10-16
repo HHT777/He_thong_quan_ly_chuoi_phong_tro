@@ -32,3 +32,10 @@ test("system config has central defaults and validates numeric overrides", () =>
   if (original === undefined) delete process.env.DEBT_CLOSE_DAY;
   else process.env.DEBT_CLOSE_DAY = original;
 });
+
+test("FR-200 validates database-backed configuration domains", () => {
+  assert.equal(config.validateSystemConfigValue("billScheduleDay", 28), 28);
+  assert.equal(config.validateSystemConfigValue("billScheduleHour", 0), 0);
+  assert.throws(() => config.validateSystemConfigValue("billScheduleDay", 29), (error) => error.code === "INVALID_SYSTEM_CONFIG");
+  assert.throws(() => config.validateSystemConfigValue("unknown", 1), (error) => error.code === "UNKNOWN_SYSTEM_CONFIG");
+});
