@@ -68,12 +68,18 @@ class KhoanPhaiThuService {
     const contractWhere = {};
     if (filters.ma_phong) contractWhere.ma_phong = filters.ma_phong;
     if (filters.ma_khach_thue) contractWhere.ma_khach_thue = filters.ma_khach_thue;
-    return { where, contractWhere };
+    const buildingId = filters.ma_can || filters.buildingId;
+    return { where, contractWhere, buildingId };
   }
 
   async getKhoanPhaiThuList(filters, pagination) {
-    const { where, contractWhere } = this.buildWhere(filters);
-    const include = billInclude.map((item) => item.as === "hopDong" ? { ...item, required: Object.keys(contractWhere).length > 0, where: contractWhere } : item);
+    const { where, contractWhere, buildingId } = this.buildWhere(filters);
+    const include = billInclude.map((item) => item.as === "hopDong" ? {
+      ...item,
+      required: Object.keys(contractWhere).length > 0 || Boolean(buildingId),
+      where: contractWhere,
+      include: item.include.map((nested) => nested.as === "phongTro" && buildingId ? { ...nested, required: true, where: { ma_can: buildingId } } : nested),
+    } : item);
     const { count, rows } = await ThanhToan.findAndCountAll({ where, include, distinct: true, limit: pagination.limit, offset: pagination.offset, order: [["nam", "DESC"], ["thang", "DESC"]] });
     return { count, total: count, data: rows };
   }

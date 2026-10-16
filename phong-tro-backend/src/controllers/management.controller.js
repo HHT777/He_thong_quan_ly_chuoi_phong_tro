@@ -1,8 +1,13 @@
 const { CanTro, PhongTro, KhachThue, HopDong, KhoanChi, ChuTro, TaiKhoan } = require("../models");
+const sequelize = require("../config/database");
+const schemas = require("../validations/management.validation");
+const { writeAuditLog } = require("../services/auditLog.service");
 
 function notFound(message) {
   return { status: 404, message };
 }
+function validated(schema, payload) { const { error, value } = schema.validate(payload, { abortEarly: false, stripUnknown: false }); if (error) { error.isJoi = true; throw error; } return value; }
+async function validateExpenseScope(value, transaction) { if (value.pham_vi === "CAN_TRO") { if (!value.ma_can || !(await CanTro.findByPk(value.ma_can, { transaction }))) throw Object.assign(new Error("Căn trọ không tồn tại"), { status: 422 }); } else if (value.pham_vi === "TOAN_CHUOI") value.ma_can = null; return value; }
 
 class ManagementController {
   async listCanTro(req, res, next) {
@@ -23,13 +28,15 @@ class ManagementController {
 
   async createCanTro(req, res, next) {
     try {
+      const value = validated(schemas.createBuilding, req.body);
       const owner = await ChuTro.findOne({ where: { ma_tai_khoan: req.user.ma_tai_khoan } });
       if (!owner) throw notFound("Không tìm thấy hồ sơ Chủ trọ");
+      const created = await sequelize.transaction(async (transaction) => { const row = await CanTro.create({ ...value, ma_chu_tro: owner.ma_chu_tro, trang_thai: value.trang_thai || "HOAT_DONG" }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "BUILDING_CREATED", entityType: "CanTro", entityId: row.ma_can, after: row }); return row; });
       res
         .status(201)
         .json({
           success: true,
-          data: await CanTro.create({ ...req.body, ma_chu_tro: owner.ma_chu_tro, trang_thai: req.body.trang_thai || "HOAT_DONG" }),
+          data: created,
           message: "Tạo căn trọ thành công",
         });
     } catch (error) {
@@ -40,11 +47,7 @@ class ManagementController {
 
   async updateCanTro(req, res, next) {
     try {
-      const item = await CanTro.findByPk(req.params.id);
-      if (!item) throw notFound("Căn trọ không tồn tại");
-      const patch = {}; for (const key of ["ten_can", "dia_chi", "mo_ta", "quy_dinh_chung", "hinh_anh_tong_quan_url", "trang_thai"]) if (req.body[key] !== undefined) patch[key] = req.body[key];
-      if (patch.trang_thai === "NGUNG_HOAT_DONG") { const occupied = await PhongTro.count({ where: { ma_can: item.ma_can, trang_thai: ["DANG_THUE", "DA_GIU", "DANG_XU_LY_TRA_PHONG"] } }); if (occupied) throw { status: 409, message: "Không thể ngừng hoạt động căn còn phòng đang thuê/giữ/xử lý trả" }; }
-      await item.update(patch);
+      const patch = validated(schemas.updateBuilding, req.body); const item = await sequelize.transaction(async (transaction) => { const row = await CanTro.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!row) throw notFound("Căn trọ không tồn tại"); const before = row.get({ plain: true }); if (patch.trang_thai === "NGUNG_HOAT_DONG") { const occupied = await PhongTro.count({ where: { ma_can: row.ma_can, trang_thai: ["DANG_THUE", "DA_GIU", "DANG_XU_LY_TRA_PHONG"] }, transaction }); if (occupied) throw { status: 409, message: "Không thể ngừng hoạt động căn còn phòng đang thuê/giữ/xử lý trả" }; } await row.update(patch, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "BUILDING_UPDATED", entityType: "CanTro", entityId: row.ma_can, before, after: row }); return row; });
       res.json({
         success: true,
         data: item,
@@ -95,11 +98,12 @@ class ManagementController {
 
   async createKhachThue(req, res, next) {
     try {
+      const value = validated(schemas.createTenant, req.body);
       res
         .status(201)
         .json({
           success: true,
-          data: await KhachThue.create(req.body),
+          data: await KhachThue.create(value),
           message: "Tạo khách thuê thành công",
         });
     } catch (error) {
@@ -109,9 +113,9 @@ class ManagementController {
 
   async updateKhachThue(req, res, next) {
     try {
-      const item = await KhachThue.findByPk(req.params.id);
+      const item = await KhachThue.findByPk(req.params.id); const value = validated(schemas.updateTenant, req.body);
       if (!item) throw notFound("Khách thuê không tồn tại");
-      const patch = {}; for (const key of ["ho_ten", "so_dien_thoai", "cccd_giay_to"]) if (req.body[key] !== undefined) patch[key] = req.body[key]; await item.update(patch);
+      await item.update(value);
       res.json({
         success: true,
         data: item,
@@ -154,11 +158,13 @@ class ManagementController {
 
   async createChiPhi(req, res, next) {
     try {
+      const value = validated(schemas.createExpense, req.body);
+      const created = await sequelize.transaction(async (transaction) => { await validateExpenseScope(value, transaction); const row = await KhoanChi.create({ ...value, trang_thai: "HIEU_LUC" }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "EXPENSE_CREATED", entityType: "KhoanChi", entityId: row.ma_khoan_chi, after: row }); return row; });
       res
         .status(201)
         .json({
           success: true,
-          data: await KhoanChi.create({ loai_khoan_chi: String(req.body.loai_khoan_chi || "").trim(), so_tien: Number(req.body.so_tien), ngay_phat_sinh: req.body.ngay_phat_sinh, pham_vi: req.body.pham_vi, ghi_chu: req.body.ghi_chu || null, ma_can: req.body.ma_can || null, trang_thai: "HIEU_LUC" }),
+          data: created,
           message: "Tạo khoản chi thành công",
         });
     } catch (error) {
@@ -168,9 +174,7 @@ class ManagementController {
 
   async updateChiPhi(req, res, next) {
     try {
-      const item = await KhoanChi.findByPk(req.params.id);
-      if (!item) throw notFound("Khoản chi không tồn tại");
-      const patch = {}; for (const key of ["loai_khoan_chi", "ngay_phat_sinh", "pham_vi", "ghi_chu", "ma_can"]) if (req.body[key] !== undefined) patch[key] = req.body[key]; if (req.body.so_tien !== undefined) patch.so_tien = Number(req.body.so_tien); if (!patch.loai_khoan_chi && !item.loai_khoan_chi) throw Object.assign(new Error("Loại khoản chi là bắt buộc"), { status: 422 }); if (patch.so_tien !== undefined && (!Number.isFinite(patch.so_tien) || patch.so_tien < 0)) throw Object.assign(new Error("Số tiền không hợp lệ"), { status: 422 }); await item.update(patch);
+      const patch = validated(schemas.updateExpense, req.body); const item = await sequelize.transaction(async (transaction) => { const row = await KhoanChi.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!row) throw notFound("Khoản chi không tồn tại"); if (row.trang_thai === "DA_HUY") throw Object.assign(new Error("Khoản chi đã hủy"), { status: 409 }); const before = row.get({ plain: true }); const merged = { ...before, ...patch }; await validateExpenseScope(merged, transaction); await row.update(patch.pham_vi === "TOAN_CHUOI" ? { ...patch, ma_can: null } : patch, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "EXPENSE_UPDATED", entityType: "KhoanChi", entityId: row.ma_khoan_chi, before, after: row }); return row; });
       res.json({
         success: true,
         data: item,
@@ -183,9 +187,7 @@ class ManagementController {
 
   async deleteChiPhi(req, res, next) {
     try {
-      const item = await KhoanChi.findByPk(req.params.id);
-      if (!item) throw notFound("Khoản chi không tồn tại");
-      const reason = String(req.body.reason || "").trim(); if (!reason) throw Object.assign(new Error("Lý do hủy là bắt buộc"), { status: 422 }); await item.update({ trang_thai: "DA_HUY", ly_do_huy: reason, ngay_huy: new Date(), nguoi_huy_id: req.user.ma_tai_khoan });
+      const reason = String(req.body.reason || "").trim(); if (!reason) throw Object.assign(new Error("Lý do hủy là bắt buộc"), { status: 422 }); await sequelize.transaction(async (transaction) => { const item = await KhoanChi.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!item) throw notFound("Khoản chi không tồn tại"); if (item.trang_thai === "DA_HUY") throw Object.assign(new Error("Khoản chi đã hủy"), { status: 409 }); const before = item.get({ plain: true }); await item.update({ trang_thai: "DA_HUY", ly_do_huy: reason, ngay_huy: new Date(), nguoi_huy_id: req.user.ma_tai_khoan }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "EXPENSE_CANCELLED", entityType: "KhoanChi", entityId: item.ma_khoan_chi, before, after: item, reason }); });
       res.json({
         success: true,
         data: null,
