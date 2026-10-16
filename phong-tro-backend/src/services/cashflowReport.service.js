@@ -13,18 +13,18 @@ const {
 function parseDate(value, field) {
   if (value === undefined) return undefined;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw { status: 422, code: "INVALID_REPORT_PERIOD", message: `${field} phải có định dạng YYYY-MM-DD` };
+    throw { status: 400, code: "INVALID_REPORT_PERIOD", message: `${field} phải có định dạng YYYY-MM-DD` };
   }
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-    throw { status: 422, code: "INVALID_REPORT_PERIOD", message: `${field} không phải ngày hợp lệ` };
+    throw { status: 400, code: "INVALID_REPORT_PERIOD", message: `${field} không phải ngày hợp lệ` };
   }
   return value;
 }
 
 function buildDateCondition(from, to) {
   if (from && to && from > to) {
-    throw { status: 422, code: "INVALID_REPORT_PERIOD", message: "from không được sau to" };
+    throw { status: 400, code: "INVALID_REPORT_PERIOD", message: "from không được sau to" };
   }
   if (from && to) return { [Op.between]: [from, to] };
   if (from) return { [Op.gte]: from };
@@ -178,10 +178,17 @@ function allocateReceipts(receipts) {
     const grossLines = lines.filter((line) => line.loai_khoan !== "GIAM_TRU");
     const grossTotal = grossLines.reduce((sum, line) => sum + Math.max(0, Number(line.so_tien)), 0) || entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
     const discountTotal = lines.filter((line) => line.loai_khoan === "GIAM_TRU").reduce((sum, line) => sum + Math.abs(Number(line.so_tien)), 0);
-    const netTotal = entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
+    // Allocate against the bill's immutable net payable, not the set of
+    // receipts currently visible in the report period. This keeps an earlier
+    // payment's gross/discount attribution stable when a later payment lands.
+    const netTotal = Number(entries[0].bill?.tong_phai_tra) > 0
+      ? Number(entries[0].bill.tong_phai_tra)
+      : (grossTotal - discountTotal || entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0));
+    let cumulative = 0;
     let grossAssigned = 0; let discountAssigned = 0;
     entries.forEach((item, index) => {
-      const last = index === entries.length - 1;
+      cumulative += Number(item.row.so_tien);
+      const last = index === entries.length - 1 && cumulative >= netTotal;
       const gross = last ? grossTotal - grossAssigned : Math.round(Number(item.row.so_tien) * grossTotal / (netTotal || 1));
       const discount = last ? discountTotal - discountAssigned : Math.round(Number(item.row.so_tien) * discountTotal / (netTotal || 1));
       grossAssigned += gross; discountAssigned += discount;

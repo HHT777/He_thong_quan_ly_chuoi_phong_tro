@@ -78,12 +78,25 @@ test("CT-012 bill generation ignores client-provided monetary overrides", () => 
 
 test("BR-44 allocates gross revenue and discount across partial receipts with final rounding", () => {
   const rows = [
-    { ma_khoan_thu: "p1", so_tien: 60, ngay_ghi_nhan: "2026-10-01", giaoDich: { thanhToan: { ma_thanh_toan: "b1", chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 100 }, { loai_khoan: "GIAM_TRU", so_tien: -20 }] } } },
-    { ma_khoan_thu: "p2", so_tien: 20, ngay_ghi_nhan: "2026-10-02", giaoDich: { thanhToan: { ma_thanh_toan: "b1", chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 100 }, { loai_khoan: "GIAM_TRU", so_tien: -20 }] } } },
+    { ma_khoan_thu: "p1", so_tien: 60, ngay_ghi_nhan: "2026-10-01", giaoDich: { thanhToan: { ma_thanh_toan: "b1", tong_phai_tra: 80, chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 100 }, { loai_khoan: "GIAM_TRU", so_tien: -20 }] } } },
+    { ma_khoan_thu: "p2", so_tien: 20, ngay_ghi_nhan: "2026-10-02", giaoDich: { thanhToan: { ma_thanh_toan: "b1", tong_phai_tra: 80, chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 100 }, { loai_khoan: "GIAM_TRU", so_tien: -20 }] } } },
   ];
   const allocated = reportService.allocateReceipts(rows);
   assert.equal(allocated.reduce((sum, row) => sum + row.gross, 0), 100);
   assert.equal(allocated.reduce((sum, row) => sum + row.discount, 0), 20);
   assert.equal(allocated[0].gross - allocated[0].discount, 60);
   assert.equal(allocated[1].gross - allocated[1].discount, 20);
+});
+
+test("BR-44 keeps an earlier receipt allocation immutable when later payment arrives or is cancelled", () => {
+  const bill = { ma_thanh_toan: "b-immutable", tong_phai_tra: 80, chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 100 }, { loai_khoan: "GIAM_TRU", so_tien: -20 }] };
+  const first = { ma_khoan_thu: "p1", so_tien: 60, ngay_ghi_nhan: "2026-10-01", giaoDich: { thanhToan: bill } };
+  const later = { ma_khoan_thu: "p2", so_tien: 20, ngay_ghi_nhan: "2026-10-02", giaoDich: { thanhToan: bill } };
+  const before = reportService.allocateReceipts([first])[0];
+  const after = reportService.allocateReceipts([first, later])[0];
+  assert.deepEqual({ gross: after.gross, discount: after.discount }, { gross: before.gross, discount: before.discount });
+  const cancelled = reportService.allocateReceipts([first])[0];
+  assert.equal(cancelled.gross, before.gross);
+  assert.equal(cancelled.discount, before.discount);
+  assert.equal(cancelled.gross - cancelled.discount, 60);
 });
