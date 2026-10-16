@@ -562,3 +562,12 @@ Route riêng: `POST /api/v1/meter-readings/ocr-previews` và `POST /api/v1/meter
 Mọi producer đều đi qua `createIdempotent`, bắt duplicate key ở tầng DB; không producer nào còn kiểu đọc-rồi-ghi để chống race.
 
 Mốc sau sửa SRS: unit **57/57**, integration **50/50**, bất biến **0** (gồm `activeReservationRoomState`, `heldRoomWithoutReservation`, `reservationContractOverlap`). Commit: `933dc68` (FR-168 SRS), `a308499` (FR-065 OCR). Clone sạch/`npm ci`, verify migration MariaDB/MySQL lặp lại và frontend build chưa chạy trong lượt này; không ghi nhận đạt.
+
+## A/B – BR-44 và kiểm chứng trước F.5 (2026-10-16)
+
+- Hợp đồng API mới: `totalRevenue` và `totalCollected` = tổng `KhoanThu` hiệu lực (tiền thực nhận sau giảm trừ) + khấu trừ cọc/thu giữ không hoàn; `grossRevenue = totalRevenue + discounts`; `grossCashRevenue` giữ nghĩa tổng gộp tiền mặt; `profit = totalRevenue - totalExpenses`. Frontend báo cáo và dashboard đã đọc các trường này.
+- Test unit: **60/60 pass** (`BR-44 report contract`, `3m/300k`, làm tròn 3 lần). Integration MySQL 8.0.46 TCP: **50/50 pass**; invariants: **0**.
+- A.3: phép thử điều chỉnh phiếu sau khi đã thu một phần cho thấy phân bổ cũ đổi (`discount 100 → 50`). Đây là lỗi ổn định; dừng phần A.3 và đề xuất migration 015 snapshot `giamTruPhanBo`, `doanhThuGop` trên `KhoanThu` (guard `INFORMATION_SCHEMA`, backfill ghi chú rõ), chờ duyệt trước khi tạo DDL.
+- Event-key producer đã kiểm chứng: billing/debt/move-out/reservation/contract/incident/payment/co-tenant/request/broadcast/transfer/contract-create dùng `createIdempotent` trong transaction (broadcast chia lô); OCR/meter không tạo thông báo. Race tests reservation, contract, broadcast pass.
+- Miền trạng thái `DA_CHUYEN_THANH_HOP_DONG` có trong `data2.md:692`; không cần DDL B.3.
+- Chưa chạy clone sạch/`npm ci`, verify migration lặp lại MariaDB/MySQL, frontend build trong lượt này; chưa làm F.5. Các file untracked vẫn nguyên trạng.
