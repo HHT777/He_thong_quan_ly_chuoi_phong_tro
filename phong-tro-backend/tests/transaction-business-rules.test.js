@@ -39,7 +39,7 @@ test("CT-004 settlement coordinates every lifecycle write in one transaction", (
     "contract.update",
     "room.update",
     "TaiKhoan.update",
-    "ThongBao.create",
+    "createIdempotent",
   ]) assert.match(service, new RegExp(operation.replace(".", "\\.")), operation);
   assert.match(route, /moveOutService\.settle/);
   assert.doesNotMatch(route, /BienBanTraPhong\.create/);
@@ -54,7 +54,8 @@ test("CT-005 incident completion creates exactly one financial branch and notifi
   assert.match(service, /KhoanChi\.create/);
   assert.match(service, /ChiPhiSuCoKhachThue\.create/);
   assert.doesNotMatch(service, /ChiTietThanhToan\.create/);
-  assert.match(service, /ThongBao\.create/);
+  assert.match(service, /createIdempotent/);
+  assert.match(service, /KET_QUA_SU_CO:/);
   assert.match(service, /INCIDENT_FINANCE_ALREADY_EXISTS/);
   assert.match(route, /incidentService\.update/);
 });
