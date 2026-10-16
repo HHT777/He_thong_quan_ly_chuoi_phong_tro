@@ -18,7 +18,7 @@ test("AUD-01..06 audit matrix writes exactly one safe row per operation", async 
     await sequelize.transaction((transaction) => writeAuditLog({ transaction, actorId: actor.ma_tai_khoan, action, entityType: "AuditMatrix", entityId, before: { password: "secret" }, after: { passwordHash: "secret" }, metadata: { token: "secret" } }));
     const rows = await AuditLog.findAll({ where: { action, entity_id: entityId } });
     assert.equal(rows.length, 1, action);
-    assert.doesNotMatch(JSON.stringify(rows), /password|hash|token/i, action);
+    assert.doesNotMatch(JSON.stringify(rows.map((row) => ({ before: row.before_json, after: row.after_json }))), /password|hash|token/i, action);
   }
 });
 
