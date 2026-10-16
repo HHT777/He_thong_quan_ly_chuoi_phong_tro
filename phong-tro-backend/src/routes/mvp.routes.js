@@ -195,7 +195,7 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
       const row = await YeuCau.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE });
       if (!row) throw fail(404, "Yêu cầu không tồn tại");
       if (row.trang_thai !== "CHO_XU_LY") throw fail(409, "Yêu cầu này đã được xử lý");
-      if (status === "TU_CHOI" && !String(req.body.reason || "").trim()) throw fail(422, "Lý do từ chối là bắt buộc", "REQUEST_REJECTION_REASON_REQUIRED");
+      if (status === "TU_CHOI" && !String(req.body.reason || "").trim()) throw fail(400, "Lý do từ chối là bắt buộc", "REQUEST_REJECTION_REASON_REQUIRED");
       await row.update({ trang_thai: status, ly_do_xu_ly: req.body.reason || null, ngay_duyet: new Date(), nguoi_xu_ly_id: req.user.ma_tai_khoan }, { transaction });
       if (status === "TU_CHOI" && row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG") {
         const proposal = await DeXuatBanCungPhong.findByPk(row.ma_yeu_cau, { transaction, lock: transaction.LOCK.UPDATE });
