@@ -115,6 +115,19 @@ async function getCashflow(filters) {
   const revenueByType = Object.values(allocations.reduce((all, row) => { for (const [key, amount] of Object.entries(row.byType)) { all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += amount; } return all; }, {}));
   if (depositDeductions > 0) revenueByType.push({ type: "KHAU_TRU_COC", amount: depositDeductions });
   const expensesByType = Object.values(expenses.reduce((all, row) => { const key = row.loai_khoan_chi; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
+  const expenseDetails = expenses.map((row) => ({ source: "CHI_PHI", amount: Number(row.so_tien), date: row.ngay_phat_sinh, expenseId: row.ma_khoan_chi, buildingId: row.ma_can || null, roomId: null, incidentId: row.ma_su_co || null }));
+  const comparison = {};
+  for (const item of allocations) {
+    const key = item.buildingId || "TOAN_CHUOI";
+    comparison[key] = comparison[key] || { buildingId: item.buildingId || null, revenue: 0, discounts: 0, expenses: 0 };
+    comparison[key].revenue += item.gross; comparison[key].discounts += item.discount;
+  }
+  for (const row of expenses) {
+    const key = row.ma_can || "TOAN_CHUOI";
+    comparison[key] = comparison[key] || { buildingId: row.ma_can || null, revenue: 0, discounts: 0, expenses: 0 };
+    comparison[key].expenses += Number(row.so_tien);
+  }
+  const byBuilding = Object.values(comparison).map((row) => ({ ...row, profit: row.revenue - row.discounts - row.expenses }));
   const receiptDetails = [
     ...receipts.map((row) => ({
       source: "THU_TIEN",
@@ -144,7 +157,7 @@ async function getCashflow(filters) {
     totalExpenses,
     profit: totalRevenue - discounts - totalExpenses,
     revenueByType, expensesByType,
-    receiptDetails,
+    byBuilding, receiptDetails: [...receiptDetails, ...expenseDetails], expenseDetails,
     receipts,
     expenses,
   };
@@ -178,7 +191,7 @@ function allocateReceipts(receipts) {
         byType[line.loai_khoan] = (byType[line.loai_khoan] || 0) + amount;
       }
       if (!grossLines.length) byType.THANH_TOAN = gross;
-      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType });
+      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType, buildingId: item.row.ma_can || null });
     });
   }
   return result;
