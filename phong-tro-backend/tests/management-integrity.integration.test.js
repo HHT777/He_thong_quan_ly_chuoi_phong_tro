@@ -42,7 +42,10 @@ test("FR-193 deactivation guards each occupied room state and allows an all-empt
   const landlord = await login(integration.landlord);
   for (const status of ["DANG_THUE", "DA_GIU", "DANG_XU_LY_TRA_PHONG"]) {
     const fresh = await createBaseRental(landlord, `building-status-${status}`);
-    await PhongTro.update({ trang_thai: status }, { where: { ma_phong: fresh.room.ma_phong } });
+    if (status === "DA_GIU") {
+      const held = await request("/api/v1/reservations", { method: "POST", headers: headers(landlord), body: JSON.stringify({ roomId: fresh.room.ma_phong, holderName: "Guard", phone: fresh.unique.phone, amount: 1, receivedOn: "2026-10-01", expiresOn: "2026-12-01", terms: "guard" }) });
+      assert.equal(held.response.status, 201);
+    } else await PhongTro.update({ trang_thai: status }, { where: { ma_phong: fresh.room.ma_phong } });
     const blocked = await request(`/api/management/can-tro/${fresh.building.ma_can}`, { method: "PUT", headers: headers(landlord), body: JSON.stringify({ trang_thai: "NGUNG_HOAT_DONG" }) });
     assert.equal(blocked.response.status, 409, status);
   }

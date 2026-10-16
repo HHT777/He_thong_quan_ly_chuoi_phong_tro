@@ -4,6 +4,7 @@ const path = require("path");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { ChiSoDien, HopDong, PhongTro, CanTro, KhachThue } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
 const { getPersistedSystemConfig } = require("./systemConfig.service");
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads", "meter");
@@ -117,7 +118,7 @@ async function getContext(tenantId, period) {
 }
 async function callOcr(filePath) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30000);
+  const timer = setTimeout(() => controller.abort(), Number(process.env.OCR_TIMEOUT_MS || 30000));
   try {
     const form = new FormData();
     form.append("file", new File([fs.readFileSync(filePath)], path.basename(filePath), { type: path.extname(filePath).toLowerCase() === ".png" ? "image/png" : "image/jpeg" }));
@@ -169,4 +170,24 @@ async function submit(tenantId, payload, actorId) {
   });
 }
 
-module.exports = { parsePeriod, toDto, include, getContext, createPreview, findReading, submit, tenantContract, requirePreviousReading, previousReading, signUploadPayload, verifyUploadToken, cleanupExpiredUploads };
+async function submitForLandlord(payload, actorId) {
+  const parsed = parsePeriod(payload.period);
+  const preview = resolvePreview(null, payload.period, payload.uploadToken, actorId);
+  if (!preview?.roomId) throw { status: 422, code: "UPLOAD_TOKEN_EXPIRED", message: "Preview upload không hợp lệ hoặc đã hết hạn" };
+  const value = Number(payload.readingValue);
+  if (!Number.isInteger(value) || value < 0) throw { status: 422, code: "INVALID_READING", message: "Chỉ số điện phải là số nguyên không âm" };
+  const contract = await HopDong.findOne({ where: { ma_phong: preview.roomId, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, order: [["ngay_bat_dau", "DESC"]] });
+  if (!contract) throw { status: 404, code: "ACTIVE_CONTRACT_NOT_FOUND", message: "Phòng chưa có hợp đồng hiệu lực" };
+  return sequelize.transaction(async (transaction) => {
+    const previous = await previousReading(contract.ma_phong, payload.period, transaction);
+    if (value < previous) throw { status: 400, code: "READING_BELOW_PREVIOUS", message: "Chỉ số điện không được nhỏ hơn kỳ trước", details: { previousReading: previous } };
+    const existing = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, transaction, lock: transaction.LOCK.UPDATE });
+    if (existing?.trang_thai_xac_nhan === "DA_XAC_NHAN") throw { status: 409, code: "READING_ALREADY_CONFIRMED", message: "Kỳ này đã được xác nhận" };
+    const values = { ...parsed, ma_phong: contract.ma_phong, loai_chi_so: "DINH_KY", khoa_nghiep_vu: `DINH_KY:${parsed.nam}-${String(parsed.thang).padStart(2, "0")}`, chi_so_moi: value, anh_cong_to_url: preview.filePath || existing?.anh_cong_to_url || null, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", ngay_ghi_nhan: new Date(), nguoi_ghi_nhan_id: actorId, nguoi_xac_nhan_id: actorId, ngay_xac_nhan: new Date(), da_xoa: false };
+    const row = existing ? await existing.update(values, { transaction }) : await ChiSoDien.create(values, { transaction });
+    await writeAuditLog({ transaction, actorId, action: "METER_READING_MANUAL_CREATED", entityType: "ChiSoDien", entityId: row.ma_chi_so, after: { value, period: payload.period, source: "LANDLORD_OCR" } });
+    const result = toDto(await row.reload({ include, transaction })); result.previousReading = previous; return result;
+  });
+}
+
+module.exports = { parsePeriod, toDto, include, getContext, createPreview, findReading, submit, submitForLandlord, tenantContract, requirePreviousReading, previousReading, signUploadPayload, verifyUploadToken, cleanupExpiredUploads, callOcr };

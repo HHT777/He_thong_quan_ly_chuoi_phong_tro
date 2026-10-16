@@ -1,8 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ThongBao, TaiKhoan, DatGiuPhong, HopDong } = require("../src/models");
+const { ThongBao, TaiKhoan, DatGiuPhong, HopDong, PhongTro } = require("../src/models");
 const { createIdempotent } = require("../src/services/notification.service");
-const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
+const { integration, request, headers, login, createFreshRental, createBaseRental } = require("./helpers/integration-api");
 
 test("FR-159 event key schema permits legacy NULL rows without collisions", async () => {
   const landlord = await TaiKhoan.findOne({ where: { vai_tro: "CHU_TRO" } });
@@ -13,9 +13,9 @@ test("FR-159 event key schema permits legacy NULL rows without collisions", asyn
 });
 
 test("FR-159 reservation expiry race creates exactly one event-key notification", async () => {
-  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "notification-reservation-race", { createAccount: false });
+  const landlord = await login(integration.landlord); const fresh = await createBaseRental(landlord, "notification-reservation-race");
   const owner = await TaiKhoan.findOne({ where: { vai_tro: "CHU_TRO" } });
-  await fresh.room.update({ trang_thai: "DA_GIU" });
+  await PhongTro.update({ trang_thai: "DA_GIU" }, { where: { ma_phong: fresh.room.ma_phong } });
   const reservation = await DatGiuPhong.create({ ho_ten_nguoi_giu: "Race", so_dien_thoai: fresh.unique.phone, so_tien_giu: 1, ngay_nhan: "2026-01-01", han_giu: "2026-01-02", dieu_kien: "race", ma_phong: fresh.room.ma_phong, nguoi_thuc_hien_id: owner.ma_tai_khoan });
   const eventKey = `GIU_PHONG_HET_HAN:${reservation.ma_dat_giu}:2026-10-16`;
   const [a, b] = await Promise.all([
