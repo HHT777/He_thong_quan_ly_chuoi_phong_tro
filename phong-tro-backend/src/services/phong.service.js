@@ -1,5 +1,7 @@
 const { PhongTro, CanTro } = require("../models");
 const { Op } = require("sequelize");
+const sequelize = require("../config/database");
+const { writeAuditLog } = require("./auditLog.service");
 
 class PhongService {
   async createPhong(data, transaction = null) {
@@ -73,12 +75,17 @@ class PhongService {
     return phong;
   }
 
-  async updatePhong(maPhong, data) {
-    const phong = await this.getPhongById(maPhong);
-
-    await phong.update(data);
-
-    return phong;
+  async updatePhong(maPhong, data, actorId) {
+    return sequelize.transaction(async (transaction) => {
+      const phong = await PhongTro.findByPk(maPhong, { transaction, lock: transaction.LOCK.UPDATE });
+      if (!phong) throw { status: 404, message: "Phòng trọ không tồn tại" };
+      const before = phong.get({ plain: true });
+      await phong.update(data, { transaction });
+      if (data.gia_thue !== undefined && Number(before.gia_thue) !== Number(phong.gia_thue)) {
+        await writeAuditLog({ transaction, actorId, action: "ROOM_PRICE_UPDATED", entityType: "PhongTro", entityId: phong.ma_phong, before: { price: before.gia_thue }, after: { price: phong.gia_thue } });
+      }
+      return phong;
+    });
   }
 
   async deletePhong(maPhong) {

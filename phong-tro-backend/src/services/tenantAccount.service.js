@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { TaiKhoan, KhachThue, HopDong, TienCoc } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
 
 const ACTIVE_CONTRACT_STATES = Object.freeze(["DANG_HIEU_LUC", "SAP_HET_HAN"]);
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
@@ -50,7 +51,7 @@ async function requireRentalEligibility(tenantId, transaction) {
   return { contract, deposit };
 }
 
-async function createWithinTransaction(tenantId, transaction) {
+async function createWithinTransaction(tenantId, transaction, actorId) {
   const tenant = await KhachThue.findByPk(tenantId, {
     transaction,
     lock: transaction.LOCK.UPDATE,
@@ -70,11 +71,12 @@ async function createWithinTransaction(tenantId, transaction) {
     bat_buoc_doi_mat_khau: true,
   }, { transaction });
   await tenant.update({ ma_tai_khoan: account.ma_tai_khoan }, { transaction });
+  if (actorId) await writeAuditLog({ transaction, actorId, action: "TENANT_ACCOUNT_CREATED", entityType: "TaiKhoan", entityId: account.ma_tai_khoan, after: accountDto(account) });
   return accountDto(account);
 }
 
-async function create(tenantId) {
-  return sequelize.transaction((transaction) => createWithinTransaction(tenantId, transaction));
+async function create(tenantId, actorId) {
+  return sequelize.transaction((transaction) => createWithinTransaction(tenantId, transaction, actorId));
 }
 
 function assertTenantRole(account) {
@@ -100,7 +102,7 @@ async function requireTenantAccount(accountId, transaction) {
   return { account, tenant };
 }
 
-async function updateStatus(accountId, status) {
+async function updateStatus(accountId, status, actorId) {
   if (!["HOAT_DONG", "DA_KHOA"].includes(status)) {
     throw fail(422, "INVALID_ACCOUNT_STATUS", "Trạng thái tài khoản không hợp lệ");
   }
@@ -110,12 +112,13 @@ async function updateStatus(accountId, status) {
       throw fail(409, "ACCOUNT_STATUS_UNCHANGED", `Tài khoản đã ở trạng thái ${status}`);
     }
     if (status === "HOAT_DONG") await requireRentalEligibility(tenant.ma_khach_thue, transaction);
-    await account.update({ trang_thai: status }, { transaction });
+    const before = accountDto(account); await account.update({ trang_thai: status }, { transaction });
+    await writeAuditLog({ transaction, actorId, action: status === "DA_KHOA" ? "ACCOUNT_LOCKED" : "ACCOUNT_UNLOCKED", entityType: "TaiKhoan", entityId: accountId, before, after: accountDto(account) });
     return accountDto(account);
   });
 }
 
-async function resetPassword(tenantId) {
+async function resetPassword(tenantId, actorId) {
   return sequelize.transaction(async (transaction) => {
     const tenant = await KhachThue.findByPk(tenantId, {
       transaction,
@@ -124,6 +127,7 @@ async function resetPassword(tenantId) {
     if (!tenant?.ma_tai_khoan) throw fail(404, "ACCOUNT_NOT_FOUND", "Tài khoản khách thuê không tồn tại");
     const { account } = await requireTenantAccount(tenant.ma_tai_khoan, transaction);
     await account.update({ mat_khau: "1", bat_buoc_doi_mat_khau: true }, { transaction });
+    await writeAuditLog({ transaction, actorId, action: "ACCOUNT_PASSWORD_RESET", entityType: "TaiKhoan", entityId: account.ma_tai_khoan, after: { reset: true, forcePasswordChange: true } });
     return { reset: true, account: accountDto(account) };
   });
 }

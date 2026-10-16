@@ -7,6 +7,7 @@ const {
   YeuCau,
   DeXuatBanCungPhong,
 } = require("../models");
+const { writeAuditLog } = require("./auditLog.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -37,7 +38,7 @@ async function assertCapacityAndUniqueness(room, phone, transaction) {
   }
 }
 
-async function propose(tenantId, payload) {
+async function propose(tenantId, payload, actorId) {
   const { name, phone, identity, birthDate, gender, address, relationship, startDate } = validateProposal(payload);
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findOne({
@@ -90,11 +91,12 @@ async function propose(tenantId, payload) {
       noi_dung_bo_sung: payload.note || null,
       cccd_giay_to: identity, ngay_sinh: birthDate, gioi_tinh: gender, dia_chi_thuong_tru: address, quan_he: relationship, ngay_bat_dau_o: startDate,
     }, { transaction });
+    await writeAuditLog({ transaction, actorId, action: "CO_TENANT_PROPOSED", entityType: "DeXuatBanCungPhong", entityId: request.ma_yeu_cau, after: { roomId: room.ma_phong, name, phone, startDate } });
     return { request, proposal };
   });
 }
 
-async function approve(request, transaction) {
+async function approve(request, transaction, actorId) {
   const proposal = await DeXuatBanCungPhong.findByPk(request.ma_yeu_cau, {
     transaction,
     lock: transaction.LOCK.UPDATE,
@@ -114,7 +116,7 @@ async function approve(request, transaction) {
   const room = await PhongTro.findByPk(proposal.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
   await assertCapacityAndUniqueness(room, proposal.so_dien_thoai_nguoi_de_xuat, transaction);
 
-  return ThanhVienPhong.create({
+  const member = await ThanhVienPhong.create({
     ho_ten: proposal.ho_ten_nguoi_de_xuat,
     so_dien_thoai: proposal.so_dien_thoai_nguoi_de_xuat,
     ngay_vao: proposal.ngay_bat_dau_o,
@@ -123,6 +125,8 @@ async function approve(request, transaction) {
     ma_hop_dong: contract.ma_hop_dong,
     cccd_giay_to: proposal.cccd_giay_to, ngay_sinh: proposal.ngay_sinh, gioi_tinh: proposal.gioi_tinh, dia_chi_thuong_tru: proposal.dia_chi_thuong_tru, quan_he: proposal.quan_he,
   }, { transaction });
+  await writeAuditLog({ transaction, actorId, action: "CO_TENANT_ADMITTED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, after: { roomId: member.ma_phong, contractId: member.ma_hop_dong } });
+  return member;
 }
 
 module.exports = { propose, approve, validateProposal };

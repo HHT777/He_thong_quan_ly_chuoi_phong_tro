@@ -20,11 +20,12 @@ const contractViolationService = require("../services/contractViolation.service"
 const contractLifecycleService = require("../services/contractLifecycle.service");
 const moveOutRequestService = require("../services/moveOutRequest.service");
 const { writeAuditLog } = require("../services/auditLog.service");
+const { validateSystemConfigValue, invalidateSystemConfigCache } = require("../services/systemConfig.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
   KhoanKhauTru, YeuCau, YeuCauGiaHan, YeuCauTraPhong,
-  DeXuatBanCungPhong, SuCo, ThanhVienPhong, ThongBao, KhoanThu, KhoanChi, TaiSan, DatGiuPhong, ViPhamHopDong, CauHinhHeThong, DanhMucSuCo,
+  DeXuatBanCungPhong, SuCo, ThanhVienPhong, ThongBao, KhoanThu, KhoanChi, TaiSan, SuCoTaiSan, DatGiuPhong, ViPhamHopDong, CauHinhHeThong, DanhMucSuCo,
 } = require("../models");
 
 const router = express.Router();
@@ -54,14 +55,14 @@ router.patch("/account/password", async (req, res, next) => {
 
 router.post("/accounts", landlord, async (req, res, next) => {
   try {
-    return data(res, await tenantAccountService.create(req.body.tenantId), 201);
+    return data(res, await tenantAccountService.create(req.body.tenantId, req.user.ma_tai_khoan), 201);
   } catch (e) { next(e); }
 });
 router.patch("/accounts/:id/status", landlord, async (req, res, next) => {
-  try { return data(res, await tenantAccountService.updateStatus(req.params.id, req.body.status)); } catch (e) { next(e); }
+  try { return data(res, await tenantAccountService.updateStatus(req.params.id, req.body.status, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/accounts/reset-password", landlord, async (req, res, next) => {
-  try { return data(res, await tenantAccountService.resetPassword(req.body.tenantId)); } catch (e) { next(e); }
+  try { return data(res, await tenantAccountService.resetPassword(req.body.tenantId, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 
 router.get("/reservations", landlord, async (req, res, next) => {
@@ -77,7 +78,7 @@ router.post("/reservations/:id/cancel", landlord, async (req, res, next) => {
   try { return data(res, await reservationService.cancel(req.params.id, req.body, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.get("/system-config", landlord, async (req, res, next) => { try { return data(res, await CauHinhHeThong.findAll({ order: [["khoa", "ASC"]] })); } catch (e) { next(e); } });
-router.put("/system-config/:key", landlord, async (req, res, next) => { try { const key = String(req.params.key || "").trim(); if (!key || req.body.value === undefined) throw fail(422, "Khóa và giá trị cấu hình là bắt buộc"); const [row] = await CauHinhHeThong.findOrCreate({ where: { khoa: key }, defaults: { khoa: key, gia_tri: req.body.value, mo_ta: req.body.description || null, nguoi_cap_nhat_id: req.user.ma_tai_khoan } }); if (!row.isNewRecord) await row.update({ gia_tri: req.body.value, mo_ta: req.body.description ?? row.mo_ta, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: req.user.ma_tai_khoan }); return data(res, row); } catch (e) { next(e); } });
+router.put("/system-config/:key", landlord, async (req, res, next) => { try { const key = String(req.params.key || "").trim(); if (!key || req.body.value === undefined) throw fail(422, "Khóa và giá trị cấu hình là bắt buộc"); const value = validateSystemConfigValue(key, req.body.value); const row = await sequelize.transaction(async (transaction) => { const existing = await CauHinhHeThong.findOne({ where: { khoa: key }, transaction, lock: transaction.LOCK.UPDATE }); const before = existing?.get({ plain: true }) || null; const saved = existing ? await existing.update({ gia_tri: value, mo_ta: req.body.description ?? existing.mo_ta, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }) : await CauHinhHeThong.create({ khoa: key, gia_tri: value, mo_ta: req.body.description || null, nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "SYSTEM_CONFIG_UPDATED", entityType: "CauHinhHeThong", entityId: saved.ma_cau_hinh, before, after: { key, value } }); return saved; }); invalidateSystemConfigCache(); return data(res, row); } catch (e) { next(e); } });
 router.get("/incident-categories", async (req, res, next) => { try { return data(res, await DanhMucSuCo.findAll({ where: req.user.vai_tro === "CHU_TRO" ? {} : { dang_hoat_dong: true }, order: [["thu_tu", "ASC"], ["ten", "ASC"]] })); } catch (e) { next(e); } });
 router.post("/incident-categories", landlord, async (req, res, next) => { try { const code = String(req.body.code || "").trim(); const name = String(req.body.name || "").trim(); if (!code || !name) throw fail(422, "Mã và tên danh mục là bắt buộc"); return data(res, await DanhMucSuCo.create({ ma: code, ten: name, thu_tu: Number(req.body.order || 0) }), 201); } catch (e) { next(e); } });
 router.get("/contracts/:id/violations", async (req, res, next) => {
@@ -163,7 +164,7 @@ router.put("/assets/:id", landlord, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 router.delete("/assets/:id", landlord, async (req, res, next) => {
-  try { const row = await TaiSan.findByPk(req.params.id); if (!row) throw fail(404, "Tài sản không tồn tại"); await row.destroy(); return data(res, { deleted: true }); } catch (e) { next(e); }
+  try { const result = await sequelize.transaction(async (transaction) => { const row = await TaiSan.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!row) throw fail(404, "Tài sản không tồn tại"); const [incidents, settlements] = await Promise.all([SuCoTaiSan.count({ where: { ma_tai_san: row.ma_tai_san }, transaction }), KhoanKhauTru.count({ where: { ma_tai_san: row.ma_tai_san }, transaction })]); if (incidents || settlements) throw fail(409, "Không thể xóa tài sản đã liên kết sự cố hoặc biên bản trả phòng"); await row.destroy({ transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "ASSET_DELETED", entityType: "TaiSan", entityId: row.ma_tai_san, before: row }); return { deleted: true }; }); return data(res, result); } catch (e) { next(e); }
 });
 
 router.post("/requests", tenant, async (req, res, next) => {
@@ -220,7 +221,7 @@ router.patch("/requests/:id", landlord, async (req, res, next) => {
         });
       }
       if (status === "DA_PHE_DUYET" && row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG") {
-        const member = await coTenantService.approve(row, transaction);
+        const member = await coTenantService.approve(row, transaction, req.user.ma_tai_khoan);
         automation = {
           type: "CO_TENANT_ADMITTED",
           memberId: member.ma_thanh_vien_phong,
@@ -317,11 +318,12 @@ router.post("/co-tenants", tenant, async (req, res, next) => {
     return data(res, await coTenantService.propose(
       req.user.ma_khach_thue,
       req.body,
+      req.user.ma_tai_khoan,
     ), 201);
   } catch (e) { next(e); }
 });
 router.get("/co-tenants", async (req, res, next) => { try { const where = {}; if (req.user.vai_tro === "KHACH_THUE") { const contracts = await HopDong.findAll({ where: { ma_khach_thue: req.user.ma_khach_thue }, attributes: ["ma_hop_dong"], raw: true }); where.ma_hop_dong = { [Op.in]: contracts.map((c) => c.ma_hop_dong) }; } return data(res, await ThanhVienPhong.findAll({ where })); } catch (e) { next(e); } });
-router.patch("/co-tenants/:id", landlord, async (req, res, next) => { try { const row = await ThanhVienPhong.findByPk(req.params.id); if (!row) throw fail(404, "Thành viên phòng không tồn tại"); if (req.body.status === "DA_ROI") await row.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: req.body.leaveDate || new Date() }); return data(res, row); } catch (e) { next(e); } });
+router.patch("/co-tenants/:id", landlord, async (req, res, next) => { try { const row = await sequelize.transaction(async (transaction) => { const member = await ThanhVienPhong.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!member) throw fail(404, "Thành viên phòng không tồn tại"); const before = member.get({ plain: true }); if (req.body.status === "DA_ROI") await member.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: req.body.leaveDate || new Date() }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "CO_TENANT_UPDATED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, before, after: member }); return member; }); return data(res, row); } catch (e) { next(e); } });
 
 router.get("/notifications", async (req, res, next) => { try { return data(res, await ThongBao.findAll({ where: { ma_tai_khoan: req.user.ma_tai_khoan }, order: [["thoi_diem_tao", "DESC"]] })); } catch (e) { next(e); } });
 router.patch("/notifications/:id/read", async (req, res, next) => { try { const row = await ThongBao.findOne({ where: { ma_thong_bao: req.params.id, ma_tai_khoan: req.user.ma_tai_khoan } }); if (!row) throw fail(404, "Thông báo không tồn tại"); await row.update({ da_doc: true }); return data(res, row); } catch (e) { next(e); } });

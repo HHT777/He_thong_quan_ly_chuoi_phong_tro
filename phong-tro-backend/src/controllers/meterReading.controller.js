@@ -53,9 +53,9 @@ class MeterReadingController {
       const value = readingValue(req); const previous = await service.previousReading(row.ma_phong, `${row.nam}-${String(row.thang).padStart(2, "0")}`); if (value < previous) return res.apiError(422, "READING_BELOW_PREVIOUS", "Chỉ số không được nhỏ hơn kỳ trước.");
       const result = await sequelize.transaction(async (transaction) => {
         const locked = await ChiSoDien.findByPk(row.ma_chi_so, { transaction, lock: transaction.LOCK.UPDATE });
-        await LichSuChinhSuaChiSoDien.create({ ma_chi_so: locked.ma_chi_so, chi_so_cu: locked.chi_so_moi, chi_so_moi: value, ly_do: reason, nguoi_sua_id: req.user.ma_tai_khoan }, { transaction });
+        const previousValue = locked.chi_so_moi; await LichSuChinhSuaChiSoDien.create({ ma_chi_so: locked.ma_chi_so, chi_so_cu: previousValue, chi_so_moi: value, ly_do: reason, nguoi_sua_id: req.user.ma_tai_khoan }, { transaction });
         await locked.update({ chi_so_moi: value }, { transaction });
-        await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "METER_READING_UPDATED", entityType: "ChiSoDien", entityId: locked.ma_chi_so, before: { value: locked.chi_so_moi }, after: { value }, reason });
+        await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "METER_READING_UPDATED", entityType: "ChiSoDien", entityId: locked.ma_chi_so, before: { value: previousValue }, after: { value }, reason });
         return locked;
       }); res.apiSuccess(service.toDto(await service.findReading(result.ma_chi_so)));
     } catch (e) { next(e); }
@@ -67,7 +67,7 @@ class MeterReadingController {
         const row = await ChiSoDien.findByPk(String(req.params.readingId).replace(/^mr_/, ""), { transaction, lock: transaction.LOCK.UPDATE });
         if (!row) throw { status: 404, code: "READING_NOT_FOUND", message: "Không tìm thấy chỉ số điện" };
         if (row.trang_thai_xac_nhan === "DA_XAC_NHAN") return row;
-        await row.update({ trang_thai_xac_nhan: "DA_XAC_NHAN", nguoi_xac_nhan_id: req.user.ma_tai_khoan, ngay_xac_nhan: new Date() }, { transaction }); return row;
+        const before = { status: row.trang_thai_xac_nhan }; await row.update({ trang_thai_xac_nhan: "DA_XAC_NHAN", nguoi_xac_nhan_id: req.user.ma_tai_khoan, ngay_xac_nhan: new Date() }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "METER_READING_CONFIRMED", entityType: "ChiSoDien", entityId: row.ma_chi_so, before, after: { status: row.trang_thai_xac_nhan } }); return row;
       });
       res.apiSuccess(service.toDto(await service.findReading(result.ma_chi_so)));
     } catch (e) { next(e); }
@@ -93,7 +93,7 @@ class MeterReadingController {
       landlord(req); header(req, "Idempotency-Key"); const value = readingValue(req); const contract = await service.tenantContract(req.body.tenantId);
       const parsed = service.parsePeriod(req.body.period); if (await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed } })) return res.apiError(409, "PENDING_READING_EXISTS", "Kỳ này đã có chỉ số.");
       const previous = await service.previousReading(contract.ma_phong, req.body.period); if (value < previous) return res.apiError(422, "READING_BELOW_PREVIOUS", "Chỉ số không được nhỏ hơn kỳ trước.");
-      const row = await ChiSoDien.create({ ...parsed, ma_phong: contract.ma_phong, chi_so_moi: value, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", nguoi_ghi_nhan_id: req.user.ma_tai_khoan, nguoi_xac_nhan_id: req.user.ma_tai_khoan, ngay_xac_nhan: new Date() });
+      const row = await sequelize.transaction(async (transaction) => { const created = await ChiSoDien.create({ ...parsed, ma_phong: contract.ma_phong, chi_so_moi: value, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", nguoi_ghi_nhan_id: req.user.ma_tai_khoan, nguoi_xac_nhan_id: req.user.ma_tai_khoan, ngay_xac_nhan: new Date() }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "METER_READING_MANUAL_CREATED", entityType: "ChiSoDien", entityId: created.ma_chi_so, after: { value, period: req.body.period } }); return created; });
       res.apiSuccess(service.toDto(await service.findReading(row.ma_chi_so)), null, 201);
     } catch (e) { next(e); }
   }

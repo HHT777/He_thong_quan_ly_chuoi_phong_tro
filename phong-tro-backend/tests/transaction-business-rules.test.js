@@ -78,11 +78,11 @@ test("CT-008 co-tenant proposal creates request detail first and residence only 
   assert.match(service, /YeuCau\.create/);
   assert.match(service, /DeXuatBanCungPhong\.create/);
   assert.match(service, /trang_thai: "CHO_XU_LY"/);
-  assert.match(service, /async function approve\(request, transaction\)/);
+  assert.match(service, /async function approve\(request, transaction, actorId\)/);
   assert.match(service, /ThanhVienPhong\.create/);
   assert.match(service, /ROOM_CAPACITY_REACHED/);
   assert.match(service, /CO_TENANT_ALREADY_RESIDENT/);
-  assert.match(route, /coTenantService\.approve\(row, transaction\)/);
+  assert.match(route, /coTenantService\.approve\(row, transaction, req\.user\.ma_tai_khoan\)/);
   const coTenantRoute = route.slice(route.indexOf('router.post("/co-tenants"'));
   assert.match(coTenantRoute, /coTenantService\.propose/);
   assert.doesNotMatch(coTenantRoute.split('router.get("/co-tenants"')[0], /ThanhVienPhong\.create/);

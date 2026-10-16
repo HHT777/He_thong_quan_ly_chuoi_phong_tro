@@ -48,11 +48,10 @@ class ThanhToanService {
         transaction, actorId, action: "PAYMENT_RECORDED", entityType: "GiaoDichThanhToan", entityId: row.ma_giao_dich,
         after: { billId: bill.ma_thanh_toan, amount }, reason: data.ghi_chu || null,
       });
+      const accountId = bill.hopDong?.khachThue?.ma_tai_khoan;
+      if (accountId) await ThongBao.create({ ma_tai_khoan: accountId, loai_thong_bao: "THANH_TOAN", noi_dung: `Đã ghi nhận thanh toán ${amount.toLocaleString("vi-VN")}đ`, thoi_diem_tao: new Date(), da_doc: false }, { transaction });
       return row;
     });
-    const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: KhachThue, as: "khachThue" }] }] });
-    const accountId = bill?.hopDong?.khachThue?.ma_tai_khoan;
-    if (accountId) await ThongBao.create({ ma_tai_khoan: accountId, loai_thong_bao: "THANH_TOAN", noi_dung: `Đã ghi nhận thanh toán ${Number(data.so_tien).toLocaleString("vi-VN")}đ`, thoi_diem_tao: new Date(), da_doc: false });
     return payment;
   }
 

@@ -23,7 +23,7 @@ test("CT-009 account creation checks contract and deposit in one transaction", (
   assert.match(accountService, /vai_tro: "KHACH_THUE"/);
   assert.doesNotMatch(accountService.slice(accountService.indexOf("function accountDto"), accountService.indexOf("function usernameFor")), /\n\s+mat_khau:/);
   const createRoute = route.slice(route.indexOf('router.post("/accounts"'), route.indexOf('router.patch("/accounts/:id/status"'));
-  assert.match(createRoute, /tenantAccountService\.create\(req\.body\.tenantId\)/);
+  assert.match(createRoute, /tenantAccountService\.create\(req\.body\.tenantId, req\.user\.ma_tai_khoan\)/);
   assert.doesNotMatch(createRoute, /req\.body\.(username|password)/);
 });
 
@@ -42,6 +42,6 @@ test("CT-010 status and reset routes use guarded tenant account operations", () 
   assert.match(accountService, /assertTenantRole\(account\)/);
   assert.match(accountService, /where: \{ ma_tai_khoan: account\.ma_tai_khoan \}/);
   assert.match(accountService, /status === "HOAT_DONG".*requireRentalEligibility/);
-  assert.match(route, /tenantAccountService\.updateStatus\(req\.params\.id, req\.body\.status\)/);
-  assert.match(route, /tenantAccountService\.resetPassword\(req\.body\.tenantId\)/);
+  assert.match(route, /tenantAccountService\.updateStatus\(req\.params\.id, req\.body\.status, req\.user\.ma_tai_khoan\)/);
+  assert.match(route, /tenantAccountService\.resetPassword\(req\.body\.tenantId, req\.user\.ma_tai_khoan\)/);
 });

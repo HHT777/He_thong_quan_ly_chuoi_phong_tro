@@ -71,7 +71,7 @@ class PhongController {
         return next(error);
       }
 
-      const phong = await phongService.updatePhong(req.params.id, value);
+      const phong = await phongService.updatePhong(req.params.id, value, req.user.ma_tai_khoan);
 
       res.json({
         success: true,
