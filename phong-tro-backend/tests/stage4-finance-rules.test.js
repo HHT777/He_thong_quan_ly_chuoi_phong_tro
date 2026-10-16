@@ -6,6 +6,7 @@ const adjustmentService = require("../src/services/billAdjustment.service");
 const meterReadingService = require("../src/services/meterReading.service");
 const billGenerationService = require("../src/services/billGeneration.service");
 const { sumSignedLineAmounts, assertBillDetailTotal } = require("../src/utils/billLine.util");
+const { firstPeriodRatio, prorateMonthlyAmount } = require("../src/utils/billingPeriod.util");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -59,10 +60,16 @@ test("CT-012 derives water from contract price and active occupants", () => {
   assert.throws(() => billGenerationService.calculateWater(100000, 0), (error) => error.code === "MISSING_BILLABLE_OCCUPANTS");
 });
 
+test("FR-180 prorates the first contract period with the shared day formula", () => {
+  assert.equal(firstPeriodRatio("2026-10-15", "2026-10"), 17 / 31);
+  assert.equal(prorateMonthlyAmount(3100000, 17 / 31), 1700000);
+  assert.equal(firstPeriodRatio("2026-10-15", "2026-11"), 1);
+});
+
 test("CT-012 bill generation ignores client-provided monetary overrides", () => {
   const route = fs.readFileSync(path.resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
   const generationRoute = route.slice(route.indexOf('router.post("/bills/generate"'), route.indexOf('router.get("/debt"'));
-  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan\)/);
+  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan, req\.body\.contractIds\)/);
   assert.doesNotMatch(generationRoute, /waterAmount|serviceFee/);
   const service = fs.readFileSync(path.resolve(__dirname, "../src/services/billGeneration.service.js"), "utf8");
   assert.match(service, /contract\.phi_dich_vu/);

@@ -1135,6 +1135,16 @@ insert into `ThanhToan` (`maThanhToan`, `thang`, `nam`, `tongPhaiTra`, `tongDaTh
 ('2a1f4a2b-6bc8-50b7-9dbe-8d57a90d8aa7', 9, 2026, 3712500, 3712500, 0, 'DA_THANH_TOAN', '92256090-e741-5003-8cb0-ee1336a340fc'),
 ('c586bc81-418d-5590-b741-bd5a0e721517', 9, 2026, 3962500, 3962500, 0, 'DA_THANH_TOAN', '7814acca-085e-50ab-ac90-479792d8b10a');
 
+-- Backfill legacy: các phiếu mẫu đã tồn tại trước migration 013 được đánh dấu đã xử lý
+-- để lần chạy cron đầu tiên không gửi/nhắc lại; soTienConNo được giữ nguyên.
+update `ThanhToan` set
+`ngayLap`=timestamp(concat(`nam`, '-', lpad(`thang`, 2, '0'), '-01 00:00:00')),
+`daGui`=true, `ngayGui`=timestamp(concat(`nam`, '-', lpad(`thang`, 2, '0'), '-01 00:00:00')),
+`daNhacHan`=true, `ngayNhacHan`=timestamp(concat(`nam`, '-', lpad(`thang`, 2, '0'), '-05 00:00:00')),
+`quaHan`=true, `ngayQuaHan`=timestamp(concat(`nam`, '-', lpad(`thang`, 2, '0'), '-06 00:00:00')),
+`daChotCongNo`=true, `ngayChotCongNo`=timestamp(concat(`nam`, '-', lpad(`thang`, 2, '0'), '-10 23:59:59')),
+`soTienChotCongNo`=`soTienConNo`;
+
 -- SuCo: 6 bản ghi
 insert into `SuCo` (`maSuCo`, `loaiSuCo`, `mucDoUuTien`, `moTa`, `hinhAnhUrl`, `trangThai`, `ngayGui`, `ngayChinhSua`, `ngayTiepNhan`, `ketQuaXuLy`, `thietBiThayThe`, `chiPhiSuaChua`, `doiTuongChiuPhi`, `ngayHoanTat`, `daXoa`, `lyDoXoa`, `ngayXoa`, `nguoiTiepNhanId`, `nguoiXoaId`, `maNguoiGui`, `maPhong`) values
 ('da6a760f-965a-54c9-a283-3038da36f6ed', 'THIET_BI', 'CAO', 'Báo cáo thiết bị phòng 101 cần kiểm tra', '/demo/images/su-co-1.jpg', 'DA_XU_LY', '2026-10-03 08:00:00', null, '2026-10-03 10:00:00', 'Đã kiểm tra và sửa chữa', null, 180000, 'CHU_TRO', '2026-10-04 15:00:00', false, null, null, '910fb605-b871-5141-8d96-1f8577508ac2', null, '492d371e-f8c5-53b7-8615-ffdb678575ab', '859d5d6b-750c-5471-8c33-9b9585fdfb8e'),

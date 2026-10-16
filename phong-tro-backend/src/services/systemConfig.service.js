@@ -35,6 +35,7 @@ function getSystemConfig() {
     debtCloseDay: readPositiveInteger("DEBT_CLOSE_DAY", DEFAULTS.debtCloseDay, { max: 31 }),
     billScheduleDay: readPositiveInteger("BILL_SCHEDULE_DAY", DEFAULTS.billScheduleDay, { max: 28 }),
     billScheduleHour: readPositiveInteger("BILL_SCHEDULE_HOUR", DEFAULTS.billScheduleHour, { min: 0, max: 23 }),
+    billingCronLookbackMonths: readPositiveInteger("BILLING_CRON_LOOKBACK_MONTHS", DEFAULTS.billingCronLookbackMonths, { max: 24 }),
   });
 }
 
@@ -45,7 +46,13 @@ async function getPersistedSystemConfig() {
   const rows = await CauHinhHeThong.findAll();
   const values = Object.fromEntries(rows.map((row) => [row.khoa, row.gia_tri]));
   const number = (key, fallbackValue, min, max) => {
-    const value = values[key] ?? fallbackValue; const parsed = Number(value);
+    let value = values[key] ?? fallbackValue;
+    // MariaDB may return a JSON scalar as its serialized representation (for
+    // example `"3"`) while MySQL/other drivers return the scalar directly.
+    if (typeof value === "string") {
+      try { value = JSON.parse(value); } catch (_) { /* plain string */ }
+    }
+    const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw Object.assign(new Error(`Cấu hình ${key} không hợp lệ`), { status: 422, code: "INVALID_SYSTEM_CONFIG" });
     return parsed;
   };

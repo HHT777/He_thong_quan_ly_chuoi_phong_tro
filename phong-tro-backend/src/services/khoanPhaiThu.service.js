@@ -24,7 +24,7 @@ class KhoanPhaiThuService {
         ? await HopDong.findByPk(data.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE })
         : await HopDong.findOne({ where: { ma_phong: data.ma_phong, ma_khach_thue: data.ma_khach_thue, trang_thai: { [Op.ne]: "DA_THANH_LY" } }, transaction, lock: transaction.LOCK.UPDATE });
       if (!contract) throw { status: 404, message: "Không tìm thấy hợp đồng phù hợp" };
-      if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
+      if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, code: "BILL_ALREADY_EXISTS", message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
       const lines = [
         { type: BILL_LINE_TYPES.RENT, amount: Number(data.tien_phong), description: "Tiền phòng" },
         { type: BILL_LINE_TYPES.ELECTRICITY, amount: Number(data.tien_dien), description: "Tiền điện" },
@@ -32,15 +32,30 @@ class KhoanPhaiThuService {
         { type: BILL_LINE_TYPES.SERVICE_FEE, amount: Number(data.phi_dich_vu), description: "Phí dịch vụ" },
         { type: BILL_LINE_TYPES.INCIDENTAL_FEE, amount: Number(data.phi_phat_sinh), description: "Phí phát sinh" },
       ].filter(({ amount }) => amount > 0);
+      const definitions = Array.isArray(data.adjustments) ? data.adjustments : [];
+      for (const definition of definitions.filter((item) => item.type === BILL_LINE_TYPES.INCIDENTAL_FEE)) {
+        const amount = Number(definition.amount);
+        if (amount > 0) lines.push({ type: BILL_LINE_TYPES.INCIDENTAL_FEE, amount, description: definition.description, definitionId: definition.id });
+      }
       const gross = sumSignedLineAmounts(lines);
-      const requestedDiscount = Math.abs(Number(data.khoan_giam_tru || 0));
-      const discount = Math.min(Number.isFinite(requestedDiscount) ? requestedDiscount : 0, gross);
-      if (discount > 0) lines.push({ type: BILL_LINE_TYPES.DISCOUNT, amount: -discount, description: "Giảm trừ" });
+      let discountCapacity = gross;
+      const manualDiscount = Math.min(Math.abs(Number(data.khoan_giam_tru || 0)) || 0, discountCapacity);
+      if (manualDiscount > 0) { lines.push({ type: BILL_LINE_TYPES.DISCOUNT, amount: -manualDiscount, description: "Giảm trừ" }); discountCapacity -= manualDiscount; }
+      for (const definition of definitions.filter((item) => item.type === BILL_LINE_TYPES.DISCOUNT)) {
+        const amount = Math.min(Number(definition.amount) || 0, discountCapacity);
+        if (amount > 0) { lines.push({ type: BILL_LINE_TYPES.DISCOUNT, amount: -amount, description: definition.description, definitionId: definition.id }); discountCapacity -= amount; }
+      }
       const calculated = sumSignedLineAmounts(lines);
       const total = data.tong_phai_thanh_toan === undefined ? calculated : Number(data.tong_phai_thanh_toan);
       if (!Number.isFinite(total) || total < 0 || Math.abs(total - calculated) > 0.001) throw { status: 422, message: "Tổng phải trả không khớp tổng chi tiết", details: { calculated } };
-      const bill = await ThanhToan.create({ ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY", tong_phai_tra: total, tong_da_thanh_toan: 0, so_tien_con_no: total, trang_thai: "CHUA_THANH_TOAN" }, { transaction });
-      for (const line of lines) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: line.type, so_tien: line.amount, dien_giai: line.description, nguoi_thuc_hien_id: actorId || null }, { transaction });
+      let bill;
+      try {
+        bill = await ThanhToan.create({ ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY", tong_phai_tra: total, tong_da_thanh_toan: 0, so_tien_con_no: total, trang_thai: total === 0 ? "DA_THANH_TOAN" : "CHUA_THANH_TOAN" }, { transaction });
+      } catch (error) {
+        if (error.name === "SequelizeUniqueConstraintError") throw Object.assign(new Error("Khoản phải thu của hợp đồng trong kỳ đã tồn tại"), { status: 409, code: "BILL_ALREADY_EXISTS" });
+        throw error;
+      }
+      for (const line of lines) await ChiTietThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, loai_khoan: line.type, so_tien: line.amount, dien_giai: String(line.description || line.type).slice(0, 255), ma_khoan_dieu_chinh: line.definitionId || null, nguoi_thuc_hien_id: actorId || null }, { transaction });
       if (actorId) await writeAuditLog({ transaction, actorId, action: "BILL_CREATED", entityType: "ThanhToan", entityId: bill.ma_thanh_toan, after: { period: data.ky, total } });
       return bill;
     });

@@ -7,6 +7,7 @@ const { writeAuditLog } = require("./auditLog.service");
 const contractLifecycle = require("./contractLifecycle.service");
 const { countBillableOccupants, calculateWaterCharge } = require("./occupancy.service");
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
+const { elapsedMonthRatio } = require("../utils/billingPeriod.util");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -18,7 +19,7 @@ function validateChecklist(payload) {
   if (!String(payload.roomCondition || "").trim()) throw fail(422, "Thiếu kết quả kiểm tra phòng", "ROOM_CONDITION_REQUIRED");
   return amount(payload.deduction, "Khấu trừ khác");
 }
-function dayRatio(value) { const d = new Date(`${String(value).slice(0, 10)}T00:00:00Z`); const days = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), days, ratio: d.getUTCDate() / days }; }
+const dayRatio = elapsedMonthRatio;
 async function approvedRequest(contractId, transaction) {
   const details = await YeuCauTraPhong.findAll({ where: { ma_hop_dong: contractId }, order: [["ngay_tra_da_duyet", "DESC"]], transaction });
   for (const detail of details) if ((await YeuCau.findByPk(detail.ma_yeu_cau, { transaction }))?.trang_thai === "DA_PHE_DUYET") return detail;

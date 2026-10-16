@@ -11,6 +11,8 @@ const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
+const billingAdjustmentDefinitionService = require("../services/billingAdjustmentDefinition.service");
+const billingCronService = require("../services/billingCron.service");
 const tenantAccountService = require("../services/tenantAccount.service");
 const reservationService = require("../services/reservation.service");
 const contractViolationService = require("../services/contractViolation.service");
@@ -102,9 +104,26 @@ async function adjustBill(req, res, next) {
 }
 router.post("/bills/:id/adjustments", landlord, adjustBill);
 
+router.get("/billing-adjustments", landlord, async (req, res, next) => {
+  try { return data(res, await billingAdjustmentDefinitionService.list(req.query.contractId)); } catch (e) { next(e); }
+});
+router.post("/billing-adjustments", landlord, async (req, res, next) => {
+  try { return data(res, await billingAdjustmentDefinitionService.create(req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
+});
+router.patch("/billing-adjustments/:id", landlord, async (req, res, next) => {
+  try { return data(res, await billingAdjustmentDefinitionService.update(req.params.id, req.body, req.user.ma_tai_khoan)); } catch (e) { next(e); }
+});
+router.post("/billing-adjustments/:id/toggle", landlord, async (req, res, next) => {
+  try { return data(res, await billingAdjustmentDefinitionService.setEnabled(req.params.id, req.body.enabled === true, req.body.reason, req.user.ma_tai_khoan)); } catch (e) { next(e); }
+});
+
+router.post("/bills/preview", landlord, async (req, res, next) => {
+  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds)); } catch (e) { next(e); }
+});
+
 router.post("/bills/generate", landlord, async (req, res, next) => {
   try {
-    return data(res, await billGenerationService.generate(req.body.period, req.user.ma_tai_khoan), 201);
+    return data(res, await billGenerationService.generate(req.body.period, req.user.ma_tai_khoan, req.body.contractIds), 201);
   } catch (e) { next(e); }
 });
 router.get("/debt", async (req, res, next) => {
@@ -125,6 +144,7 @@ router.get("/debt", async (req, res, next) => {
 });
 router.post("/jobs/close-overdue-debt", landlord, async (req, res, next) => { try { return data(res, { processed: (await billService.getOverdueBills()).length }); } catch (e) { next(e); } });
 router.post("/jobs/remind-due-bills", landlord, async (req, res, next) => { try { const bills = await billService.getOverdueBills(); let created = 0; for (const bill of bills) { const tenantRow = await KhachThue.findByPk(bill.hopDong.ma_khach_thue); if (tenantRow?.ma_tai_khoan) { await ThongBao.create({ loai_thong_bao: "NHAC_THANH_TOAN", noi_dung: `Khoản kỳ ${bill.nam}-${String(bill.thang).padStart(2, "0")} còn ${bill.so_tien_con_no}đ`, thoi_diem_tao: new Date(), ma_tai_khoan: tenantRow.ma_tai_khoan }); created += 1; } } return data(res, { created }); } catch (e) { next(e); } });
+router.post("/jobs/billing", landlord, async (req, res, next) => { try { return data(res, await billingCronService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan, force: req.body.force === true })); } catch (e) { next(e); } });
 
 // Tài sản được quản lý theo thứ bậc Căn trọ → Phòng → Tài sản.
 router.get("/assets", landlord, async (req, res, next) => {
