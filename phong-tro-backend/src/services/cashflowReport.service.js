@@ -162,7 +162,8 @@ function allocateReceipts(receipts) {
   for (const entries of groups.values()) {
     entries.sort((a, b) => new Date(a.row.ngay_ghi_nhan) - new Date(b.row.ngay_ghi_nhan));
     const lines = entries[0].bill?.chiTiets || [];
-    const grossTotal = lines.filter((line) => line.loai_khoan !== "GIAM_TRU").reduce((sum, line) => sum + Math.max(0, Number(line.so_tien)), 0);
+    const grossLines = lines.filter((line) => line.loai_khoan !== "GIAM_TRU");
+    const grossTotal = grossLines.reduce((sum, line) => sum + Math.max(0, Number(line.so_tien)), 0) || entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
     const discountTotal = lines.filter((line) => line.loai_khoan === "GIAM_TRU").reduce((sum, line) => sum + Math.abs(Number(line.so_tien)), 0);
     const netTotal = entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
     let grossAssigned = 0; let discountAssigned = 0;
@@ -172,10 +173,11 @@ function allocateReceipts(receipts) {
       const discount = last ? discountTotal - discountAssigned : Math.round(Number(item.row.so_tien) * discountTotal / (netTotal || 1));
       grossAssigned += gross; discountAssigned += discount;
       const byType = {};
-      for (const line of lines.filter((line) => line.loai_khoan !== "GIAM_TRU")) {
+      for (const line of grossLines) {
         const amount = last ? Math.max(0, Number(line.so_tien)) : Math.round(Math.max(0, Number(line.so_tien)) * gross / (grossTotal || 1));
         byType[line.loai_khoan] = (byType[line.loai_khoan] || 0) + amount;
       }
+      if (!grossLines.length) byType.THANH_TOAN = gross;
       result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType });
     });
   }
