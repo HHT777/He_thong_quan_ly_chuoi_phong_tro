@@ -428,6 +428,13 @@ Audit helper bắt buộc transaction; DTO không ghi password/hash/token (test 
 - Phép thử phủ định: tạm bỏ bắt `ER_DUP_ENTRY` trong `notification.service.js`; suite đỏ với `SequelizeUniqueConstraintError`/`ER_DUP_ENTRY` tại reservation/contract/concurrent insert (5 test fail trong 41); helper đã khôi phục, không commit trạng thái hỏng.
 - Frontend build theo chỉ thị F.0: **chưa chạy**.
 
+## F.1 – báo cáo doanh thu/lợi nhuận
+
+- BR-44 đã áp dụng trong `cashflowReport.service.js`: **Doanh thu trước giảm trừ; Lợi nhuận = Doanh thu − Giảm trừ − Chi phí. Với giá trị trước giảm G, giảm D, tổng thực trả N = G − D > 0, mỗi lần thu p phân bổ doanh thu p × G/N và giảm trừ p × D/N; làm tròn đến đồng, dồn sai số vào lần thu cuối để tổng doanh thu − tổng giảm trừ = tổng tiền thực thu. Nếu N = 0 thì không có doanh thu từ khoản này; theo dõi giảm trừ đã cấp riêng, không trừ lần hai vào lợi nhuận tiền mặt.**
+- FR-132: lọc tháng/quý/năm và khoảng ngày; FR-133/135: doanh thu, giảm trừ, chi phí, lợi nhuận; FR-136/142: thêm `byBuilding` để so sánh từng căn/toàn chuỗi; FR-137: `receiptDetails` gồm dòng thu và chi với nguồn, căn, phòng (khi có), ngày.
+- Test mới `BR-44 allocates gross revenue and discount across partial receipts with final rounding`; unit **49/49**, integration **41/41**, invariants **0** sau thay đổi.
+- Commit: `f87b28b feat(FR-133): allocate gross revenue and discounts`, `8787516 fix(FR-133): preserve revenue for detailless receipts`, `536e429 feat(FR-136): add building report comparison details`.
+
 ## Xác minh lại sau migration 014
 
 - TCP MySQL `127.0.0.1:3307`: `8.0.46`; MariaDB `127.0.0.1:3306`: `10.4.32-MariaDB`.
