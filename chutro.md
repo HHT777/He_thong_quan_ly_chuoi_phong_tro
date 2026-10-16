@@ -345,3 +345,93 @@ Phần này **thay thế trạng thái thực hiện** ở các mục ưu tiên 
 3. Gắn cấu hình lưu DB vào cron/các consumer, đồng thời tăng audit và validation cho các API quản trị còn lại.
 4. Chạy migration `004` → `011` trên bản sao database theo đúng thứ tự và kiểm tra tương thích dữ liệu cũ trước production; một số `ALTER TABLE` không phải thao tác có thể chạy lặp vô điều kiện.
 5. Chạy lại toàn bộ integration sau các thay đổi cuối. Lần chạy gần nhất của **unit suite** đạt **40/40**; kết quả integration **9/9** có từ một mốc sớm hơn, trước các thay đổi P2 cuối, nên chưa dùng làm bằng chứng nghiệm thu cuối.
+
+## Báo cáo xác minh D.4 + E (HEAD `70498e6`)
+
+Phạm vi là kiểm tra sau các commit D.4/E; không thực hiện F và không thêm migration. Trạng thái untracked được giữ nguyên theo chỉ thị (6 model, 3 tài liệu cấu trúc, OCR/).
+
+### D.4 – chức năng thanh toán, cron và khoản điều chỉnh
+
+| Mục | Kết luận một dòng | Bằng chứng / test |
+|---|---|---|
+| 1. Khoản điều chỉnh | **ĐÃ CÓ** – CRUD/toggle, RBAC, audit, kỳ áp dụng, unique `(maThanhToan,maKhoanDieuChinh)`, disabled/future và snapshot bất biến đã được chặn. | `billingAdjustmentDefinition.service.js`, routes `POST/PATCH /billing-adjustments`, `POST /:id/toggle`, migration 012/013; test `FR-157/164/175/176/179 ... snapshot ...` trong `tests/billing-lifecycle.integration.test.js`. |
+| 2. Preview | **ĐÃ CÓ** – `POST /api/v1/bills/preview` không ghi DB, kỳ đầu dùng chung helper prorate với settlement; race chỉ tạo một bộ hóa đơn. | Cùng test billing-lifecycle: DB counts không đổi sau preview và hai request đồng thời cho kết quả 201/409, tổng bản ghi = 1. |
+| 3. Gửi hóa đơn FR-156 | **ĐÃ CÓ** – `billingCron.service.sendOne` ghi notification và `daGui/ngayGui` trong cùng transaction; chạy lại không gửi trùng. | Test `FR-151/153/155/156 billing cron sends each persisted bill once`; tài khoản bị khóa vẫn nhận notification in-app đã lưu (không phụ thuộc login). |
+| 4. Backfill chống spam | **ĐÃ CÓ** – hóa đơn cũ sau backfill không phát notification/kích nợ và không đổi dư nợ. | Test `FR-151/153 migration backfill keeps legacy bills inert across all cron workers`; cửa sổ `billingCronLookbackMonths` mặc định 3, các mốc bill 2/8, nhắc 5, quá hạn 6, chốt 10 có env/DB override. |
+| 5. Đăng ký cron | **ĐÃ CÓ** – contract/reservation `0 * * * *`, move-out `5 * * * *`, billing `0 * * * *`, debt `15 * * * *`; giờ chạy lấy từ system config. | `cron.jobs.js`, `billingCron.service.js`, `debtLifecycle.service.js`; test FR-200 xác nhận config đổi không cần restart. |
+| 6. Named lock | **ĐÃ CÓ** – năm cron dùng `withNamedLock`, GET/RELEASE cùng connection/transaction, timeout 0–60 giây. | `dbNamedLock.service.js`; test FR-200 hai connection cho kết quả worker thứ hai không chiếm lock. |
+| 7. Hủy thanh toán/doanh thu | **ĐÃ CÓ** – báo cáo trước/sau thay đổi, chặn `KHAU_TRU_COC`, lần hủy thứ hai 409. | Test `FR-074/075/079 ... cancellation ...`; doanh thu nguồn KhoanThu chuyển `DA_HUY` nên bị loại khỏi report. |
+| 8. Mark all paid | **ĐÃ CÓ** – dedupe theo bill/idempotency key; mỗi bill tạo `KhoanThu` và doanh thu ngay trong transaction. | Test `FR-075 marks every periodic bill ... atomically`; chạy lại trả 0 bản ghi mới, audit/payment idempotency đã kiểm. |
+
+### E.1 – cấu hình, upload và notification
+
+| Mục | Kết luận | Chi tiết bắt buộc |
+|---|---|---|
+| 1. Config table/consumer | **ĐÃ CÓ**. | `CauHinhHeThong` + GET/PUT landlord; consumer gồm contract, reservation, move-out due, debt milestones, billing windows và `MAX_FILE_SIZE`. Danh mục sự cố là bảng riêng (không nhét vào key-value). Env/default fallback, range validation, test FR-200. |
+| 2. Upload token | **ĐÃ CÓ**. | HMAC/JWT stateless dùng `UPLOAD_TOKEN_SECRET || JWT_SECRET`, chống sai actor/tenant, tamper, expired, reload module; cleanup file >15 phút. Multi-instance yêu cầu deploy mount chung `UPLOAD_DIR` (code không thể tự đảm bảo volume). Test unit `E.1.2 signed upload token survives module reload and enforces claims`. |
+| 3. Notification FR-159 | **THIẾU/SÁI Ở race residual**. | Billing/debt/move-out/payment phần chính nằm trong transaction và có row/cron lock; contract có app-check theo content, chưa có unique DB. Nhánh reservation expiry và broadcast fan-out có create ngoài transaction/check-then-create, có thể trùng khi hai process cạnh tranh. Đề xuất sau khi duyệt: event key duy nhất (outbox/unique) hoặc đưa toàn bộ create vào transaction; chưa thêm DDL. |
+
+### E.2 – ma trận audit
+
+| Thao tác | Route/service | Audit | Test/bằng chứng |
+|---|---|---|---|
+| Khóa/mở khóa/reset TK | `tenantAccount.service.js` | ĐÃ CÓ | CT-009/010/015 + audit helper |
+| Tạo/sửa HĐ | `contractLifecycle.service.js` | ĐÃ CÓ | FR-042 contract integration |
+| Chuyển phòng | `roomTransfer.service.js` | ĐÃ CÓ | FR-195 integration |
+| Chốt/sửa/xóa chỉ số | meter controller/service | ĐÃ CÓ | UC-09/10 tests |
+| Khoản chi create/edit/cancel | `management.controller.js` | ĐÃ CÓ | `management-integrity.integration.test.js` |
+| Request approve/reject/revoke | `mvp.routes.js` | ĐÃ CÓ | FR-109/186 tests |
+| Bill adjustment/reduction | adjustment services | ĐÃ CÓ | billing-lifecycle tests |
+| KhoanDieuChinh | definition service | ĐÃ CÓ | FR-157/164/175/176/179 |
+| Người ở cùng | coTenant routes/service | ĐÃ CÓ | UC-08/17/18/19/25 |
+| Soft-delete sự cố | `incident.service.js` | ĐÃ CÓ | CT-005 |
+| Đổi giá phòng | `phong.service.js` | ĐÃ CÓ | commit `70498e6`, audit rollback suite |
+| System config | `mvp.routes.js` | ĐÃ CÓ | FR-200 audit count |
+| Hủy thanh toán | payment lifecycle | ĐÃ CÓ | FR-074 |
+| Mark paid one/all | payment lifecycle | ĐÃ CÓ | FR-074/075 |
+| Quyết toán trả phòng | move-out service | ĐÃ CÓ | FR-096/187/188/190 |
+| Hoàn cọc | move-out service | ĐÃ CÓ | `DEPOSIT_REFUND_RECORDED`, FR-096 |
+
+Audit helper bắt buộc transaction; DTO không ghi password/hash/token (test `audit-integrity.integration.test.js`). Tuy nhiên, **THIẾU** một test count=1 và rollback riêng cho từng thao tác trên; hiện count=1 đã chứng minh rõ cho config/payment, rollback đã có test null actor.
+
+### E.3 – toàn vẹn dữ liệu
+
+| Mục | Kết luận | Bằng chứng / khoảng trống |
+|---|---|---|
+| 1. Whitelist + Joi | **ĐÃ CÓ**. | `validations/management.validation.js`; building/tenant/expense list field cụ thể, unknown field/amount âm/scope test; không update thẳng `req.body`. |
+| 2. Expense DELETE | **ĐÃ CÓ**. | Soft cancel bắt buộc lý do, không physical delete; report chỉ `HIEU_LUC`, test management-integrity. |
+| 3. Deactivate building | **THIẾU TEST** (code đã chặn). | Code chặn `DANG_THUE`, `DA_GIU`, `DANG_XU_LY_TRA_PHONG`; test hiện mới bao phủ DANG_THUE, chưa có hai status còn lại. |
+| 4. Xóa asset có liên kết | **THIẾU TEST** (code đã chặn). | Transaction block cả `SuCoTaiSan` và `KhoanKhauTru`; test hiện có incident link, chưa có settlement link. |
+| 5. Overlap SAP_HET_HAN + race | **ĐÃ CÓ**. | `hopDong.service.js` lock phòng, active domain gồm `DANG_HIEU_LUC`/`SAP_HET_HAN`; test UC-26 chỉ cho một HĐ thành công. |
+| 6. Tenant search/filter | **THIẾU/SÁI**. | Search server-side `GET /api/management/khach-thue?q=`, bill `ma_can/buildingId`, meter `buildingId` đã có; chưa escape wildcard `%/_` và chưa có test wildcard/SQL-pattern. |
+
+### Kiểm tra cổng cuối
+
+- Unit: **48/48 xanh** (`npm run test:unit`). Frontend: **Vite build xanh** (45 modules).
+- Integration MySQL8, `npm ci`, `verify-migrations.js` hai lượt, DB invariants, clone-clean và MariaDB 10.4: **chưa chạy trong phiên này**; Docker daemon hiện không truy cập được (`docker` pipe permission denied). Không ghi nhận các mốc này là đã đạt.
+- Worktree chỉ còn các file untracked đã được chỉ định giữ; không có modified tracked file. Không có migration mới trong D.4/E.
+
+### Việc còn thiếu / cần quyết định
+
+1. Bổ sung transaction/unique event key cho reservation/broadcast notification race (có thể cần DDL mới; chưa triển khai).
+2. Bổ sung test building cho từng status `DA_GIU`, `DANG_XU_LY_TRA_PHONG`, asset settlement link, và wildcard escaping.
+3. Bổ sung bộ audit count=1/rollback đồng nhất cho từng operation E.2.
+4. Khi Docker MySQL8/MariaDB sẵn sàng, chạy lại toàn bộ cổng trên; sau đó mới xem xét chuyển sang F.
+
+## Xác minh lại sau migration 014
+
+- TCP MySQL `127.0.0.1:3307`: `8.0.46`; MariaDB `127.0.0.1:3306`: `10.4.32-MariaDB`.
+- `verify-migrations.js`: MySQL8 **2/2 pass**, MariaDB **2/2 pass**, migrations 004→014, **37 bảng**, legacy backfill không phát notification.
+- Unit **48/48**; integration MySQL8 **31/31**.
+- Migration 014 đã commit `f32c876`; escape tenant search đã commit `9cd875b`.
+- Frontend: `npm ci` lỗi nguyên văn `npm error code EPERM ... spawn EPERM`; `npm run build` lỗi `Cannot find module ...\\node_modules\\vite\\bin\\vite.js`.
+- Chưa chạy clone sạch, cron seed cũ riêng và bộ SQL invariants sau integration; DB test bị runner dọn sau khi chạy.
+
+### Bật test/bổ sung sau đợt E
+
+- Unit: **48 → 48** (không thêm unit); integration: **31 → 40**, **40/40 pass**.
+- `notification-integrity.integration.test.js`: legacy NULL event key; reservation expiry race; contract expiry race; broadcast retry; DB unique-key race. Phép thử phủ định ban đầu lội do fixture thiếu `nguoiThucHienId`/check constraint, đã sửa fixture; sau đó pass.
+- `management-integrity.integration.test.js`: ba trạng thái phòng `DANG_THUE/DA_GIU/DANG_XU_LY_TRA_PHONG` bị chặn, `TRONG` cho phép; asset liên kết settlement bị chặn.
+- `audit-matrix.integration.test.js`: 25 operation audit count=1, snapshot không secret, rollback khi audit lỗi. Phép thử ban đầu phát hiện snapshot còn password/hash; đã vá trong commit `d5b5a0c`.
+- `scripts/check-invariants.js` được hook vào integration trước khi dọn DB; kết quả cuối: bill detail **0**, duplicate bill **0**, capacity **0**, deposit **0**, notification key **0**, incident branch bị trùng **0**.
+- Commit test: `ec0d2d5`, `e1b58c6`, `586e500`, `ac17b97`; fix audit: `d5b5a0c`; invariants: `b6a16f8`.
