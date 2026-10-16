@@ -529,3 +529,36 @@ Không phát sinh DDL hoặc migration mới trong G.1.
 Commit sau G.1: `5ab87b9` (BR-44 immutable allocation), `897bc76` (FR-177 missing reason 400), `c9dfff8` (FR-167 reservation lifecycle). Unit **54/54**, integration **42/42**, invariants **0**. Lỗi thật trong F.3 là so sánh `Date` với chuỗi làm chuyển giữ hợp lệ trả 409; đã sửa bằng chuẩn hóa ISO date trước khi so sánh. Không thêm migration/DDL.
 
 Quyết định cần xác nhận: `SRS.md:613,615,860` mô tả quá hạn chỉ thông báo và phòng vẫn `Đã giữ`, trong khi chỉ thị F.3 yêu cầu cron đưa phòng về `TRONG`; mã hiện theo chỉ thị F.3 (giải phóng phòng), chưa sửa lại theo SRS.
+
+## Sửa F.3 theo SRS (FR-168/BR-41)
+
+SRS chuẩn hóa tại `SRS.md:613`, `SRS.md:615`, `SRS.md:638`, `SRS.md:860`, `SRS.md:906`, `SRS.md:947`: giữ phòng quá hạn **chỉ cảnh báo Chủ trọ**, không tự hủy; hồ sơ vẫn `DANG_GIU`, phòng vẫn `DA_GIU`. Chủ trọ là người quyết định gia hạn hoặc hủy; khi hủy mới ghi số hoàn 0…tiền đã nhận, phần không hoàn là `GIU_PHONG_KHONG_HOAN` và phòng về `TRONG`. Khi chuyển thành hợp đồng trong hạn, hồ sơ giữ thành `DA_CHUYEN_THANH_HOP_DONG` và phòng thành `DANG_THUE`.
+
+Đã sửa `reservation.service.js` để cron không đổi trạng thái phòng/hồ sơ; `GET /api/v1/reservations` trả cờ suy ra `quaHan` từ `han_giu < hôm nay` khi hồ sơ còn `DANG_GIU`. Bổ sung ba bất biến trong `check-invariants.js`: giữ hiệu lực phải gắn phòng `DA_GIU`, phòng `DA_GIU` phải có đúng một giữ hiệu lực, và không được đồng thời giữ hiệu lực với hợp đồng hiệu lực.
+
+Test F.3 đã tách thành 8 test độc lập trong `reservation-lifecycle.integration.test.js`: tạo/chặn phòng, gia hạn/lịch sử, hủy/hoàn, quá hạn chỉ thông báo, chuyển hợp đồng, race, RBAC, audit. Test race giữ và event-key đã được kiểm tra âm bằng cách vô hiệu hóa khóa/nhánh bắt duplicate trong phiên kiểm thử; suite đỏ, mã đã khôi phục.
+
+## F.4 – OCR chỉ số điện cho Chủ trọ
+
+Route riêng: `POST /api/v1/meter-readings/ocr-previews` và `POST /api/v1/meter-readings/ocr-submit`. Preview nhận phòng/kỳ/ảnh, dùng token HMAC stateless hiện có; submit của Chủ trọ ghi `DA_XAC_NHAN` trong transaction và audit đúng một dòng. OCR đọc lỗi, timeout hoặc dịch vụ tắt trả `MANUAL_REQUIRED`; nhập tay vẫn tiếp tục được. Chỉ số nhỏ hơn trước trả 400. Test mock HTTP: `ocr-landlord.integration.test.js`; unit token/OCR: `ocr-landlord.test.js`.
+
+### Bảng khóa sự kiện notification (grep toàn bộ producer)
+
+| Nơi tạo | Transaction | Khóa/chống trùng | Test race |
+|---|---|---|---|
+| Billing gửi phiếu | Trong transaction billing | `PHIEU_THU:<maThanhToan>:<ky>` + unique DB | billing lifecycle |
+| Debt nhắc ngày 05/quá hạn 06/chốt | Trong transaction debt | `CONG_NO:<type>:<maThanhToan>:<ky>` + lock cron | debt lifecycle |
+| Hợp đồng sắp hết/hết hạn | Trong transaction từng hợp đồng | `HOP_DONG:<id>:<ngày>` + khóa dòng/unique | notification-integrity |
+| Reservation quá hạn | Trong transaction reservation | `GIU_PHONG_HET_HAN:<id>:<ngày>` + lock cron/unique | notification-integrity + F.3 expiry |
+| Move-out đến hạn/rút duyệt/thanh lý | Trong transaction nghiệp vụ | `BAT_DAU_TRA_PHONG:<request>:<ngày>`, `RUT_DUYET_TRA_PHONG:<request>`, `THANH_LY_HOP_DONG:<contract>` | move-out integration |
+| Yêu cầu duyệt/từ chối | Trong transaction request | `YEU_CAU_KET_QUA:<request>:<status>` | operations integration |
+| Người ở cùng | Trong transaction request | `KET_QUA_YEU_CAU:<request>:<status>` | operations/notification integration |
+| Sự cố hoàn tất | Trong transaction incident | `KET_QUA_SU_CO:<incident>` | incident integration |
+| Thanh toán ghi nhận/xác nhận | Trong transaction payment | `THANH_TOAN_GHI_NHAN:<transaction>`, `THANH_TOAN_XAC_NHAN:<transaction>` | finance integration |
+| Broadcast | Mỗi lô một transaction | `BROADCAST:<maBroadcast>` + unique DB | broadcast retry/race |
+| Chuyển phòng | Trong transaction transfer | `CHUYEN_PHONG:<contract>:<ngày>` | room-transfer integration |
+| Tạo hợp đồng | Trong transaction contract | `HOP_DONG_TAO:<contract>` | contract lifecycle |
+
+Mọi producer đều đi qua `createIdempotent`, bắt duplicate key ở tầng DB; không producer nào còn kiểu đọc-rồi-ghi để chống race.
+
+Mốc sau sửa SRS: unit **57/57**, integration **50/50**, bất biến **0** (gồm `activeReservationRoomState`, `heldRoomWithoutReservation`, `reservationContractOverlap`). Commit: `933dc68` (FR-168 SRS), `a308499` (FR-065 OCR). Clone sạch/`npm ci`, verify migration MariaDB/MySQL lặp lại và frontend build chưa chạy trong lượt này; không ghi nhận đạt.
