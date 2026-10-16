@@ -13,7 +13,7 @@ SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schem
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='fk_YeuCau_nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD CONSTRAINT `fk_YeuCau_nguoiXuLyId` FOREIGN KEY (`nguoiXuLyId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='ck_YeuCau_2'), 'ALTER TABLE `YeuCau` DROP CONSTRAINT `ck_YeuCau_2`', 'SELECT 1');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='ck_YeuCau_2'), IF(LOCATE('MariaDB', VERSION()) > 0, 'ALTER TABLE `YeuCau` DROP CONSTRAINT `ck_YeuCau_2`', 'ALTER TABLE `YeuCau` DROP CHECK `ck_YeuCau_2`'), 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 ALTER TABLE `YeuCau` ADD CONSTRAINT `ck_YeuCau_2` CHECK (`trangThai` IN ('CHO_XU_LY', 'DA_PHE_DUYET', 'TU_CHOI', 'DA_RUT'));
 

@@ -438,7 +438,7 @@ constraint `fk_ChiTietThanhToan_nguoiThucHien` foreign key (`nguoiThucHienId`) r
 primary key (`maChiTiet`),
 key `ix_ChiTietThanhToan_maThanhToan` (`maThanhToan`),
 unique key `uq_ChiTietThanhToan_dieu_chinh` (`maThanhToan`, `maKhoanDieuChinh`),
-constraint `ck_ChiTietThanhToan_013` check (case when `loaiKhoan` in ('GIAM_TRU','DIEU_CHINH_GIAM') then `soTien` < 0 when `loaiKhoan` in ('TIEN_PHONG','TIEN_DIEN','TIEN_NUOC','PHI_DICH_VU','PHI_PHAT_SINH','DIEU_CHINH_TANG','NO_SAU_THANH_LY','SUA_CHUA') then `soTien` > 0 else false end)
+constraint `ck_ChiTietThanhToan_013` check ((`loaiKhoan` in ('GIAM_TRU','DIEU_CHINH_GIAM') and `soTien` < 0) or (`loaiKhoan` in ('TIEN_PHONG','TIEN_DIEN','TIEN_NUOC','PHI_DICH_VU','PHI_PHAT_SINH','DIEU_CHINH_TANG','NO_SAU_THANH_LY','SUA_CHUA') and `soTien` >= 0))
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table `KhoanChi` (

@@ -1,7 +1,7 @@
 -- P2/FR-167..170: room reservations for the UUID/camel-case schema.
 -- Rollback is manual after exporting reservation history.
 SET @schema_name = DATABASE();
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='PhongTro' AND constraint_name='ck_PhongTro_3'), 'ALTER TABLE `PhongTro` DROP CONSTRAINT `ck_PhongTro_3`', 'SELECT 1');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='PhongTro' AND constraint_name='ck_PhongTro_3'), IF(LOCATE('MariaDB', VERSION()) > 0, 'ALTER TABLE `PhongTro` DROP CONSTRAINT `ck_PhongTro_3`', 'ALTER TABLE `PhongTro` DROP CHECK `ck_PhongTro_3`'), 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 ALTER TABLE `PhongTro` ADD CONSTRAINT `ck_PhongTro_3` CHECK (`trangThai` IN ('TRONG', 'DA_GIU', 'DANG_THUE', 'DANG_XU_LY_TRA_PHONG', 'NGUNG_SU_DUNG'));
 
