@@ -27,6 +27,6 @@ test("AUD-01..06 audit failure rolls back the transaction for the matrix operati
   await assert.rejects(() => sequelize.transaction(async (transaction) => {
     await writeAuditLog({ transaction, actorId: null, action: "ROOM_TRANSFERRED", entityType: "AuditMatrix", entityId: "rollback" });
     await writeAuditLog({ transaction, actorId: actor.ma_tai_khoan, action: "ROOM_TRANSFERRED", entityType: "AuditMatrix", entityId: "rollback" });
-  }), /INVALID_AUDIT_LOG/);
+  }), (error) => error.code === "INVALID_AUDIT_LOG");
   assert.equal(await AuditLog.count({ where: { entity_id: "rollback" } }), 0);
 });

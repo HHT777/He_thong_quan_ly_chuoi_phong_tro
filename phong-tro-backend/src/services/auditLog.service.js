@@ -8,7 +8,14 @@ const fail = (message, code) => Object.assign(new Error(message), {
 function toJsonValue(value) {
   if (value === undefined || value === null) return value ?? null;
   const plain = typeof value.get === "function" ? value.get({ plain: true }) : value;
-  return JSON.parse(JSON.stringify(plain));
+  const scrub = (item) => {
+    if (Array.isArray(item)) return item.map(scrub);
+    if (!item || typeof item !== "object") return item;
+    return Object.fromEntries(Object.entries(item)
+      .filter(([key]) => !/(?:password|matkhau|hash|token|secret)/i.test(key))
+      .map(([key, entry]) => [key, scrub(entry)]));
+  };
+  return scrub(JSON.parse(JSON.stringify(plain)));
 }
 
 function requiredString(value, field, maxLength) {
