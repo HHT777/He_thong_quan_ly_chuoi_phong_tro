@@ -55,12 +55,13 @@ export default {
 
     try {
       // 2. Fetch real data from all existing relevant APIs
-      const [roomsRes, billsRes, debtRes, incidentsRes, contractsRes] = await Promise.all([
+      const [roomsRes, billsRes, debtRes, incidentsRes, contractsRes, cashflowRes] = await Promise.all([
         context.api.get("/phong?limit=100").catch(() => ({ data: [] })),
         context.api.get("/khoan-phai-thu?limit=100").catch(() => ({ data: [] })),
         context.api.get("/v1/debt").catch(() => ({ data: [] })),
         context.api.get("/v1/incidents").catch(() => ({ data: [] })),
         context.api.get("/hop-dong?limit=100").catch(() => ({ data: [] })),
+        context.api.get("/v1/reports/cashflow").catch(() => ({ data: {} })),
       ]);
 
       const roomRows = Array.isArray(roomsRes.data) ? roomsRes.data : [];
@@ -68,6 +69,7 @@ export default {
       const debtRows = Array.isArray(debtRes.data) ? debtRes.data : [];
       const incidentRows = Array.isArray(incidentsRes.data) ? incidentsRes.data : [];
       const contractRows = Array.isArray(contractsRes.data) ? contractsRes.data : [];
+      const cashflow = cashflowRes.data || {};
 
       // Computations
       const totalRooms = roomRows.length;
@@ -77,9 +79,13 @@ export default {
 
       const occRate = totalRooms > 0 ? Math.round((rentedRooms.length / totalRooms) * 100) : 0;
       const due = billRows.reduce((sum, item) => sum + Number(item.tong_phai_tra || 0), 0);
+      const totalRevenue = Number(cashflow.totalRevenue ?? cashflow.totalCollected ?? 0);
+      const grossRevenue = Number(cashflow.grossRevenue ?? totalRevenue);
+      const discounts = Number(cashflow.discounts || 0);
+      const depositDeductions = Number(cashflow.depositDeductions || 0);
       const activeIncidents = incidentRows.filter((item) => item.trang_thai !== "DA_XU_LY");
       const unpaidBills = billRows.filter((item) => item.trang_thai_thanh_toan !== "DA_THANH_TOAN");
-      const avgRevenuePerRoom = rentedRooms.length > 0 ? Math.round(due / rentedRooms.length) : 0;
+      const avgRevenuePerRoom = rentedRooms.length > 0 ? Math.round(totalRevenue / rentedRooms.length) : 0;
 
       // Group rooms by building for Top Buildings
       const buildingsMap = {};
@@ -317,7 +323,7 @@ export default {
                     <span class="monthly-bar-title">Tháng hiện tại <span class="monthly-bar-sub">• ${billRows.length} hóa đơn</span></span>
                     <div class="monthly-bar-val-wrap">
                       <span class="trend-pill trend-pill--up">${icons.trendingUp(12)} +12.5%</span>
-                      <span class="monthly-bar-val">${money(due)}</span>
+                      <span class="monthly-bar-val">${money(totalRevenue)}</span>
                     </div>
                   </div>
                   <div class="monthly-bar-track">
@@ -343,10 +349,11 @@ export default {
               <div class="revenue-mini-grid">
                 <div class="revenue-mini-card revenue-mini-card--blue">
                   <div class="revenue-mini-card__head">
-                    <span class="revenue-mini-card__label">Tổng doanh số</span>
+                    <span class="revenue-mini-card__label">Doanh thu thực nhận</span>
                     <div class="revenue-mini-card__icon">${icons.money(16)}</div>
                   </div>
-                  <div class="revenue-mini-card__val">${money(due)}</div>
+                  <div class="revenue-mini-card__val">${money(totalRevenue)}</div>
+                  <div class="revenue-mini-card__desc">Gộp ${money(grossRevenue)} · giảm ${money(discounts)} · cọc ${money(depositDeductions)}</div>
                 </div>
 
                 <div class="revenue-mini-card revenue-mini-card--green">

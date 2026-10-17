@@ -8,6 +8,7 @@ const {
   BienBanTraPhong,
   HopDong,
   PhongTro,
+  CanTro,
 } = require("../models");
 
 function parseDate(value, field) {
@@ -102,6 +103,16 @@ async function getCashflow(filters) {
       order: [["ngay_quyet_toan", "DESC"]],
     }),
   ]);
+  const buildingIds = [...new Set([
+    ...receipts.map((row) => row.ma_can),
+    ...expenses.map((row) => row.ma_can),
+    ...reports.map((row) => row.hopDong?.phongTro?.ma_can),
+  ].filter(Boolean))];
+  const buildings = buildingIds.length ? await CanTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } } }) : [];
+  return summarizeCashflow({ receipts, expenses, reports, buildings });
+}
+
+function summarizeCashflow({ receipts, expenses, reports, buildings = [] }) {
   const allocations = allocateReceipts(receipts);
   const cashReceipts = receipts.reduce((sum, row) => sum + Number(row.so_tien), 0);
   const grossCashRevenue = allocations.reduce((sum, row) => sum + row.gross, 0);
@@ -126,35 +137,56 @@ async function getCashflow(filters) {
   if (depositDeductions > 0) revenueByType.push({ type: "KHAU_TRU_COC", amount: depositDeductions });
   const expensesByType = Object.values(expenses.reduce((all, row) => { const key = row.loai_khoan_chi; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
   const expenseDetails = expenses.map((row) => ({ source: "CHI_PHI", amount: Number(row.so_tien), date: row.ngay_phat_sinh, expenseId: row.ma_khoan_chi, buildingId: row.ma_can || null, roomId: null, incidentId: row.ma_su_co || null }));
+  const statusByBuilding = new Map(buildings.map((row) => [row.ma_can, row.trang_thai]));
   const comparison = {};
+  const buildingRow = (buildingId) => {
+    const key = buildingId || "TOAN_CHUOI";
+    comparison[key] ||= { buildingId: buildingId || null, revenue: 0, grossRevenue: 0, discounts: 0, depositDeductions: 0, expenses: 0 };
+    return comparison[key];
+  };
   for (const item of allocations) {
-    const key = item.buildingId || "TOAN_CHUOI";
-    comparison[key] = comparison[key] || { buildingId: item.buildingId || null, revenue: 0, grossRevenue: 0, discounts: 0, expenses: 0 };
-    comparison[key].revenue += item.gross - item.discount;
-    comparison[key].grossRevenue = (comparison[key].grossRevenue || 0) + item.gross;
-    comparison[key].discounts += item.discount;
+    const row = buildingRow(item.buildingId);
+    row.revenue += item.gross - item.discount;
+    row.grossRevenue += item.gross;
+    row.discounts += item.discount;
+  }
+  for (const report of reports) {
+    const amount = Math.min(Number(report.tien_coc_ban_dau || 0), Number(report.tong_khoan_khau_tru || 0));
+    if (amount <= 0) continue;
+    const row = buildingRow(report.hopDong?.phongTro?.ma_can || null);
+    row.revenue += amount;
+    row.grossRevenue += amount;
+    row.depositDeductions += amount;
   }
   for (const row of expenses) {
-    const key = row.ma_can || "TOAN_CHUOI";
-    comparison[key] = comparison[key] || { buildingId: row.ma_can || null, revenue: 0, grossRevenue: 0, discounts: 0, expenses: 0 };
-    comparison[key].expenses += Number(row.so_tien);
+    buildingRow(row.ma_can).expenses += Number(row.so_tien);
   }
-  const byBuilding = Object.values(comparison).map((row) => ({ ...row, profit: row.revenue - row.expenses }));
+  const byBuilding = Object.values(comparison).map((row) => ({
+    ...row,
+    inComparison: row.buildingId ? statusByBuilding.get(row.buildingId) === "HOAT_DONG" : false,
+    profit: row.revenue - row.expenses,
+  }));
   const receiptDetails = [
-    ...receipts.map((row) => ({
-      source: "THU_TIEN",
-      amount: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.gross || 0,
+    ...receipts.map((row) => {
+      const allocation = allocations.find((item) => item.receiptId === row.ma_khoan_thu);
+      const grossAmount = allocation?.gross || Number(row.so_tien);
+      const discountAllocated = allocation?.discount || 0;
+      return ({
+      source: "THU_TIEN", amount: grossAmount - discountAllocated, grossAmount, discountAllocated,
       date: row.ngay_ghi_nhan,
       receiptId: row.ma_khoan_thu,
-      snapshotSource: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.snapshotSource || null,
-      snapshotFallback: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.snapshotFallback ?? true,
+      snapshotSource: allocation?.snapshotSource || null,
+      snapshotFallback: allocation?.snapshotFallback ?? true,
       reportId: null,
       roomId: row.giaoDich?.thanhToan?.hopDong?.phongTro?.ma_phong || null,
       buildingId: row.ma_can,
-    })),
+    }); }),
     ...reports.map((row) => ({
       source: "KHAU_TRU_COC",
       amount: Math.min(Number(row.tien_coc_ban_dau || 0), Number(row.tong_khoan_khau_tru || 0)),
+      grossAmount: Math.min(Number(row.tien_coc_ban_dau || 0), Number(row.tong_khoan_khau_tru || 0)),
+      discountAllocated: 0,
+      snapshotSource: null,
       date: row.ngay_quyet_toan,
       receiptId: null,
       reportId: row.ma_bien_ban,
@@ -232,4 +264,4 @@ function allocateReceipts(receipts) {
   return result;
 }
 
-module.exports = { parseDate, buildDateCondition, buildWhere, getCashflow, allocateReceipts };
+module.exports = { parseDate, buildDateCondition, buildWhere, getCashflow, allocateReceipts, summarizeCashflow };
