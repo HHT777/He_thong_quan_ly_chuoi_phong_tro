@@ -1,37 +1,111 @@
-import { listTab } from "../../shared/components/tab-factory.js";
-import { date } from "../../shared/components/view.js";
-export default listTab({ id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "operations", order: 52, roles: ["CHU_TRO"] }, {
-  title: "Trả phòng & thanh lý",
-  description: "Kiểm tra điện, tài sản, công nợ và cọc trước khi thanh lý nguyên khối.",
-  endpoint: "/v1/move-outs",
-  columns: [
-    { label: "Hợp đồng", key: "ma_hop_dong" },
-    { label: "Nội dung", key: "noi_dung" },
-    { label: "Ngày gửi", format: (row) => date(row.ngay_gui) },
-    { label: "Trạng thái", key: "trang_thai" },
-  ],
-  rowActions: [{
-    id: "settle",
-    label: "Quyết toán",
-    visible: (row) => row.trang_thai === "DA_PHE_DUYET" && Boolean(row.ma_hop_dong),
-    fields: [
-      { name: "inspectionDate", label: "Ngày kiểm tra", type: "date", required: true },
-      { name: "finalElectricityReading", label: "Chỉ số điện cuối", type: "number", required: true },
-      { name: "roomCondition", label: "Tình trạng phòng", type: "textarea", required: true },
-      { name: "assetsChecked", label: "Đã kiểm tra tài sản", required: true, options: [{ value: "true", label: "Đã kiểm tra" }, { value: "false", label: "Chưa kiểm tra" }] },
-      { name: "debtReviewed", label: "Đã đối chiếu công nợ", required: true, options: [{ value: "true", label: "Đã đối chiếu" }, { value: "false", label: "Chưa đối chiếu" }] },
-      { name: "deduction", label: "Tổng khấu trừ", type: "number", required: true },
-      { name: "deductionType", label: "Loại khấu trừ khác", options: [{ value: "KHAC", label: "Khác" }, { value: "HU_HONG_TAI_SAN", label: "Hư hỏng tài sản" }, { value: "VI_PHAM_HOP_DONG", label: "Vi phạm hợp đồng" }] },
-      { name: "reason", label: "Ghi chú/lý do", type: "textarea" },
-    ],
-    map: (raw, row) => ({
-      ...raw,
-      assetsChecked: raw.assetsChecked === "true",
-      debtReviewed: raw.debtReviewed === "true",
-      deduction: Number(raw.deduction),
-      finalElectricityReading: Number(raw.finalElectricityReading),
-      moveOutRequestId: row.ma_yeu_cau,
-    }),
-    run: (context, row, values) => context.api.post(`/v1/move-outs/${row.ma_hop_dong}/settle`, values),
-  }],
-});
+import { shellPage, escapeHtml, money, date } from "../../shared/components/view.js";
+import { showToast } from "../../shared/components/toast.js";
+
+const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "operations", order: 52, roles: ["CHU_TRO"] };
+const integerMoney = (value, label) => {
+  if (!/^\d+$/.test(String(value || ""))) throw new Error(`${label} phải là số nguyên không âm.`);
+  return Number(value);
+};
+const localToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+const uuid = () => crypto.randomUUID();
+
+function contextMarkup(data) {
+  const assets = data.assets || [];
+  const incidents = data.pendingIncidentCharges || [];
+  const violations = data.violations || [];
+  return `
+    <div class="panel" data-settlement-context>
+      <h3>Thông tin quyết toán</h3>
+      <div class="summary-grid">
+        <p><strong>Khách:</strong> ${escapeHtml(data.tenant?.ho_ten)}</p>
+        <p><strong>Phòng:</strong> ${escapeHtml(data.room?.so_phong || data.room?.ma_phong)}</p>
+        <p><strong>Tiền cọc:</strong> ${money(data.deposit?.so_tien_coc)}</p>
+        <p><strong>Công nợ:</strong> ${money(data.outstandingDebt)}</p>
+        <p><strong>Chỉ số điện gần nhất:</strong> ${escapeHtml(data.latestElectricityReading?.chi_so_moi)}</p>
+        <p><strong>Ngày trả đã duyệt:</strong> ${date(data.approvedMoveOutDate)}</p>
+      </div>
+      <p class="form-hint">Điện cuối kỳ, tiền phòng tháng lẻ, tiền trả trước được hoàn và kết quả cọc/nợ do server tính khi quyết toán.</p>
+      <form class="form-grid" data-settlement-form>
+        <label>Ngày kiểm tra<input name="inspectionDate" type="date" value="${localToday()}" required></label>
+        <label>Chỉ số điện cuối<input name="finalElectricityReading" type="number" min="0" step="1" required></label>
+        <label>Tình trạng phòng<textarea name="roomCondition" required></textarea></label>
+        <label>Khấu trừ khác (VND)<input name="deduction" type="number" min="0" step="1" value="0" required></label>
+        <label>Lý do khấu trừ khác<textarea name="reason"></textarea></label>
+        <label><input name="assetsChecked" type="checkbox" required> Đã kiểm tra đầy đủ tài sản</label>
+        <label><input name="debtReviewed" type="checkbox" required> Đã đối chiếu công nợ</label>
+        <div class="table-wrap"><table><thead><tr><th>Tài sản</th><th>Hỏng/mất</th><th>Số lượng</th><th>Bồi thường</th><th>Lý do</th></tr></thead><tbody>
+          ${assets.map((asset) => `<tr data-asset-row data-asset-id="${escapeHtml(asset.ma_tai_san)}"><td>${escapeHtml(asset.ten_tai_san)}</td><td><input data-asset-selected type="checkbox"></td><td><input data-asset-quantity type="number" min="1" step="1" value="1"></td><td><input data-asset-amount type="number" min="0" step="1" value="0"></td><td><input data-asset-reason value=""></td></tr>`).join("") || "<tr><td colspan='5'>Không có tài sản</td></tr>"}
+        </tbody></table></div>
+        <div class="panel"><h4>Khoản khách chịu đang chờ</h4>
+          <p>Sự cố: ${incidents.length}; vi phạm: ${violations.length}. Các khoản sự cố do server tự đưa vào quyết toán.</p>
+          ${violations.map((item) => `<label data-violation-row data-violation-id="${escapeHtml(item.ma_vi_pham)}"><input data-violation-selected type="checkbox"> ${escapeHtml(item.noi_dung)} — <input data-violation-amount type="number" min="0" step="1" value="${escapeHtml(item.muc_phat || 0)}"> VND</label>`).join("")}
+        </div>
+        <div class="form-grid__actions"><button class="btn btn--primary" type="submit">Quyết toán</button><span data-settlement-message></span></div>
+      </form>
+    </div>`;
+}
+
+function resultMarkup(result) {
+  const report = result.report || {};
+  const lines = result.snapshot?.lines || [];
+  return `<div class="panel" data-settlement-result>
+    <h3>Biên bản quyết toán</h3>
+    <p>Mã biên bản: <strong>${escapeHtml(report.ma_bien_ban)}</strong></p>
+    <p>Tổng khấu trừ: <strong>${money(result.totalDeduction)}</strong> · Cọc được hoàn: <strong>${money(result.refund)}</strong> · Nợ sau thanh lý: <strong>${money(result.postDebt)}</strong></p>
+    <div class="table-wrap"><table><thead><tr><th>Khoản</th><th>Lý do</th><th>Số tiền</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${escapeHtml(line.type)}</td><td>${escapeHtml(line.reason)}</td><td>${money(line.amount)}</td></tr>`).join("")}</tbody></table></div>
+    <form class="form-grid" data-refund-form data-report-id="${escapeHtml(report.ma_bien_ban)}">
+      <h4>Ghi nhận hoàn cọc thực tế</h4>
+      <label>Ngày hoàn<input name="ngayHoan" type="date" value="${localToday()}" required></label>
+      <label>Số tiền hoàn lần này<input name="soTien" type="number" min="1" step="1" required></label>
+      <div class="form-grid__actions"><button class="btn btn--secondary" type="submit">Ghi nhận hoàn cọc</button><span data-refund-message></span></div>
+    </form>
+  </div>`;
+}
+
+async function render(context) {
+  context.main.innerHTML = shellPage("Trả phòng & thanh lý", "Chọn yêu cầu đã duyệt, kiểm tra context rồi quyết toán và hoàn cọc từng phần.");
+  const content = context.main.querySelector("[data-content]");
+  try {
+    const response = await context.api.get("/v1/move-outs");
+    const rows = (response.data || []).filter((row) => row.trang_thai === "DA_PHE_DUYET" && row.ma_hop_dong);
+    if (!rows.length) { content.innerHTML = '<div class="empty-state"><h4>Không có yêu cầu trả phòng đã duyệt</h4></div>'; return; }
+    content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Hợp đồng</th><th>Nội dung</th><th>Ngày gửi</th><th></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${escapeHtml(row.ma_hop_dong)}</td><td>${escapeHtml(row.noi_dung)}</td><td>${date(row.ngay_gui)}</td><td><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></td></tr>`).join("")}</tbody></table></div><div data-workspace></div>`;
+    const workspace = content.querySelector("[data-workspace]");
+    content.querySelectorAll("[data-open-context]").forEach((button) => button.addEventListener("click", async () => {
+      button.disabled = true; workspace.textContent = "Đang tải dữ liệu quyết toán...";
+      try {
+        const row = rows[Number(button.dataset.openContext)];
+        const details = (await context.api.get(`/v1/move-outs/${row.ma_hop_dong}/context`)).data;
+        workspace.innerHTML = contextMarkup(details);
+        const form = workspace.querySelector("[data-settlement-form]");
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!window.confirm("Quyết toán sẽ thanh lý hợp đồng, chốt công nợ và trả phòng. Bạn chắc chắn tiếp tục?")) return;
+          const submit = form.querySelector("button[type='submit']"); const message = form.querySelector("[data-settlement-message]"); submit.disabled = true;
+          try {
+            const raw = Object.fromEntries(new FormData(form));
+            const assetDeductions = [...form.querySelectorAll("[data-asset-row]")].filter((x) => x.querySelector("[data-asset-selected]").checked).map((x) => ({ assetId: x.dataset.assetId, quantity: integerMoney(x.querySelector("[data-asset-quantity]").value, "Số lượng"), amount: integerMoney(x.querySelector("[data-asset-amount]").value, "Chi phí tài sản"), reason: x.querySelector("[data-asset-reason]").value.trim() }));
+            if (assetDeductions.some((x) => !x.reason)) throw new Error("Tài sản hỏng/mất phải có lý do.");
+            const violationDeductions = [...form.querySelectorAll("[data-violation-row]")].filter((x) => x.querySelector("[data-violation-selected]").checked).map((x) => ({ violationId: x.dataset.violationId, amount: integerMoney(x.querySelector("[data-violation-amount]").value, "Mức phạt") }));
+            const payload = { inspectionDate: raw.inspectionDate, finalElectricityReading: integerMoney(raw.finalElectricityReading, "Chỉ số điện cuối"), roomCondition: raw.roomCondition.trim(), assetsChecked: raw.assetsChecked === "on", debtReviewed: raw.debtReviewed === "on", deduction: integerMoney(raw.deduction, "Khấu trừ khác"), reason: raw.reason.trim() || undefined, assetDeductions, violationDeductions, moveOutRequestId: row.ma_yeu_cau };
+            const settled = (await context.api.post(`/v1/move-outs/${row.ma_hop_dong}/settle`, payload)).data;
+            workspace.innerHTML = resultMarkup(settled);
+            const refundForm = workspace.querySelector("[data-refund-form]"); const refundKey = uuid();
+            refundForm.addEventListener("submit", async (refundEvent) => {
+              refundEvent.preventDefault();
+              if (!window.confirm("Ghi nhận số tiền đã hoàn thực tế? Thao tác này làm tăng tổng tiền cọc đã hoàn.")) return;
+              const refundButton = refundForm.querySelector("button[type='submit']"); const refundMessage = refundForm.querySelector("[data-refund-message]"); refundButton.disabled = true;
+              try { const values = Object.fromEntries(new FormData(refundForm)); await context.api.post(`/v1/move-outs/${refundForm.dataset.reportId}/deposit-refunds`, { ngayHoan: values.ngayHoan, soTien: integerMoney(values.soTien, "Số tiền hoàn"), khoaChongTrung: refundKey }); refundMessage.textContent = "Đã ghi nhận hoàn cọc."; showToast("Đã ghi nhận hoàn cọc.", "success"); }
+              catch (error) { refundMessage.textContent = error.message; showToast(error.message, "error"); }
+              finally { refundButton.disabled = false; }
+            });
+            showToast("Quyết toán thành công.", "success");
+          } catch (error) { message.textContent = error.message; showToast(error.message, "error"); submit.disabled = false; }
+        });
+      } catch (error) { workspace.textContent = error.message; showToast(error.message, "error"); }
+      finally { button.disabled = false; }
+    }));
+  } catch (error) { content.innerHTML = `<div class="empty-state empty-state--error"><h4>Lỗi tải dữ liệu</h4><p>${escapeHtml(error.message)}</p></div>`; }
+}
+
+export default { ...meta, render };
