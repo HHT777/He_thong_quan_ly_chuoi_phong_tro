@@ -33,7 +33,11 @@ function buildDateCondition(from, to) {
   return undefined;
 }
 
-function normalizeFilters(filters = {}) {
+function vietnamMonth(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(now);
+}
+
+function normalizeFilters(filters = {}, now = new Date()) {
   const bad = (code, message) => { throw { status: 400, code, message }; };
   const hasType = filters.periodType !== undefined;
   const hasValue = filters.periodValue !== undefined;
@@ -56,12 +60,11 @@ function normalizeFilters(filters = {}) {
   }
   if (hasDates) return filters;
   // SRS UC-19 / FR-132: default to the current month in Vietnam.
-  const now = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date());
-  return normalizeFilters({ ...filters, periodType: "month", periodValue: now });
+  return normalizeFilters({ ...filters, periodType: "month", periodValue: vietnamMonth(now) }, now);
 }
 
-function buildWhere(filters = {}) {
-  filters = normalizeFilters(filters);
+function buildWhere(filters = {}, now = new Date()) {
+  filters = normalizeFilters(filters, now);
   if (filters.buildingId !== undefined && (typeof filters.buildingId !== "string" || !/^[0-9a-fA-F-]{36}$/.test(filters.buildingId))) {
     throw { status: 400, code: "INVALID_REPORT_BUILDING", message: "Mã căn trọ không hợp lệ" };
   }
@@ -286,4 +289,4 @@ function allocateReceipts(receipts) {
   return result;
 }
 
-module.exports = { parseDate, buildDateCondition, buildWhere, getCashflow, allocateReceipts, summarizeCashflow };
+module.exports = { parseDate, buildDateCondition, buildWhere, vietnamMonth, getCashflow, allocateReceipts, summarizeCashflow };
