@@ -14,5 +14,8 @@ test("FR-195 contract screen pre-fills reservation and transfers only to server-
   assert.match(source, /initialElectricityReading/);
   assert.match(source, /\/transfers/);
   assert.match(source, /escapeHtml\(item\.detail\)/);
+  assert.match(source, /truoc_json/);
+  assert.match(source, /sau_json/);
+  assert.doesNotMatch(source, /cccd_giay_to|mat_khau/);
   assert.doesNotMatch(source, /\bfetch\(/);
 });

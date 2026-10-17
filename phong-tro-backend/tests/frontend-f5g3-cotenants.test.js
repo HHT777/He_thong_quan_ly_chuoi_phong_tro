@@ -12,3 +12,18 @@ test("FR-166 co-tenant screen shows identity, validates rejection and next-perio
   assert.match(source, /không trả đủ thông tin định danh/);
   assert.doesNotMatch(source, /\bfetch\(/);
 });
+
+test("FR-166 generic requests screen does not approve co-tenant proposal without identity detail", () => {
+  const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/residents-contracts/requests.tab.js"), "utf8");
+  assert.match(source, /item\.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG"/);
+  assert.match(source, /Cần đối chiếu hồ sơ định danh/);
+  assert.match(source, /requiredText\(raw\.reason/);
+  assert.doesNotMatch(source, /window\.(alert|prompt|confirm)/);
+});
+
+test("FR-166 resident actions use shared escaped confirmation dialog", () => {
+  const view = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/shared/components/view.js"), "utf8");
+  assert.match(view, /export function confirmAction/);
+  assert.match(view, /\[data-confirm-message\]"\)\.textContent = message/);
+  assert.match(view, /if \(result === false\) return/);
+});

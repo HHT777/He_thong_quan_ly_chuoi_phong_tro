@@ -1,6 +1,20 @@
 import { icons } from "./icons.js";
 import { showToast } from "./toast.js";
 
+export function confirmAction(message) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = '<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Xác nhận thao tác</h3><p data-confirm-message></p><button type="button" data-cancel>Hủy</button> <button type="button" class="btn btn--danger" data-accept>Tiếp tục</button></div>';
+    overlay.querySelector("[data-confirm-message]").textContent = message;
+    const finish = (value) => { overlay.remove(); resolve(value); };
+    overlay.querySelector("[data-cancel]").addEventListener("click", () => finish(false));
+    overlay.querySelector("[data-accept]").addEventListener("click", () => finish(true));
+    overlay.addEventListener("click", (event) => { if (event.target === overlay) finish(false); });
+    document.body.appendChild(overlay);
+  });
+}
+
 export const escapeHtml = (value) =>
   String(value ?? "—").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 
@@ -142,7 +156,8 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
     message.textContent = "Đang lưu...";
     try {
       const raw = Object.fromEntries(new FormData(form));
-      await submit(raw);
+      const result = await submit(raw);
+      if (result === false) return;
       showToast("Đã lưu thành công!", "success");
       close();
     } catch (err) {

@@ -1,4 +1,4 @@
-import { shellPage, escapeHtml, money, date } from "../../shared/components/view.js";
+import { shellPage, escapeHtml, money, date, confirmAction } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 
@@ -77,7 +77,7 @@ async function render(context) {
         const form = workspace.querySelector("[data-settlement-form]");
         form.addEventListener("submit", async (event) => {
           event.preventDefault();
-          if (!window.confirm("Quyết toán sẽ thanh lý hợp đồng, chốt công nợ và trả phòng. Bạn chắc chắn tiếp tục?")) return;
+          if (!await confirmAction("Quyết toán sẽ thanh lý hợp đồng, chốt công nợ và trả phòng. Bạn chắc chắn tiếp tục?")) return;
           const submit = form.querySelector("button[type='submit']"); const message = form.querySelector("[data-settlement-message]"); submit.disabled = true;
           try {
             const raw = Object.fromEntries(new FormData(form));
@@ -90,7 +90,7 @@ async function render(context) {
             const refundForm = workspace.querySelector("[data-refund-form]");
             refundForm.addEventListener("submit", async (refundEvent) => {
               refundEvent.preventDefault();
-              if (!window.confirm("Ghi nhận số tiền đã hoàn thực tế? Thao tác này làm tăng tổng tiền cọc đã hoàn.")) return;
+              if (!await confirmAction("Ghi nhận số tiền đã hoàn thực tế? Thao tác này làm tăng tổng tiền cọc đã hoàn.")) return;
               const refundButton = refundForm.querySelector("button[type='submit']"); const refundMessage = refundForm.querySelector("[data-refund-message]"); refundButton.disabled = true;
               const scope = `refund:${refundForm.dataset.reportId}`;
               try { const values = Object.fromEntries(new FormData(refundForm)); const identity = { reportId: refundForm.dataset.reportId, ngayHoan: requiredText(values.ngayHoan, "Ngày hoàn"), soTien: integerVnd(values.soTien, "Số tiền hoàn", { positive: true }) }; await context.api.post(`/v1/move-outs/${refundForm.dataset.reportId}/deposit-refunds`, { ngayHoan: identity.ngayHoan, soTien: identity.soTien, khoaChongTrung: requestKeys.keyFor(scope, identity) }); requestKeys.complete(scope); refundMessage.textContent = "Đã ghi nhận hoàn cọc."; showToast("Đã ghi nhận hoàn cọc.", "success"); }

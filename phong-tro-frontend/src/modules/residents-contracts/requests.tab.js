@@ -1,6 +1,34 @@
-import { shellPage, escapeHtml, date } from "../../shared/components/view.js";
-export default { id: "requests", route: "/residents-contracts/requests", title: "Yêu cầu cư dân", tabLabel: "Yêu cầu", group: "residents-contracts", order: 34, roles: ["CHU_TRO"], async render(context) {
-  context.main.innerHTML = shellPage("Yêu cầu cư dân", "Duyệt gia hạn hoặc trả phòng. Việc duyệt sẽ tự động cập nhật nghiệp vụ liên quan."); const content = context.main.querySelector("[data-content]");
-  try { const { data = [] } = await context.api.get("/v1/requests"); content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Loại</th><th>Nội dung</th><th>Ngày gửi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${data.map((item) => `<tr><td>${escapeHtml(item.loai_yeu_cau)}</td><td>${escapeHtml(item.noi_dung)}</td><td>${date(item.ngay_gui)}</td><td>${escapeHtml(item.trang_thai)}</td><td>${item.trang_thai === "CHO_XU_LY" ? `<button class="btn btn--primary" data-approve="${item.ma_yeu_cau}">Duyệt</button> <button class="btn" data-reject="${item.ma_yeu_cau}">Từ chối</button>` : item.loai_yeu_cau === "TRA_PHONG" && item.trang_thai === "DA_PHE_DUYET" ? `<button class="btn" data-revoke="${item.ma_yeu_cau}">Rút duyệt</button>` : "—"}</td></tr>`).join("")}</tbody></table></div>`; content.querySelectorAll("[data-approve],[data-reject]").forEach((button) => button.addEventListener("click", async () => { button.disabled = true; try { await context.api.patch(`/v1/requests/${button.dataset.approve || button.dataset.reject}`, { status: button.dataset.approve ? "DA_PHE_DUYET" : "TU_CHOI" }); await this.render(context); } catch (error) { window.alert(error.message); button.disabled = false; } })); content.querySelectorAll("[data-revoke]").forEach((button) => button.addEventListener("click", async () => { const reason = window.prompt("Nhập lý do rút duyệt yêu cầu trả phòng:")?.trim(); if (!reason) return window.alert("Lý do rút duyệt là bắt buộc."); button.disabled = true; try { await context.api.post(`/v1/requests/${button.dataset.revoke}/revoke`, { reason }); await this.render(context); } catch (error) { window.alert(error.message); button.disabled = false; } })); }
-  catch (error) { content.innerHTML = `<div class="empty-state empty-state--error">${escapeHtml(error.message)}</div>`; }
-} };
+import { shellPage, escapeHtml, date, openFormModal, confirmAction } from "../../shared/components/view.js";
+import { requiredText } from "../../core/idempotency.js";
+
+export default {
+  id: "requests", route: "/residents-contracts/requests", title: "Yêu cầu cư dân", tabLabel: "Yêu cầu", group: "residents-contracts", order: 34, roles: ["CHU_TRO"],
+  async render(context) {
+    context.main.innerHTML = shellPage("Yêu cầu cư dân", "Duyệt gia hạn, trả phòng và đề xuất người ở cùng sau khi đối chiếu thông tin.");
+    const content = context.main.querySelector("[data-content]");
+    try {
+      const { data = [] } = await context.api.get("/v1/requests");
+      content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Loại</th><th>Nội dung</th><th>Ngày gửi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${data.map((item, index) => `<tr><td>${escapeHtml(item.loai_yeu_cau)}</td><td>${escapeHtml(item.noi_dung)}</td><td>${escapeHtml(date(item.ngay_gui))}</td><td>${escapeHtml(item.trang_thai)}</td><td>${item.trang_thai === "CHO_XU_LY" ? `${item.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" ? "Cần đối chiếu hồ sơ định danh trước khi duyệt" : `<button data-approve="${index}">Duyệt</button>`} <button data-reject="${index}">Từ chối</button>` : item.loai_yeu_cau === "TRA_PHONG" && item.trang_thai === "DA_PHE_DUYET" ? `<button data-revoke="${index}">Rút duyệt</button>` : "—"}</td></tr>`).join("")}</tbody></table></div><p data-message role="status"></p>`;
+      const message = content.querySelector("[data-message]");
+      content.addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-approve],[data-reject],[data-revoke]"); if (!button) return;
+        const row = data[Number(button.dataset.approve ?? button.dataset.reject ?? button.dataset.revoke)];
+        if (button.dataset.approve != null) {
+          if (!await confirmAction(`Duyệt yêu cầu ${row.loai_yeu_cau}?`)) return;
+          button.disabled = true;
+          try { await context.api.patch(`/v1/requests/${encodeURIComponent(row.ma_yeu_cau)}`, { status: "DA_PHE_DUYET" }); await this.render(context); }
+          catch (error) { message.textContent = error.message; button.disabled = false; }
+          return;
+        }
+        const revoke = button.dataset.revoke != null;
+        openFormModal({ title: revoke ? "Rút duyệt trả phòng" : "Từ chối yêu cầu", fields: [{ name: "reason", label: "Lý do", type: "textarea", required: true }], submit: async (raw) => {
+          const reason = requiredText(raw.reason, "Lý do");
+          if (!await confirmAction(revoke ? "Rút duyệt sẽ hoàn trạng thái yêu cầu và phòng. Tiếp tục?" : "Từ chối yêu cầu này?")) return false;
+          if (revoke) await context.api.post(`/v1/requests/${encodeURIComponent(row.ma_yeu_cau)}/revoke`, { reason });
+          else await context.api.patch(`/v1/requests/${encodeURIComponent(row.ma_yeu_cau)}`, { status: "TU_CHOI", reason });
+          await this.render(context);
+        } });
+      });
+    } catch (error) { content.innerHTML = `<div class="empty-state empty-state--error">${escapeHtml(error.message)}</div>`; }
+  },
+};

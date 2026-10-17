@@ -1,4 +1,4 @@
-import { shellPage, escapeHtml, date, money } from "../../shared/components/view.js";
+import { shellPage, escapeHtml, date, money, confirmAction } from "../../shared/components/view.js";
 import { openFormModal } from "../../shared/components/view.js";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
 
@@ -40,7 +40,7 @@ export default {
           title: "Hủy giữ phòng và ghi nhận hoàn tiền", submitLabel: "Xác nhận hủy",
           fields: [{ name: "refundAmount", label: `Tiền hoàn (tiền đã giữ: ${money(row.so_tien_giu)})`, type: "number", value: row.so_tien_giu, required: true }, { name: "reason", label: "Lý do hủy", type: "textarea", required: true }],
           submit: async (raw) => {
-            if (!window.confirm("Hủy giữ phòng sẽ giải phóng phòng và ghi nhận phần tiền không hoàn là doanh thu. Tiếp tục?")) return;
+            if (!await confirmAction("Hủy giữ phòng sẽ giải phóng phòng và ghi nhận phần tiền không hoàn là doanh thu. Tiếp tục?")) return false;
             const refundAmount = integerVnd(raw.refundAmount, "Tiền hoàn");
             button.disabled = true;
             try { const result = await context.api.post(`/v1/reservations/${encodeURIComponent(row.ma_dat_giu)}/cancel`, { refundAmount, reason: requiredText(raw.reason, "Lý do hủy") }); message.textContent = `Đã hủy; tiền hoàn theo server: ${money(result.data.so_tien_hoan)}.`; await this.render(context); }

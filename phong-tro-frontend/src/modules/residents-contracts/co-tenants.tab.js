@@ -1,4 +1,4 @@
-import { shellPage, escapeHtml, date, openFormModal } from "../../shared/components/view.js";
+import { shellPage, escapeHtml, date, openFormModal, confirmAction } from "../../shared/components/view.js";
 import { requiredText } from "../../core/idempotency.js";
 
 const nextPeriod = () => {
@@ -26,7 +26,7 @@ export default {
           const row = members[Number(button.dataset.leave)];
           return openFormModal({ title: "Đánh dấu rời phòng", submitLabel: "Xác nhận rời", fields: [{ name: "leaveDate", label: "Ngày hiệu lực (kỳ kế tiếp)", type: "date", required: true }], initial: { leaveDate: nextPeriod() }, submit: async (raw) => {
             if (raw.leaveDate < nextPeriod()) throw new Error("Ngày rời phải từ kỳ nước kế tiếp.");
-            if (!window.confirm(`Người ở cùng rời phòng từ ${raw.leaveDate}; tiền nước thay đổi từ kỳ ${raw.leaveDate.slice(0, 7)}. Tiếp tục?`)) return;
+            if (!await confirmAction(`Người ở cùng rời phòng từ ${raw.leaveDate}; tiền nước thay đổi từ kỳ ${raw.leaveDate.slice(0, 7)}. Tiếp tục?`)) return false;
             await context.api.patch(`/v1/co-tenants/${encodeURIComponent(row.ma_thanh_vien_phong)}`, { status: "DA_ROI", leaveDate: raw.leaveDate }); await this.render(context);
           } });
         }

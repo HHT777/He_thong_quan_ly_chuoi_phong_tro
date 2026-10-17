@@ -97,7 +97,7 @@ test("FR-186 frontend exposes owner revoke with a reason and no tenant withdraw 
 
   assert.doesNotMatch(frontendSource, /\/withdraw\b/);
   assert.match(ownerRequestSource, /data-revoke/);
-  assert.match(ownerRequestSource, /\/v1\/requests\/\$\{button\.dataset\.revoke\}\/revoke/);
-  assert.match(ownerRequestSource, /prompt\([^)]*lý do rút duyệt/i);
+  assert.match(ownerRequestSource, /\/v1\/requests\/\$\{encodeURIComponent\(row\.ma_yeu_cau\)\}\/revoke/);
+  assert.match(ownerRequestSource, /requiredText\(raw\.reason/);
   assert.match(legacyOwnerSource, /\/v1\/requests\/\$\{item\.ma_yeu_cau\}\/revoke/);
 });

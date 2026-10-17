@@ -1,14 +1,19 @@
 import { listTab } from "../../shared/components/tab-factory.js";
-import { date, money, openFormModal, escapeHtml } from "../../shared/components/view.js";
+import { date, money, openFormModal, escapeHtml, confirmAction } from "../../shared/components/view.js";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
 const reservationPrefill = () => {
   try { return JSON.parse(sessionStorage.getItem("qlpt:contract-reservation") || "null"); } catch (_) { return null; }
 };
 const safeHistory = (item) => {
   const row = item.data || {};
-  const type = { CHANGE: "Sửa hợp đồng", RENEWAL: "Gia hạn", ROOM_TRANSFER: "Chuyển phòng" }[item.type] || "Lịch sử";
-  const fields = item.type === "RENEWAL" ? ["ngay_ket_thuc_cu", "ngay_ket_thuc_moi", "so_thang"] : item.type === "ROOM_TRANSFER" ? ["ma_phong_cu", "ma_phong_moi", "ngay_chuyen"] : ["du_lieu_truoc", "du_lieu_sau"];
-  return { type, date: date(item.occurredAt), detail: fields.map((key) => `${key}: ${typeof row[key] === "object" ? "(đã thay đổi)" : row[key] ?? "—"}`).join(" · ") };
+  const parse = (value) => { try { return typeof value === "string" ? JSON.parse(value) : value || {}; } catch (_) { return {}; } };
+  const before = parse(row.truoc_json);
+  const afterEnvelope = parse(row.sau_json);
+  const after = parse(afterEnvelope.contract || afterEnvelope);
+  const type = item.type === "CHANGE" ? ({ CREATE: "Tạo hợp đồng", UPDATE: "Sửa hợp đồng", LIQUIDATE: "Thanh lý" }[afterEnvelope.action] || "Sửa hợp đồng") : ({ RENEWAL: "Gia hạn", ROOM_TRANSFER: "Chuyển phòng" }[item.type] || "Lịch sử");
+  const keys = ["ngay_bat_dau", "ngay_ket_thuc", "gia_thue", "ma_phong", "trang_thai", "don_gia_dien", "don_gia_nuoc"];
+  const detail = item.type === "CHANGE" ? keys.filter((key) => before[key] !== after[key] && (before[key] != null || after[key] != null)).map((key) => `${key}: ${before[key] ?? "—"} → ${after[key] ?? "—"}`).join(" · ") : item.type === "RENEWAL" ? `${row.ngay_ket_thuc_cu} → ${row.ngay_ket_thuc_moi} (${row.so_thang} tháng)` : `${row.ma_phong_cu} → ${row.ma_phong_moi} (${row.ngay_chuyen})`;
+  return { type, date: date(item.occurredAt), detail };
 };
 const numericContractValues = (raw) => ({
   ...raw,
@@ -69,7 +74,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
         { name: "newRent", label: "Giá thuê mới", type: "number", required: true },
         { name: "reason", label: "Lý do", type: "textarea", required: true },
       ], initial: { newRent: row.gia_thue }, submit: async (raw) => {
-        if (!window.confirm("Chuyển phòng sẽ chốt điện phòng cũ và cập nhật hợp đồng. Tiếp tục?")) return;
+        if (!await confirmAction("Chuyển phòng sẽ chốt điện phòng cũ và cập nhật hợp đồng. Tiếp tục?")) return false;
         await context.api.post(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/transfers`, { targetRoomId: raw.targetRoomId, transferDate: raw.transferDate, finalElectricityReading: integerVnd(raw.finalElectricityReading, "Chỉ số cuối"), initialElectricityReading: integerVnd(raw.initialElectricityReading, "Chỉ số đầu"), newRent: integerVnd(raw.newRent, "Giá thuê mới", { positive: true }), reason: requiredText(raw.reason, "Lý do") });
       } });
     },
