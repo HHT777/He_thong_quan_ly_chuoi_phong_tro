@@ -1,3 +1,92 @@
-import { listTab } from "../../shared/components/tab-factory.js";
-import { money } from "../../shared/components/view.js";
-export default listTab({ id: "bills", route: "/finance/bills", title: "Hóa đơn", tabLabel: "Hóa đơn", group: "finance", order: 40, roles: ["CHU_TRO"] }, { title: "Hóa đơn", description: "Khoản phải thu theo kỳ và phòng.", endpoint: "/khoan-phai-thu?limit=100", columns: [{ label: "Khách thuê", format: (row) => row.hopDong?.khachThue?.ho_ten || "—" }, { label: "Kỳ", format: (row) => `${row.thang || "—"}/${row.nam || "—"}` }, { label: "Phải trả", format: (row) => money(row.tong_phai_tra) }, { label: "Còn nợ", format: (row) => money(row.so_tien_con_no) }, { label: "Trạng thái", key: "trang_thai" }] });
+import { shellPage, escapeHtml, money, date } from "../../shared/components/view.js";
+import { showToast } from "../../shared/components/toast.js";
+
+const meta = { id: "bills", route: "/finance/bills", title: "Phiếu thu", tabLabel: "Phiếu thu", group: "finance", order: 40, roles: ["CHU_TRO"] };
+const keys = new Map();
+const retryKey = (scope) => { if (!keys.has(scope)) keys.set(scope, crypto.randomUUID()); return keys.get(scope); };
+const clearKey = (scope) => keys.delete(scope);
+const integer = (value, label, { positive = false, signed = false } = {}) => {
+  const pattern = signed ? /^-?\d+$/ : /^\d+$/;
+  if (!pattern.test(String(value || ""))) throw new Error(`${label} phải là số nguyên${signed ? "" : " không âm"}.`);
+  const result = Number(value);
+  if (signed && result === 0) throw new Error(`${label} phải khác 0.`);
+  if (positive && result <= 0) throw new Error(`${label} phải lớn hơn 0.`);
+  return result;
+};
+const periodNow = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+
+const lineTable = (lines = []) => `<div class="table-wrap"><table><thead><tr><th>Loại</th><th>Diễn giải</th><th>Số tiền</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${escapeHtml(line.loai_khoan)}</td><td>${escapeHtml(line.dien_giai)}</td><td>${money(line.so_tien)}</td></tr>`).join("") || "<tr><td colspan='3'>Không có chi tiết</td></tr>"}</tbody></table></div>`;
+
+function billRows(rows) {
+  return `<div class="table-wrap"><table><thead><tr><th>Phòng/khách</th><th>Kỳ</th><th>Phải trả</th><th>Còn nợ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows.map((row, index) => `<tr>
+    <td>${escapeHtml(row.hopDong?.phongTro?.so_phong)} · ${escapeHtml(row.hopDong?.khachThue?.ho_ten)}</td><td>${escapeHtml(String(row.thang).padStart(2, "0"))}/${escapeHtml(row.nam)}</td><td>${money(row.tong_phai_tra)}</td><td>${money(row.so_tien_con_no)}</td><td>${escapeHtml(row.trang_thai)}</td>
+    <td><div class="table-actions"><button class="btn btn--secondary" data-bill-action="detail" data-index="${index}">Chi tiết</button><button class="btn btn--secondary" data-bill-action="adjust" data-index="${index}">Điều chỉnh</button><button class="btn btn--secondary" data-bill-action="pay" data-index="${index}">Ghi nhận thu</button><button class="btn btn--primary" data-bill-action="paid" data-index="${index}">Đã đóng</button></div></td>
+  </tr>`).join("") || "<tr><td colspan='6'>Không có phiếu thu</td></tr>"}</tbody></table></div>`;
+}
+
+function previewMarkup(result) {
+  return `<div class="panel"><h3>Kết quả xem trước</h3>
+    ${(result.previews || []).map((item) => `<article class="panel"><strong>${escapeHtml(item.contractId || item.ma_hop_dong)}</strong><p>Tổng do server tính: ${money(item.total)}</p>${lineTable(Object.entries(item.components || {}).map(([key, value]) => ({ loai_khoan: key, dien_giai: key, so_tien: value })))}</article>`).join("") || "<p>Không có hợp đồng đủ điều kiện.</p>"}
+    <h4>Phòng/hợp đồng bị bỏ qua</h4><ul>${(result.skipped || []).map((item) => `<li>${escapeHtml(item.contractId || item.ma_hop_dong)}: ${escapeHtml(item.reason || item.message || item.code)}</li>`).join("") || "<li>Không có</li>"}</ul>
+  </div>`;
+}
+
+function definitionForm(initial = {}) {
+  return `<form class="panel form-grid" data-definition-form data-id="${escapeHtml(initial.ma_khoan_dieu_chinh || "")}"><h3>${initial.ma_khoan_dieu_chinh ? "Sửa" : "Tạo"} khoản điều chỉnh</h3>
+    <label>Hợp đồng<input name="contractId" value="${escapeHtml(initial.ma_hop_dong || "")}" ${initial.ma_khoan_dieu_chinh ? "readonly" : "required"}></label>
+    <label>Loại<select name="type"><option value="PHI_PHAT_SINH" ${initial.loai_khoan === "PHI_PHAT_SINH" ? "selected" : ""}>Khoản tăng</option><option value="GIAM_TRU" ${initial.loai_khoan === "GIAM_TRU" ? "selected" : ""}>Giảm trừ</option></select></label>
+    <label>Tên/lý do<input name="name" value="${escapeHtml(initial.ten_ly_do || "")}" required></label>
+    <label>Số tiền<input name="amount" type="number" min="1" step="1" value="${escapeHtml(initial.so_tien || "")}" required></label>
+    <label>Chế độ<select name="mode"><option value="THEO_KY" ${initial.che_do === "THEO_KY" ? "selected" : ""}>Theo kỳ</option><option value="CO_DINH" ${initial.che_do === "CO_DINH" ? "selected" : ""}>Cố định</option></select></label>
+    <label>Kỳ áp dụng<input name="period" type="month" value="${initial.nam_ap_dung ? `${initial.nam_ap_dung}-${String(initial.thang_ap_dung).padStart(2, "0")}` : periodNow()}"></label>
+    <label>Ngày bắt đầu<input name="startDate" type="date" value="${escapeHtml(initial.ngay_bat_dau || "")}"></label>
+    <div class="form-grid__actions"><button class="btn btn--primary" type="submit">Lưu khoản điều chỉnh</button><span data-message></span></div>
+  </form>`;
+}
+
+async function render(context) {
+  context.main.innerHTML = shellPage("Phiếu thu", "Xem trước, lập phiếu, điều chỉnh và ghi nhận thanh toán theo kỳ.");
+  const content = context.main.querySelector("[data-content]");
+  content.innerHTML = `<div class="panel form-grid">
+    <label>Kỳ<input data-period type="month" value="${periodNow()}"></label><label>Căn<select data-building><option value="">Chọn căn</option></select></label>
+    <div data-contracts></div><div class="form-grid__actions"><button class="btn btn--secondary" data-preview>Xem trước</button><button class="btn btn--primary" data-generate>Lập phiếu</button><button class="btn btn--secondary" data-mark-all>Tất cả đã đóng</button></div><span data-main-message></span>
+  </div><div data-preview-result></div><div data-bills>Đang tải phiếu thu...</div><div data-bill-workspace></div>
+  <section class="panel"><div class="form-grid__actions"><h3>Khoản điều chỉnh định kỳ</h3><button class="btn btn--secondary" data-new-definition>Tạo khoản</button></div><div data-definitions></div><div data-definition-workspace></div></section>
+  <section class="panel"><h3>Các lần thu</h3><div data-payments></div></section>`;
+  const message = content.querySelector("[data-main-message]"); const workspace = content.querySelector("[data-bill-workspace]");
+  let bills = []; let definitions = []; let payments = [];
+  const [contractsResponse, buildingsResponse] = await Promise.all([context.api.get("/hop-dong?limit=100"), context.api.get("/management/can-tro?limit=100")]);
+  const contracts = contractsResponse.data || []; const buildings = buildingsResponse.data || [];
+  content.querySelector("[data-building]").innerHTML += buildings.map((x) => `<option value="${escapeHtml(x.ma_can)}">${escapeHtml(x.ten_can || x.dia_chi || x.ma_can)}</option>`).join("");
+  content.querySelector("[data-contracts]").innerHTML = `<strong>Hợp đồng/phòng</strong><div class="checkbox-grid">${contracts.filter((x) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(x.trang_thai)).map((x) => `<label><input data-contract-id type="checkbox" value="${escapeHtml(x.ma_hop_dong)}"> ${escapeHtml(x.phongTro?.so_phong)} · ${escapeHtml(x.khachThue?.ho_ten)}</label>`).join("")}</div>`;
+  const selectedContracts = () => [...content.querySelectorAll("[data-contract-id]:checked")].map((x) => x.value);
+  const refresh = async () => {
+    const [billResponse, definitionResponse, paymentResponse] = await Promise.all([context.api.get("/khoan-phai-thu?limit=100"), context.api.get("/v1/billing-adjustments"), context.api.get("/khoan-phai-thu/payment/list?limit=100")]);
+    bills = billResponse.data || []; definitions = definitionResponse.data || []; payments = paymentResponse.data || [];
+    content.querySelector("[data-bills]").innerHTML = billRows(bills);
+    content.querySelector("[data-definitions]").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Hợp đồng</th><th>Loại</th><th>Tên</th><th>Số tiền</th><th>Chế độ</th><th>Trạng thái</th><th></th></tr></thead><tbody>${definitions.map((x, i) => `<tr><td>${escapeHtml(x.ma_hop_dong)}</td><td>${escapeHtml(x.loai_khoan)}</td><td>${escapeHtml(x.ten_ly_do)}</td><td>${money(x.so_tien)}</td><td>${escapeHtml(x.che_do)}</td><td>${escapeHtml(x.trang_thai)}</td><td><button data-definition-edit="${i}">Sửa</button> <button data-definition-toggle="${i}">${x.trang_thai === "DANG_AP_DUNG" ? "Tắt" : "Bật"}</button></td></tr>`).join("")}</tbody></table></div>`;
+    content.querySelector("[data-payments]").innerHTML = `<div class="table-wrap"><table><thead><tr><th>Giao dịch</th><th>Số tiền</th><th>Ngày</th><th>Nguồn</th><th>Trạng thái</th><th></th></tr></thead><tbody>${payments.map((x, i) => `<tr><td>${escapeHtml(x.ma_giao_dich)}</td><td>${money(x.so_tien)}</td><td>${date(x.thoi_diem_ghi_nhan)}</td><td>${escapeHtml(x.nguon_thanh_toan)}</td><td>${escapeHtml(x.trang_thai_xac_nhan)}</td><td>${x.trang_thai_xac_nhan === "DA_XAC_NHAN" ? `<button data-payment-cancel="${i}">Hủy lần thu</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    bindRows();
+  };
+  const run = async (button, task, success) => { button.disabled = true; message.textContent = "Đang xử lý..."; try { await task(); message.textContent = success; showToast(success, "success"); await refresh(); } catch (error) { message.textContent = error.message; showToast(error.message, "error"); } finally { button.disabled = false; } };
+  content.querySelector("[data-preview]").addEventListener("click", async (event) => run(event.currentTarget, async () => { const result = await context.api.post("/v1/bills/preview", { period: content.querySelector("[data-period]").value, contractIds: selectedContracts() }); content.querySelector("[data-preview-result]").innerHTML = previewMarkup(result.data); }, "Đã xem trước, chưa ghi dữ liệu."));
+  content.querySelector("[data-generate]").addEventListener("click", async (event) => run(event.currentTarget, async () => { const result = await context.api.post("/v1/bills/generate", { period: content.querySelector("[data-period]").value, contractIds: selectedContracts() }); content.querySelector("[data-preview-result]").innerHTML = `<div class="panel"><h3>Kết quả lập phiếu</h3><p>Đã lập: ${escapeHtml(result.data.created?.length || 0)}.</p>${previewMarkup({ previews: [], skipped: result.data.skipped || [] })}</div>`; }, "Đã hoàn tất lập phiếu."));
+  content.querySelector("[data-mark-all]").addEventListener("click", async (event) => { const button = event.currentTarget; const buildingId = content.querySelector("[data-building]").value; const period = content.querySelector("[data-period]").value; if (!buildingId) { message.textContent = "Phải chọn căn."; return; } if (!window.confirm("Thu tất cả sẽ ghi nhận toàn bộ dư nợ định kỳ của căn/kỳ là đã đóng. Tiếp tục?")) return; const scope = `all:${buildingId}:${period}`; button.disabled = true; try { const result = await context.api.post("/v1/bills/mark-all-paid", { buildingId, period }, { "Idempotency-Key": retryKey(scope) }); const inScope = bills.filter((bill) => bill.hopDong?.phongTro?.ma_can === buildingId && `${bill.nam}-${String(bill.thang).padStart(2, "0")}` === period); const alreadyPaid = inScope.filter((bill) => Number(bill.so_tien_con_no) <= 0).length; message.textContent = `Đã thu: ${result.data.processed}; đã đóng trước đó: ${alreadyPaid}; bỏ qua: ${Math.max(0, inScope.length - alreadyPaid - result.data.processed)}.`; clearKey(scope); showToast("Hoàn tất thu tất cả.", "success"); await refresh(); } catch (error) { message.textContent = error.message; showToast(error.message, "error"); } finally { button.disabled = false; } });
+  function bindRows() {
+    content.querySelectorAll("[data-bill-action]").forEach((button) => button.addEventListener("click", () => {
+      const row = bills[Number(button.dataset.index)]; const action = button.dataset.billAction;
+      if (action === "detail") workspace.innerHTML = `<div class="panel"><h3>Chi tiết phiếu ${escapeHtml(row.ma_thanh_toan)}</h3>${lineTable(row.chiTiets)}</div>`;
+      if (action === "adjust") { workspace.innerHTML = `<form class="panel form-grid" data-adjust-form><h3>Điều chỉnh tăng/giảm</h3><label>Chênh lệch VND<input name="delta" type="number" step="1" required></label><label>Lý do<textarea name="reason" required></textarea></label><button class="btn btn--primary">Lưu điều chỉnh</button><span data-message></span></form>`; workspace.querySelector("form").addEventListener("submit", async (event) => { event.preventDefault(); const form = event.currentTarget; const submit = form.querySelector("button"); submit.disabled = true; try { const raw = Object.fromEntries(new FormData(form)); await context.api.post(`/v1/bills/${row.ma_thanh_toan}/adjustments`, { delta: integer(raw.delta, "Chênh lệch", { signed: true }), reason: raw.reason.trim() }); showToast("Đã điều chỉnh phiếu.", "success"); await refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.status === 409 ? `Không thể giảm phiếu: ${error.message}` : error.message; } finally { submit.disabled = false; } }); }
+      if (action === "pay") { const scope = `pay:${row.ma_thanh_toan}`; workspace.innerHTML = `<form class="panel form-grid" data-pay-form><h3>Ghi nhận thanh toán</h3><label>Ngày thanh toán<input name="ngay_thanh_toan" type="date" required></label><label>Số tiền<input name="so_tien" type="number" min="1" step="1" required></label><label>Phương thức<input name="phuong_thuc" required></label><label>Ghi chú<textarea name="ghi_chu"></textarea></label><button class="btn btn--primary">Ghi nhận</button><span data-message></span></form>`; workspace.querySelector("form").addEventListener("submit", async (event) => { event.preventDefault(); const form = event.currentTarget; const submit = form.querySelector("button"); submit.disabled = true; try { const raw = Object.fromEntries(new FormData(form)); await context.api.post("/khoan-phai-thu/payment/create", { ma_khoan_phai_thu: row.ma_thanh_toan, ngay_thanh_toan: raw.ngay_thanh_toan, so_tien: integer(raw.so_tien, "Số tiền", { positive: true }), phuong_thuc: raw.phuong_thuc, ghi_chu: raw.ghi_chu || undefined }, { "Idempotency-Key": retryKey(scope) }); clearKey(scope); showToast("Đã ghi nhận thanh toán.", "success"); workspace.textContent = ""; await refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; } finally { submit.disabled = false; } }); }
+      if (action === "paid") { if (!window.confirm("Ghi nhận toàn bộ số tiền còn nợ của phiếu là đã đóng?")) return; const scope = `paid:${row.ma_thanh_toan}`; run(button, async () => { await context.api.post(`/v1/bills/${row.ma_thanh_toan}/mark-paid`, {}, { "Idempotency-Key": retryKey(scope) }); clearKey(scope); }, "Phiếu đã được ghi nhận đóng."); }
+    }));
+    content.querySelectorAll("[data-payment-cancel]").forEach((button) => button.addEventListener("click", () => { const payment = payments[Number(button.dataset.paymentCancel)]; if (payment.nguon_thanh_toan === "KHAU_TRU_COC") { showToast("Khoản khấu trừ cọc không được phép hủy.", "error"); return; } workspace.innerHTML = `<form class="panel form-grid" data-cancel-form><h3>Hủy lần thu</h3><p>Khoản thu sẽ bị loại khỏi doanh thu và dư nợ của phiếu được mở lại.</p><label>Lý do hủy<textarea name="reason" required></textarea></label><button class="btn btn--danger">Xác nhận hủy</button><span data-message></span></form>`; workspace.querySelector("form").addEventListener("submit", async (event) => { event.preventDefault(); const form = event.currentTarget; const reason = new FormData(form).get("reason")?.trim(); if (!reason || !window.confirm("Xác nhận hủy lần thu này?")) return; await run(form.querySelector("button"), () => context.api.post(`/v1/payments/${payment.ma_giao_dich}/cancel`, { reason }), "Đã hủy lần thu."); workspace.textContent = ""; }); }));
+    content.querySelectorAll("[data-definition-edit]").forEach((button) => button.addEventListener("click", () => bindDefinition(definitions[Number(button.dataset.definitionEdit)])));
+    content.querySelectorAll("[data-definition-toggle]").forEach((button) => button.addEventListener("click", async () => { const row = definitions[Number(button.dataset.definitionToggle)]; const enabled = row.trang_thai !== "DANG_AP_DUNG"; if (enabled) { await run(button, () => context.api.post(`/v1/billing-adjustments/${row.ma_khoan_dieu_chinh}/toggle`, { enabled: true }), "Đã bật khoản điều chỉnh."); return; } const target = content.querySelector("[data-definition-workspace]"); target.innerHTML = `<form class="panel form-grid" data-disable-definition><h3>Tắt khoản điều chỉnh</h3><label>Lý do<textarea name="reason" required></textarea></label><button class="btn btn--danger">Xác nhận tắt</button><span data-message></span></form>`; target.querySelector("form").addEventListener("submit", async (event) => { event.preventDefault(); const form = event.currentTarget; const reason = new FormData(form).get("reason")?.trim(); if (!reason) return; await run(form.querySelector("button"), () => context.api.post(`/v1/billing-adjustments/${row.ma_khoan_dieu_chinh}/toggle`, { enabled: false, reason }), "Đã tắt khoản điều chỉnh."); target.textContent = ""; }); }));
+  }
+  function bindDefinition(initial = {}) { const target = content.querySelector("[data-definition-workspace]"); target.innerHTML = definitionForm(initial); const form = target.querySelector("form"); form.addEventListener("submit", async (event) => { event.preventDefault(); const submit = form.querySelector("button"); submit.disabled = true; try { const raw = Object.fromEntries(new FormData(form)); const body = { contractId: raw.contractId, type: raw.type, name: raw.name.trim(), amount: integer(raw.amount, "Số tiền", { positive: true }), mode: raw.mode, period: raw.period || undefined, startDate: raw.startDate || undefined }; if (form.dataset.id) await context.api.patch(`/v1/billing-adjustments/${form.dataset.id}`, body); else await context.api.post("/v1/billing-adjustments", body); target.textContent = ""; showToast("Đã lưu khoản điều chỉnh.", "success"); await refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; } finally { submit.disabled = false; } }); }
+  content.querySelector("[data-new-definition]").addEventListener("click", () => bindDefinition());
+  await refresh();
+}
+
+export default { ...meta, render };
