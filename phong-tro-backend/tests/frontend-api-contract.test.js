@@ -43,7 +43,7 @@ test("CT-003 meter-reading SPA consumes the API DTO contract", () => {
       submittedAt: "2026-10-13T00:00:00.000Z",
     },
   );
-  for (const field of ["id", "period", "room", "readingValue", "status", "submittedAt"]) {
+  for (const field of ["id", "period", "room", "readingValue", "readingType", "status", "submittedAt"]) {
     assert.match(source, new RegExp(`row\\.${field}\\b`), `SPA must consume row.${field}`);
   }
   for (const rawField of ["ma_chi_so", "thang", "nam", "chi_so_moi", "trang_thai_xac_nhan", "ngay_ghi_nhan"]) {

@@ -13,6 +13,7 @@ test("FR-065 landlord OCR screen uses preview token, validates image and handles
   assert.match(source, /UPLOAD_TOKEN_EXPIRED/);
   assert.match(source, /READING_BELOW_PREVIOUS/);
   assert.match(source, /CHUYEN_PHONG/);
-  assert.match(source, /Chưa rõ loại/);
+  assert.match(source, /row\.readingType/);
+  assert.doesNotMatch(source, /Chưa rõ loại/);
   assert.doesNotMatch(source, /\bfetch\(/);
 });
