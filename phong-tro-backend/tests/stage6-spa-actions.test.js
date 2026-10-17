@@ -82,7 +82,7 @@ test("CT-015 move-out tab exposes the complete settlement checklist for approved
   assert.match(tab, /trang_thai === "DA_PHE_DUYET"/);
   assert.match(tab, /assetsChecked: raw\.assetsChecked === "on"/);
   assert.match(tab, /debtReviewed: raw\.debtReviewed === "on"/);
-  assert.match(tab, /finalElectricityReading: integerMoney\(raw\.finalElectricityReading/);
+  assert.match(tab, /finalElectricityReading: integerVnd\(raw\.finalElectricityReading/);
   assert.match(tab, /moveOutRequestId: row\.ma_yeu_cau/);
   assert.match(tab, /\/v1\/move-outs\/\$\{row\.ma_hop_dong\}\/settle/);
 });

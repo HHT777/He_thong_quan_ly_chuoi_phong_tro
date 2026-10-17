@@ -1,13 +1,10 @@
 import { shellPage, escapeHtml, money, date } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
+import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 
 const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "operations", order: 52, roles: ["CHU_TRO"] };
-const integerMoney = (value, label) => {
-  if (!/^\d+$/.test(String(value || ""))) throw new Error(`${label} phải là số nguyên không âm.`);
-  return Number(value);
-};
+const requestKeys = createRequestKeyStore();
 const localToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
-const uuid = () => crypto.randomUUID();
 
 function contextMarkup(data) {
   const assets = data.assets || [];
@@ -84,19 +81,20 @@ async function render(context) {
           const submit = form.querySelector("button[type='submit']"); const message = form.querySelector("[data-settlement-message]"); submit.disabled = true;
           try {
             const raw = Object.fromEntries(new FormData(form));
-            const assetDeductions = [...form.querySelectorAll("[data-asset-row]")].filter((x) => x.querySelector("[data-asset-selected]").checked).map((x) => ({ assetId: x.dataset.assetId, quantity: integerMoney(x.querySelector("[data-asset-quantity]").value, "Số lượng"), amount: integerMoney(x.querySelector("[data-asset-amount]").value, "Chi phí tài sản"), reason: x.querySelector("[data-asset-reason]").value.trim() }));
+            const assetDeductions = [...form.querySelectorAll("[data-asset-row]")].filter((x) => x.querySelector("[data-asset-selected]").checked).map((x) => ({ assetId: x.dataset.assetId, quantity: integerVnd(x.querySelector("[data-asset-quantity]").value, "Số lượng", { positive: true }), amount: integerVnd(x.querySelector("[data-asset-amount]").value, "Chi phí tài sản"), reason: requiredText(x.querySelector("[data-asset-reason]").value, "Lý do tài sản") }));
             if (assetDeductions.some((x) => !x.reason)) throw new Error("Tài sản hỏng/mất phải có lý do.");
-            const violationDeductions = [...form.querySelectorAll("[data-violation-row]")].filter((x) => x.querySelector("[data-violation-selected]").checked).map((x) => ({ violationId: x.dataset.violationId, amount: integerMoney(x.querySelector("[data-violation-amount]").value, "Mức phạt") }));
-            const payload = { inspectionDate: raw.inspectionDate, finalElectricityReading: integerMoney(raw.finalElectricityReading, "Chỉ số điện cuối"), roomCondition: raw.roomCondition.trim(), assetsChecked: raw.assetsChecked === "on", debtReviewed: raw.debtReviewed === "on", deduction: integerMoney(raw.deduction, "Khấu trừ khác"), reason: raw.reason.trim() || undefined, assetDeductions, violationDeductions, moveOutRequestId: row.ma_yeu_cau };
+            const violationDeductions = [...form.querySelectorAll("[data-violation-row]")].filter((x) => x.querySelector("[data-violation-selected]").checked).map((x) => ({ violationId: x.dataset.violationId, amount: integerVnd(x.querySelector("[data-violation-amount]").value, "Mức phạt") }));
+            const payload = { inspectionDate: raw.inspectionDate, finalElectricityReading: integerVnd(raw.finalElectricityReading, "Chỉ số điện cuối"), roomCondition: requiredText(raw.roomCondition, "Tình trạng phòng"), assetsChecked: raw.assetsChecked === "on", debtReviewed: raw.debtReviewed === "on", deduction: integerVnd(raw.deduction, "Khấu trừ khác"), reason: raw.reason.trim() || undefined, assetDeductions, violationDeductions, moveOutRequestId: row.ma_yeu_cau };
             const settled = (await context.api.post(`/v1/move-outs/${row.ma_hop_dong}/settle`, payload)).data;
             workspace.innerHTML = resultMarkup(settled);
-            const refundForm = workspace.querySelector("[data-refund-form]"); const refundKey = uuid();
+            const refundForm = workspace.querySelector("[data-refund-form]");
             refundForm.addEventListener("submit", async (refundEvent) => {
               refundEvent.preventDefault();
               if (!window.confirm("Ghi nhận số tiền đã hoàn thực tế? Thao tác này làm tăng tổng tiền cọc đã hoàn.")) return;
               const refundButton = refundForm.querySelector("button[type='submit']"); const refundMessage = refundForm.querySelector("[data-refund-message]"); refundButton.disabled = true;
-              try { const values = Object.fromEntries(new FormData(refundForm)); await context.api.post(`/v1/move-outs/${refundForm.dataset.reportId}/deposit-refunds`, { ngayHoan: values.ngayHoan, soTien: integerMoney(values.soTien, "Số tiền hoàn"), khoaChongTrung: refundKey }); refundMessage.textContent = "Đã ghi nhận hoàn cọc."; showToast("Đã ghi nhận hoàn cọc.", "success"); }
-              catch (error) { refundMessage.textContent = error.message; showToast(error.message, "error"); }
+              const scope = `refund:${refundForm.dataset.reportId}`;
+              try { const values = Object.fromEntries(new FormData(refundForm)); const identity = { reportId: refundForm.dataset.reportId, ngayHoan: requiredText(values.ngayHoan, "Ngày hoàn"), soTien: integerVnd(values.soTien, "Số tiền hoàn", { positive: true }) }; await context.api.post(`/v1/move-outs/${refundForm.dataset.reportId}/deposit-refunds`, { ngayHoan: identity.ngayHoan, soTien: identity.soTien, khoaChongTrung: requestKeys.keyFor(scope, identity) }); requestKeys.complete(scope); refundMessage.textContent = "Đã ghi nhận hoàn cọc."; showToast("Đã ghi nhận hoàn cọc.", "success"); }
+              catch (error) { refundMessage.textContent = error.message; if (error.status === 409 && error.code === "IDEMPOTENCY_CONFLICT") { const renew = document.createElement("button"); renew.type = "button"; renew.textContent = "Tạo yêu cầu mới"; renew.addEventListener("click", () => { requestKeys.renew(scope); refundMessage.textContent = "Đã tạo khóa mới; bạn có thể gửi lại."; }); refundMessage.append(" ", renew); } showToast(error.message, "error"); }
               finally { refundButton.disabled = false; }
             });
             showToast("Quyết toán thành công.", "success");

@@ -13,7 +13,8 @@ test("FR-096/187/188 move-out screen follows context, settlement and refund cont
   assert.match(source, /finalElectricityReading/);
   assert.doesNotMatch(source, /finalWater|waterReading|chỉ số nước/i);
   assert.match(source, /deposit-refunds/);
-  assert.match(source, /khoaChongTrung: refundKey/);
+  assert.match(source, /khoaChongTrung: requestKeys\.keyFor\(scope, identity\)/);
+  assert.match(source, /requestKeys\.complete\(scope\)/);
   assert.match(source, /window\.confirm/);
   assert.match(source, /escapeHtml/);
 });
