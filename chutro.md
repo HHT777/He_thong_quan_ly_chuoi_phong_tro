@@ -571,3 +571,73 @@ Mốc sau sửa SRS: unit **57/57**, integration **50/50**, bất biến **0** (
 - Event-key producer đã kiểm chứng: billing/debt/move-out/reservation/contract/incident/payment/co-tenant/request/broadcast/transfer/contract-create dùng `createIdempotent` trong transaction (broadcast chia lô); OCR/meter không tạo thông báo. Race tests reservation, contract, broadcast pass.
 - Miền trạng thái `DA_CHUYEN_THANH_HOP_DONG` có trong `data2.md:692`; không cần DDL B.3.
 - Chưa chạy clone sạch/`npm ci`, verify migration lặp lại MariaDB/MySQL, frontend build trong lượt này; chưa làm F.5. Các file untracked vẫn nguyên trạng.
+
+### A.3 – Migration 015 snapshot doanh thu (2026-10-17)
+
+Trạng thái: **ĐÃ CÓ** tại commit `00ecf38` (`fix(FR-133): snapshot receipt revenue allocation`). Tag an toàn trước thay đổi: `checkpoint-before-015`.
+
+- `015_receipt_revenue_snapshot.sql` thêm ba cột nullable trên `KhoanThu`: `doanhThuGop decimal(18,2)`, `giamTruPhanBo decimal(18,2)`, `nguonSnapshot varchar(20)`; miền nguồn là `GHI_NHAN`/`SUY_DIEN`. Migration dùng guard `INFORMATION_SCHEMA`, CHECK boolean thuần và chạy lặp được trên MySQL 8/MariaDB. Không cần index mới vì truy vấn báo cáo dùng index lọc hiện hữu, không lọc theo ba cột snapshot.
+- Dòng thu tiền gắn phiếu mới ghi snapshot `GHI_NHAN` trong cùng transaction tại `thanhToan.service.js`, `paymentLifecycle.service.js`, `paymentConfirmation.service.js`. `KHAU_TRU_COC`, nợ sau thanh lý và `GIU_PHONG_KHONG_HOAN` không đi qua snapshot phiếu.
+- Báo cáo ưu tiên snapshot, chỉ suy diễn khi snapshot NULL và trả nguồn trong chi tiết. Điều chỉnh phiếu không sửa snapshot cũ; khoản thu sau dùng trạng thái mới. Hủy khoản thu loại đúng dòng đã hủy, không viết lại các snapshot khác.
+- `schema.js`, `data2.md`, schema-contract và `check-invariants.js` đã đồng bộ. `models/index.js` không cần thêm export vì `KhoanThu` hiện hữu đã được import/export và lấy cấu trúc từ `schema.js`.
+
+| File | Test | Phép thử phủ định | Kết quả |
+|---|---|---|---|
+| `receipt-snapshot.test.js` | Mọi cash writer truyền snapshot và transaction | Bỏ `buildSnapshot` ở payment lifecycle | Test writer đỏ 1/6; khôi phục xanh |
+| `receipt-snapshot.test.js` | Phiếu 3.000.000, giảm 300.000, thu 1.000.000 + 1.700.000 | So sánh chính xác 1.111.111/111.111 và 1.888.889/188.889 | Pass |
+| `receipt-snapshot.test.js` | A.3: báo cáo lịch sử giữ gross=500, discount=100 sau điều chỉnh | Ép report bỏ đọc snapshot | Test A.3 đỏ 1/6: nhận 436/36; khôi phục xanh |
+| `receipt-snapshot.test.js` | Lần thu sau dùng trạng thái phiếu mới, snapshot lần đầu không đổi | So sánh lần đầu 500/100, lần sau 700/0 | Pass |
+| `receipt-snapshot.test.js` | Hủy khoản thu loại đúng dòng, giữ snapshot dòng còn lại | Hủy dòng cuối trong tập dữ liệu báo cáo | Pass |
+| `receipt-snapshot.test.js` | Thu ngoài phiếu không nhận snapshot | Kiểm tra `GIU_PHONG_KHONG_HOAN` | Pass |
+| `verify-migrations.js` | Backfill seed legacy | So sánh trước/sau migration và report | 32/32 dòng `SUY_DIEN`; 83.731.911 trước = sau = report |
+
+Mốc test: unit **60 → 66**, kết quả cuối **66/66 pass**; integration giữ **50/50 pass** trên MySQL 8.0.46.
+
+### B – khóa sự kiện và phép thử phủ định
+
+Tất cả producer production đi qua `notification.service.createIdempotent`; INSERT trực tiếp và bắt duplicate từ unique DB `(maNguoiNhan, khoaSuKien)`, không đọc-rồi-ghi.
+
+| Nơi tạo | Transaction | Khóa/cơ chế chống trùng | Test race |
+|---|---|---|---|
+| Billing gửi phiếu | Trong transaction gửi phiếu | `PHIEU_THU:<bill>:<kỳ>` + unique DB | billing lifecycle |
+| Debt nhắc 05/quá hạn 06/chốt | Trong transaction debt | `CONG_NO:<type>:<bill>:<kỳ>` + named lock/unique DB | debt lifecycle, legacy cron |
+| Hợp đồng sắp hết/hết hạn | Trong transaction từng hợp đồng | `HOP_DONG:<contract>:<ngày>` + khóa dòng/unique DB | `FR-159 contract expiry race...` |
+| Tạo hợp đồng | Trong transaction tạo hợp đồng | `HOP_DONG_TAO:<contract>` + unique DB | contract lifecycle |
+| Reservation quá hạn | Trong transaction cron | `GIU_PHONG_HET_HAN:<reservation>:<ngày>` + named lock/unique DB | `FR-159 reservation expiry race...`, F.3 expiry |
+| Duyệt/từ chối yêu cầu | Trong transaction request | `YEU_CAU_KET_QUA:<request>:<status>` + unique DB | operations/request integration |
+| Rút duyệt trả phòng | Trong transaction request | `RUT_DUYET_TRA_PHONG:<request>` + unique DB | move-out integration |
+| Bắt đầu trả phòng theo ngày | Trong transaction cron | `BAT_DAU_TRA_PHONG:<request>:<ngày>` + lock/unique DB | move-out due integration |
+| Thanh lý hợp đồng | Trong transaction settlement | `THANH_LY_HOP_DONG:<contract>` + unique DB | move-out integration |
+| Sự cố hoàn tất | Trong transaction incident | `KET_QUA_SU_CO:<incident>` + unique DB | incident integration |
+| Ghi nhận/xác nhận thanh toán | Trong transaction payment | `THANH_TOAN_GHI_NHAN:<transaction>` / `THANH_TOAN_XAC_NHAN:<transaction>` + unique DB | finance integration |
+| Chuyển phòng | Trong transaction transfer | `CHUYEN_PHONG:<contract>:<ngày>` + unique DB | room-transfer integration |
+| Broadcast | Mỗi lô một transaction | `BROADCAST:<maBroadcast>` + unique DB; lô lỗi không rollback lô trước | `FR-159 broadcast retry...` |
+| OCR/chỉ số điện | Không tạo thông báo | Không áp dụng | OCR integration/RBAC |
+
+Phép thử phủ định đã chạy thật và đều được khôi phục trước commit:
+
+- Bỏ khóa dòng phòng khi giữ phòng: integration đỏ 1/50, cả hai request cùng thành công (`2 !== 1`).
+- Bỏ bắt duplicate trong notification helper: integration đỏ tại race unique-key/reservation expiry và các luồng dùng chung helper; xuất hiện `ER_DUP_ENTRY`/`SequelizeUniqueConstraintError`.
+- Bỏ claim actor của token OCR: OCR unit đỏ 1/3 (`Missing expected exception`).
+- Bỏ claim hết hạn của token OCR: OCR unit đỏ 1/3 (`Missing expected exception`).
+- Race hợp đồng và broadcast cùng `maBroadcast` được phủ bởi `notification-integrity.integration.test.js`; khi vô hiệu hóa nhánh duplicate dùng chung, suite đỏ. Sau khôi phục, contract tạo đúng một notification mỗi người nhận; gửi lại broadcast trả `sent=0`, `skipped=N`.
+
+### Cổng clone sạch sau migration 015
+
+Clone sạch kiểm chứng tại HEAD `00ecf38ee85a1798c851fd3206dd8c53d8439f21`.
+
+| Bước | Kết quả thật |
+|---|---|
+| Backend `npm ci` | Pass, cài 157 package |
+| Unit | **66/66 pass** |
+| Integration MySQL TCP 8.0.46 | Lần đầu lỗi `secretOrPrivateKey must have a value`; thêm `JWT_SECRET` thì lỗi `\"expiresIn\" should be a number of seconds or string representing a timespan`; cấp thêm `JWT_EXPIRE=7d` theo cấu hình thì **50/50 pass** |
+| Bất biến sau integration | 14/14 nhóm có **0 vi phạm**: bill detail, bill trùng, sức chứa, hồ sơ cọc, nhánh tài chính sự cố, event key, hoàn cọc, ba bất biến giữ phòng và bốn bất biến snapshot |
+| MySQL 8.0.46 migration 004→015 | **2/2 lượt pass**, 37 bảng |
+| MariaDB 10.4.32 migration 004→015 | **2/2 lượt pass**, 37 bảng |
+| Backfill migration | 32 receipt; net trước/sau/report đều **83.731.911**; giữ 18 hợp đồng, 30 phòng, 21 tài khoản |
+| Cron seed legacy | Test đầu integration xác nhận seed 18/30/21; lượt 1 không tăng bill/thông báo kỳ cũ, lượt 2 không phát sinh thêm |
+| `git diff --check` / `git status` trong clone | Pass / sạch |
+| Frontend Vite build | **Chưa chạy** theo phạm vi chỉ thị; không ghi nhận đạt |
+| MySQL 8.0.16 | **Chưa xác minh**; cổng thực tế chạy trên 8.0.46 |
+
+Số vi phạm snapshot: `recordedReceiptSnapshots=0`, `receiptSnapshotArithmetic=0`, `allocatedDiscounts=0`, `snapshotReportTotals=0`. Không phát hiện lệch báo cáo sau backfill. Không làm F.5, in hợp đồng, Excel, liên kết sự cố, npm audit, dữ liệu hoàn cọc legacy hoặc thu hồi token.
