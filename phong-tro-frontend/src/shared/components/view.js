@@ -5,7 +5,7 @@ export const escapeHtml = (value) =>
   String(value ?? "—").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 
 export const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
-export const date = (value) => (value ? new Date(value).toLocaleDateString("vi-VN") : "—");
+export const date = (value) => (value ? new Date(value).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—");
 
 // Format status values into SaaS badges
 export function formatStatusBadge(status) {

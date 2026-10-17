@@ -78,14 +78,14 @@ export default {
       const checkoutRooms = roomRows.filter((item) => item.trang_thai === "DANG_XU_LY_TRA_PHONG");
 
       const occRate = totalRooms > 0 ? Math.round((rentedRooms.length / totalRooms) * 100) : 0;
-      const due = billRows.reduce((sum, item) => sum + Number(item.tong_phai_tra || 0), 0);
       const totalRevenue = Number(cashflow.totalRevenue ?? cashflow.totalCollected ?? 0);
-      const grossRevenue = Number(cashflow.grossRevenue ?? totalRevenue);
+      const grossRevenue = Number(cashflow.grossRevenue ?? 0);
       const discounts = Number(cashflow.discounts || 0);
       const depositDeductions = Number(cashflow.depositDeductions || 0);
+      const totalExpenses = Number(cashflow.totalExpenses || 0);
+      const profit = Number(cashflow.profit || 0);
       const activeIncidents = incidentRows.filter((item) => item.trang_thai !== "DA_XU_LY");
       const unpaidBills = billRows.filter((item) => item.trang_thai_thanh_toan !== "DA_THANH_TOAN");
-      const avgRevenuePerRoom = rentedRooms.length > 0 ? Math.round(totalRevenue / rentedRooms.length) : 0;
 
       // Group rooms by building for Top Buildings
       const buildingsMap = {};
@@ -251,19 +251,16 @@ export default {
               </div>
             </article>
 
-            <!-- 4. Hóa đơn kỳ hiện có -->
-            <article class="stat-card" data-navigate="/finance/bills">
+            <!-- 4. Lợi nhuận theo báo cáo -->
+            <article class="stat-card" data-navigate="/finance/reports">
               <div class="stat-card__header">
-                <span class="stat-card__label">Hóa đơn kỳ hiện có</span>
+                <span class="stat-card__label">Lợi nhuận</span>
                 <div class="stat-card__icon-wrap stat-card__icon-wrap--purple">${icons.money(20)}</div>
               </div>
-              <div class="stat-card__value" id="cardDueValue">${money(due)}</div>
-              <div class="progress-track">
-                <div class="progress-bar progress-bar--purple" style="width: 85%;"></div>
-              </div>
+              <div class="stat-card__value">${money(profit)}</div>
               <div class="stat-card__meta">
-                <span>Tổng tiền phát sinh</span>
-                <span class="trend-pill trend-pill--up">${billRows.length} hóa đơn</span>
+                <span>Thực nhận trừ chi phí</span>
+                <span class="trend-pill trend-pill--up">Server tính</span>
               </div>
             </article>
 
@@ -307,12 +304,7 @@ export default {
               <div class="dashboard-card-head">
                 <div>
                   <h3 class="dashboard-card-title">${icons.finance(20)} Phân tích doanh thu & hóa đơn</h3>
-                  <p class="dashboard-card-subtitle">Tiến độ thu tiền phòng và dịch vụ theo các chu kỳ vận hành</p>
-                </div>
-                <div class="segmented-toggle">
-                  <button class="segmented-toggle-btn is-active">Kỳ này</button>
-                  <button class="segmented-toggle-btn">3 tháng</button>
-                  <button class="segmented-toggle-btn">Năm nay</button>
+                  <p class="dashboard-card-subtitle">Số liệu báo cáo toàn kỳ từ server</p>
                 </div>
               </div>
 
@@ -320,27 +312,19 @@ export default {
               <div class="monthly-bars-list">
                 <div class="monthly-bar-item">
                   <div class="monthly-bar-header">
-                    <span class="monthly-bar-title">Tháng hiện tại <span class="monthly-bar-sub">• ${billRows.length} hóa đơn</span></span>
+                    <span class="monthly-bar-title">Doanh thu thực nhận <span class="monthly-bar-sub">• toàn kỳ, đã trừ giảm trừ</span></span>
                     <div class="monthly-bar-val-wrap">
-                      <span class="trend-pill trend-pill--up">${icons.trendingUp(12)} +12.5%</span>
                       <span class="monthly-bar-val">${money(totalRevenue)}</span>
                     </div>
-                  </div>
-                  <div class="monthly-bar-track">
-                    <div class="monthly-bar-fill" style="width: 82%;">82%</div>
                   </div>
                 </div>
 
                 <div class="monthly-bar-item">
                   <div class="monthly-bar-header">
-                    <span class="monthly-bar-title">Tháng trước <span class="monthly-bar-sub">• Đối soát hoàn tất</span></span>
+                    <span class="monthly-bar-title">Doanh thu gộp <span class="monthly-bar-sub">• trước giảm trừ</span></span>
                     <div class="monthly-bar-val-wrap">
-                      <span class="trend-pill trend-pill--up">${icons.trendingUp(12)} +8.0%</span>
-                      <span class="monthly-bar-val">${money(Math.round(due * 0.92))}</span>
+                      <span class="monthly-bar-val">${money(grossRevenue)}</span>
                     </div>
-                  </div>
-                  <div class="monthly-bar-track">
-                    <div class="monthly-bar-fill" style="width: 95%; background: linear-gradient(90deg, #10b981 0%, #34d399 100%);">95%</div>
                   </div>
                 </div>
               </div>
@@ -366,10 +350,10 @@ export default {
 
                 <div class="revenue-mini-card revenue-mini-card--purple">
                   <div class="revenue-mini-card__head">
-                    <span class="revenue-mini-card__label">Trung bình/phòng</span>
+                    <span class="revenue-mini-card__label">Chi phí</span>
                     <div class="revenue-mini-card__icon">${icons.door(16)}</div>
                   </div>
-                  <div class="revenue-mini-card__val">${money(avgRevenuePerRoom)}</div>
+                  <div class="revenue-mini-card__val">${money(totalExpenses)}</div>
                 </div>
 
                 <div class="revenue-mini-card revenue-mini-card--orange">
