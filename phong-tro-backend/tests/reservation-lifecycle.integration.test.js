@@ -5,7 +5,7 @@ const reservationService = require("../src/services/reservation.service");
 const { integration, request, headers, login, createBaseRental } = require("./helpers/integration-api");
 
 const owner = () => login(integration.landlord);
-const ownerId = async () => (await TaiKhoan.findOne({ where: { vai_tro: "CHU_TRO" } })).ma_tai_khoan;
+const ownerId = async () => (await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } })).ma_tai_khoan;
 const payload = (roomId, phone, extra = {}) => ({ roomId, holderName: "Holder", phone, amount: 1000000, receivedOn: "2026-10-01", expiresOn: "2026-10-20", terms: "Theo thỏa thuận", ...extra });
 
 test("FR-167 reservation changes TRONG to DA_GIU and rejects a non-empty room", async () => {

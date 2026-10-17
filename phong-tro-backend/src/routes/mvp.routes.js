@@ -77,11 +77,26 @@ router.get("/reservations", landlord, async (req, res, next) => {
 router.post("/reservations", landlord, async (req, res, next) => {
   try { return data(res, await reservationService.create(req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
 });
+router.get("/reservations/:id/extension-history", landlord, async (req, res, next) => {
+  try {
+    const { error, value } = Joi.string().guid({ version: "uuidv4" }).required().validate(req.params.id);
+    if (error) throw fail(400, "Mã giữ phòng không hợp lệ", "INVALID_RESERVATION_ID");
+    return data(res, await reservationService.extensionHistory(value, req.user));
+  } catch (error) { next(error); }
+});
+router.get("/reservations/:id/cancellation-quote", landlord, async (req, res, next) => {
+  try {
+    const id = Joi.string().guid({ version: "uuidv4" }).required().validate(req.params.id);
+    const amount = Joi.number().min(0).required().validate(req.query.refundAmount);
+    if (id.error || amount.error || Object.keys(req.query).some((key) => key !== "refundAmount")) throw fail(400, "Tham số báo giá không hợp lệ", "INVALID_RESERVATION_QUOTE_QUERY");
+    return data(res, await reservationService.cancellationQuote(id.value, amount.value, req.user));
+  } catch (error) { next(error); }
+});
 router.patch("/reservations/:id/extend", landlord, async (req, res, next) => {
   try { return data(res, await reservationService.extend(req.params.id, req.body, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/reservations/:id/cancel", landlord, async (req, res, next) => {
-  try { return data(res, await reservationService.cancel(req.params.id, req.body, req.user.ma_tai_khoan)); } catch (e) { next(e); }
+  try { return data(res, await reservationService.cancel(req.params.id, req.body, req.user.ma_tai_khoan, req.user)); } catch (e) { next(e); }
 });
 router.get("/system-config", landlord, async (req, res, next) => { try { return data(res, await CauHinhHeThong.findAll({ order: [["khoa", "ASC"]] })); } catch (e) { next(e); } });
 router.put("/system-config/:key", landlord, async (req, res, next) => { try { const key = String(req.params.key || "").trim(); if (!key || req.body.value === undefined) throw fail(422, "Khóa và giá trị cấu hình là bắt buộc"); const value = validateSystemConfigValue(key, req.body.value); const row = await sequelize.transaction(async (transaction) => { const existing = await CauHinhHeThong.findOne({ where: { khoa: key }, transaction, lock: transaction.LOCK.UPDATE }); const before = existing?.get({ plain: true }) || null; const saved = existing ? await existing.update({ gia_tri: value, mo_ta: req.body.description ?? existing.mo_ta, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }) : await CauHinhHeThong.create({ khoa: key, gia_tri: value, mo_ta: req.body.description || null, nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "SYSTEM_CONFIG_UPDATED", entityType: "CauHinhHeThong", entityId: saved.ma_cau_hinh, before, after: { key, value } }); return saved; }); invalidateSystemConfigCache(); return data(res, row); } catch (e) { next(e); } });
