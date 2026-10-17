@@ -10,10 +10,14 @@ test("FR-144..157/164/175/176 bill screen uses canonical routes, payloads and re
   assert.match(source, /post\("\/v1\/bills\/preview", \{ period: .* contractIds:/s);
   assert.match(source, /post\("\/v1\/bills\/generate", \{ period: .* contractIds:/s);
   assert.match(source, /\/v1\/bills\/\$\{row\.ma_thanh_toan\}\/adjustments/);
-  assert.match(source, /reason: raw\.reason\.trim\(\)/);
+  assert.match(source, /reason: requiredText\(raw\.reason/);
   assert.match(source, /\/mark-paid/);
   assert.match(source, /\/v1\/bills\/mark-all-paid/);
-  assert.match(source, /"Idempotency-Key": retryKey\(scope\)/);
+  assert.match(source, /"Idempotency-Key": requestKeys\.keyFor\(scope, payload\)/);
+  for (const scope of ["all:", "pay:", "paid:", "cancel:"]) assert.ok(source.includes(`scope = \`${scope}`));
+  assert.match(source, /requestKeys\.complete\(scope\)/);
+  assert.match(source, /IDEMPOTENCY_CONFLICT/);
+  assert.match(source, /Tạo yêu cầu mới/);
   assert.match(source, /\/v1\/payments\/\$\{payment\.ma_giao_dich\}\/cancel/);
   assert.match(source, /payment\.nguon_thanh_toan === "KHAU_TRU_COC"/);
   assert.match(source, /\/v1\/billing-adjustments/);

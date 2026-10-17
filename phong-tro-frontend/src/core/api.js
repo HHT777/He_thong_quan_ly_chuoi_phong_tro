@@ -14,7 +14,7 @@ async function request(path, options = {}) {
     const friendly = {
       ADJUSTMENT_EXCEEDS_OUTSTANDING: "Mức giảm vượt số tiền còn nợ của phiếu.",
       DEPOSIT_OFFSET_CANNOT_CANCEL: "Khoản khấu trừ cọc không được phép hủy.",
-      IDEMPOTENCY_CONFLICT: "Yêu cầu gửi lại không khớp dữ liệu ban đầu.",
+      IDEMPOTENCY_CONFLICT: "Yêu cầu đã được gửi với nội dung khác.",
     };
     const error = new Error(friendly[code] || payload.error?.message || payload.message || `Yêu cầu thất bại (${response.status})`);
     error.status = response.status;
