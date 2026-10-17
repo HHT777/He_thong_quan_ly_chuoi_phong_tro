@@ -17,10 +17,10 @@ export default {
       const [memberResult, requestResult] = await Promise.all([context.api.get("/v1/co-tenants"), context.api.get("/v1/requests")]);
       const members = memberResult.data || [];
       const pending = (requestResult.data || []).filter((row) => row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && row.trang_thai === "CHO_XU_LY");
-      content.innerHTML = `<section class="panel"><h3>Đề xuất chờ xử lý</h3><p>API hiện chỉ trả nội dung yêu cầu, chưa trả chi tiết định danh của đề xuất. Không phê duyệt khi chưa đối chiếu giấy tờ ở hồ sơ gốc.</p><div class="table-wrap"><table><thead><tr><th>Nội dung</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>${pending.map((row, index) => `<tr><td>${escapeHtml(row.noi_dung)}</td><td>${escapeHtml(date(row.ngay_gui))}</td><td><button data-approve="${index}">Duyệt</button> <button data-reject="${index}">Từ chối</button></td></tr>`).join("")}</tbody></table></div></section>
+      content.innerHTML = `<section class="panel"><h3>Đề xuất chờ xử lý</h3><p>Mở chi tiết để đối chiếu đầy đủ giấy tờ, phòng và sức chứa trước khi duyệt.</p><div class="table-wrap"><table><thead><tr><th>Nội dung</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>${pending.map((row, index) => `<tr><td>${escapeHtml(row.noi_dung)}</td><td>${escapeHtml(date(row.ngay_gui))}</td><td><button data-approve="${index}">Xem và duyệt</button> <button data-reject="${index}">Từ chối</button></td></tr>`).join("")}</tbody></table></div></section>
       <section class="panel"><h3>Người ở cùng đã duyệt</h3><div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Điện thoại</th><th>Giấy tờ</th><th>Ngày sinh</th><th>Giới tính</th><th>Thường trú</th><th>Quan hệ</th><th>Ngày vào</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${members.map((row, index) => `<tr><td>${escapeHtml(row.ho_ten)}</td><td>${escapeHtml(row.so_dien_thoai)}</td><td>${escapeHtml(row.cccd_giay_to)}</td><td>${escapeHtml(date(row.ngay_sinh))}</td><td>${escapeHtml(row.gioi_tinh)}</td><td>${escapeHtml(row.dia_chi_thuong_tru)}</td><td>${escapeHtml(row.quan_he)}</td><td>${escapeHtml(date(row.ngay_vao))}</td><td>${escapeHtml(row.trang_thai_cu_tru)}</td><td>${row.trang_thai_cu_tru === "DANG_O" ? `<button data-leave="${index}">Rời phòng</button>` : "—"}</td></tr>`).join("")}</tbody></table></div></section><p data-message role="status"></p>`;
       const message = content.querySelector("[data-message]");
-      content.addEventListener("click", (event) => {
+      content.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-approve],[data-reject],[data-leave]"); if (!button) return;
         if (button.dataset.leave != null) {
           const row = members[Number(button.dataset.leave)];
@@ -32,7 +32,24 @@ export default {
         }
         const row = pending[Number(button.dataset.approve ?? button.dataset.reject)];
         if (button.dataset.approve != null) {
-          message.textContent = "Chưa thể duyệt trên màn hình: API không trả đủ thông tin định danh để đối chiếu. Hãy xử lý tại hồ sơ có giấy tờ.";
+          button.disabled = true; message.textContent = "";
+          try {
+            const detail = (await context.api.get(`/v1/co-tenant-proposals/${encodeURIComponent(row.ma_yeu_cau)}`)).data;
+            const required = ["name", "phone", "identityNumber", "birthDate", "gender", "permanentAddress", "relationship", "startDate"];
+            const missing = required.filter((field) => !String(detail[field] ?? "").trim());
+            const fields = [["Họ tên", detail.name], ["Điện thoại", detail.phone], ["CCCD/giấy tờ", detail.identityNumber], ["Ngày sinh", detail.birthDate], ["Giới tính", detail.gender], ["Thường trú", detail.permanentAddress], ["Quan hệ", detail.relationship], ["Bắt đầu ở", detail.startDate], ["Hợp đồng", detail.contract?.id], ["Phòng", detail.room?.code], ["Đang ở / sức chứa", `${detail.room?.currentOccupants ?? "—"} / ${detail.room?.capacity ?? "—"}`], ["Trạng thái", detail.status], ["Lý do từ chối", detail.rejectionReason]];
+            const overlay = document.createElement("div"); overlay.className = "modal-overlay";
+            overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Đối chiếu đề xuất người ở cùng</h3><dl>${fields.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>${missing.length ? `<p role="alert">Thiếu thông tin định danh: ${escapeHtml(missing.join(", "))}</p>` : ""}<button type="button" data-close>Đóng</button> <button type="button" data-confirm-approve ${missing.length ? "disabled" : ""}>Xác nhận duyệt</button><p data-detail-error role="status"></p></div>`;
+            overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove());
+            overlay.querySelector("[data-confirm-approve]").addEventListener("click", async (event) => {
+              const approveButton = event.currentTarget;
+              if (!await confirmAction("Đã đối chiếu giấy tờ và sức chứa; xác nhận duyệt người ở cùng?")) return;
+              approveButton.disabled = true;
+              try { await context.api.patch(`/v1/requests/${encodeURIComponent(row.ma_yeu_cau)}`, { status: "DA_PHE_DUYET" }); overlay.remove(); await this.render(context); }
+              catch (error) { overlay.querySelector("[data-detail-error]").textContent = error.code === "CO_TENANT_IDENTITY_INCOMPLETE" ? `Không thể duyệt: ${error.message}` : error.message; approveButton.disabled = false; }
+            });
+            document.body.appendChild(overlay);
+          } catch (error) { message.textContent = error.message; } finally { button.disabled = false; }
           return;
         }
         openFormModal({ title: "Từ chối đề xuất", fields: [{ name: "reason", label: "Lý do từ chối", type: "textarea", required: true }], submit: async (raw) => {
