@@ -8,6 +8,7 @@ const {
   DeXuatBanCungPhong,
 } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
+const { assertLandlordOwnsRoom } = require("./propertyAccess.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -102,6 +103,9 @@ async function approve(request, transaction, actorId) {
     lock: transaction.LOCK.UPDATE,
   });
   if (!proposal) throw fail(422, "Yêu cầu thiếu chi tiết đề xuất bạn cùng phòng", "CO_TENANT_DETAIL_NOT_FOUND");
+  const required = ["ho_ten_nguoi_de_xuat", "so_dien_thoai_nguoi_de_xuat", "cccd_giay_to", "ngay_sinh", "gioi_tinh", "dia_chi_thuong_tru", "quan_he", "ngay_bat_dau_o"];
+  const missing = required.filter((key) => !String(proposal[key] ?? "").trim());
+  if (missing.length) throw fail(400, `Thiếu thông tin định danh: ${missing.join(", ")}`, "CO_TENANT_IDENTITY_INCOMPLETE");
   const contract = await HopDong.findOne({
     where: {
       ma_khach_thue: request.ma_khach_thue,
@@ -129,4 +133,23 @@ async function approve(request, transaction, actorId) {
   return member;
 }
 
-module.exports = { propose, approve, validateProposal };
+async function getProposal(id, user) {
+  const request = await YeuCau.findByPk(id);
+  const proposal = request?.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && await DeXuatBanCungPhong.findByPk(id);
+  if (!proposal) throw fail(404, "Không tìm thấy đề xuất người ở cùng", "CO_TENANT_PROPOSAL_NOT_FOUND");
+  if (user?.vai_tro === "CHU_TRO") await assertLandlordOwnsRoom(user, proposal.ma_phong);
+  else if (user?.vai_tro !== "KHACH_THUE" || request.ma_khach_thue !== user.ma_khach_thue) throw fail(403, "Bạn không được xem đề xuất này", "FORBIDDEN");
+  const contract = await HopDong.findOne({ where: { ma_khach_thue: request.ma_khach_thue, ma_phong: proposal.ma_phong }, order: [["ngay_bat_dau", "DESC"]], attributes: ["ma_hop_dong", "ma_phong", "trang_thai"] });
+  const room = await PhongTro.findByPk(proposal.ma_phong, { attributes: ["ma_phong", "so_phong", "so_nguoi_toi_da"] });
+  const currentOccupants = await ThanhVienPhong.count({ where: { ma_phong: proposal.ma_phong, trang_thai_cu_tru: "DANG_O" } });
+  return {
+    requestId: id, status: request.trang_thai, rejectionReason: proposal.ly_do_tu_choi || request.ly_do_xu_ly || null,
+    name: proposal.ho_ten_nguoi_de_xuat, phone: proposal.so_dien_thoai_nguoi_de_xuat,
+    identityNumber: proposal.cccd_giay_to, birthDate: proposal.ngay_sinh, gender: proposal.gioi_tinh,
+    permanentAddress: proposal.dia_chi_thuong_tru, relationship: proposal.quan_he, startDate: proposal.ngay_bat_dau_o,
+    contract: contract && { id: contract.ma_hop_dong, status: contract.trang_thai },
+    room: room && { id: room.ma_phong, code: room.so_phong, currentOccupants, capacity: room.so_nguoi_toi_da },
+  };
+}
+
+module.exports = { propose, approve, validateProposal, getProposal };

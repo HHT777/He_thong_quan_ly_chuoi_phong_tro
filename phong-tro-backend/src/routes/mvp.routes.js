@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const Joi = require("joi");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const auth = require("../middleware/auth");
@@ -323,6 +324,13 @@ router.delete("/incidents/:id", landlord, async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.get("/co-tenant-proposals/:id", async (req, res, next) => {
+  try {
+    const { error, value } = Joi.string().guid({ version: "uuidv4" }).required().validate(req.params.id);
+    if (error) throw fail(400, "Mã đề xuất không hợp lệ", "INVALID_PROPOSAL_ID");
+    return data(res, await coTenantService.getProposal(value, req.user));
+  } catch (error) { next(error); }
+});
 router.post("/co-tenants", tenant, async (req, res, next) => {
   try {
     return data(res, await coTenantService.propose(

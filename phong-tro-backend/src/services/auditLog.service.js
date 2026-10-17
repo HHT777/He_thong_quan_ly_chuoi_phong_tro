@@ -12,7 +12,7 @@ function toJsonValue(value) {
     if (Array.isArray(item)) return item.map(scrub);
     if (!item || typeof item !== "object") return item;
     return Object.fromEntries(Object.entries(item)
-      .filter(([key]) => !/(?:password|matkhau|hash|token|secret)/i.test(key))
+      .filter(([key]) => !/(?:password|matkhau|hash|token|secret|cccd|soGiayTo|so_giay_to|identityNumber|birthDate|ngaySinh|ngay_sinh|permanentAddress|diaChiThuongTru|dia_chi_thuong_tru)/i.test(key))
       .map(([key, entry]) => [key, scrub(entry)]));
   };
   return scrub(JSON.parse(JSON.stringify(plain)));
