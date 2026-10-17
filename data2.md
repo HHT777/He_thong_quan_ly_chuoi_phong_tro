@@ -528,6 +528,9 @@ create table `KhoanThu` (
 `lyDoHuy` varchar(1000) null,
 `ngayHuy` timestamp null default null,
 `maGiaoDichThanhToan` varchar(36) null,
+`doanhThuGop` decimal(18,2) null,
+`giamTruPhanBo` decimal(18,2) null,
+`nguonSnapshot` varchar(20) null,
 unique key `uq_KhoanThu_maGiaoDichThanhToan` (`maGiaoDichThanhToan`),
 constraint `fk_KhoanThu_maGiaoDichThanhToan` foreign key (`maGiaoDichThanhToan`) references `GiaoDichThanhToan` (`maGiaoDich`),
 `maCan` varchar(36) not null,
@@ -536,7 +539,9 @@ primary key (`maKhoanThu`),
 key `ix_KhoanThu_1` (`maCan`, `ngayGhiNhan`, `trangThaiGhiNhan`),
 constraint `ck_KhoanThu_1` check (`soTien` >= 0),
 constraint `ck_KhoanThu_2` check (`trangThaiGhiNhan` in ('HIEU_LUC', 'DA_HUY')),
-constraint `ck_KhoanThu_3` check (`trangThaiGhiNhan` <> 'DA_HUY' or (`lyDoHuy` is not null and `ngayHuy` is not null))
+constraint `ck_KhoanThu_3` check (`trangThaiGhiNhan` <> 'DA_HUY' or (`lyDoHuy` is not null and `ngayHuy` is not null)),
+constraint `ck_KhoanThu_015_nguon` check (`nguonSnapshot` is null or `nguonSnapshot` in ('GHI_NHAN','SUY_DIEN')),
+constraint `ck_KhoanThu_015_snapshot` check ((`nguonSnapshot` is null and `doanhThuGop` is null and `giamTruPhanBo` is null) or (`nguonSnapshot` is not null and `doanhThuGop` is not null and `giamTruPhanBo` is not null and `doanhThuGop` >= 0 and `giamTruPhanBo` >= 0 and (`nguonSnapshot` <> 'GHI_NHAN' or `doanhThuGop` - `giamTruPhanBo` = `soTien`)))
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 create table `KhoanKhauTru` (

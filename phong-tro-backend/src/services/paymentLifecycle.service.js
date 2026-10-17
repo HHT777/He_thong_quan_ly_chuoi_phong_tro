@@ -3,6 +3,7 @@ const sequelize = require("../config/database");
 const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro } = require("../models");
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
+const { buildSnapshot } = require("./receiptSnapshot.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 function deterministicUuid(value) { const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split(""); hex[12] = "4"; hex[16] = ((parseInt(hex[16], 16) & 3) | 8).toString(16); return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`; }
@@ -13,7 +14,7 @@ async function recordRemaining(bill, key, actorId, transaction, now = new Date()
   const amount = Number(bill.so_tien_con_no);
   const contract = await HopDong.findByPk(bill.ma_hop_dong, { include: [{ model: PhongTro, as: "phongTro" }], transaction });
   const payment = await GiaoDichThanhToan.create({ ma_giao_dich: id, ma_thanh_toan: bill.ma_thanh_toan, so_tien: amount, thoi_diem_ghi_nhan: now, trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: now, nguon_thanh_toan: "THU_TIEN" }, { transaction });
-  await KhoanThu.create({ loai_khoan_thu: "THANH_TOAN", so_tien: amount, ngay_ghi_nhan: now, ghi_chu: "Đánh dấu đã đóng", trang_thai_ghi_nhan: "HIEU_LUC", ma_giao_dich_thanh_toan: id, ma_can: contract.phongTro.ma_can }, { transaction });
+  await KhoanThu.create({ loai_khoan_thu: "THANH_TOAN", so_tien: amount, ngay_ghi_nhan: now, ghi_chu: "Đánh dấu đã đóng", trang_thai_ghi_nhan: "HIEU_LUC", ma_giao_dich_thanh_toan: id, ma_can: contract.phongTro.ma_can, ...await buildSnapshot(bill, amount, transaction) }, { transaction });
   await billService.updateBillStatus(bill.ma_thanh_toan, transaction);
   await writeAuditLog({ transaction, actorId, action: "BILL_MARKED_PAID", entityType: "ThanhToan", entityId: bill.ma_thanh_toan, after: { paymentId: id, amount } });
   return payment;

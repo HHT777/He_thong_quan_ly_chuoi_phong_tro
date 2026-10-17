@@ -146,6 +146,8 @@ async function getCashflow(filters) {
       amount: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.gross || 0,
       date: row.ngay_ghi_nhan,
       receiptId: row.ma_khoan_thu,
+      snapshotSource: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.snapshotSource || null,
+      snapshotFallback: allocations.find((item) => item.receiptId === row.ma_khoan_thu)?.snapshotFallback ?? true,
       reportId: null,
       roomId: row.giaoDich?.thanhToan?.hopDong?.phongTro?.ma_phong || null,
       buildingId: row.ma_can,
@@ -201,10 +203,12 @@ function allocateReceipts(receipts) {
     let cumulative = 0;
     let grossAssigned = 0; let discountAssigned = 0;
     entries.forEach((item, index) => {
+      const hasSnapshot = item.row.doanh_thu_gop !== null && item.row.doanh_thu_gop !== undefined
+        && item.row.giam_tru_phan_bo !== null && item.row.giam_tru_phan_bo !== undefined;
       cumulative += Number(item.row.so_tien);
       const last = index === entries.length - 1 && cumulative >= netTotal;
-      const gross = last ? grossTotal - grossAssigned : Math.round(Number(item.row.so_tien) * grossTotal / (netTotal || 1));
-      const discount = last ? discountTotal - discountAssigned : Math.round(Number(item.row.so_tien) * discountTotal / (netTotal || 1));
+      const gross = hasSnapshot ? Number(item.row.doanh_thu_gop) : (last ? grossTotal - grossAssigned : Math.round(Number(item.row.so_tien) * grossTotal / (netTotal || 1)));
+      const discount = hasSnapshot ? Number(item.row.giam_tru_phan_bo) : (last ? discountTotal - discountAssigned : Math.round(Number(item.row.so_tien) * discountTotal / (netTotal || 1)));
       grossAssigned += gross; discountAssigned += discount;
       const byType = {};
       for (const line of grossLines) {
@@ -222,7 +226,7 @@ function allocateReceipts(receipts) {
         netByType[type] = net;
         netAssigned += net;
       });
-      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType, netByType, buildingId: item.row.ma_can || null });
+      result.push({ receiptId: item.row.ma_khoan_thu, gross, discount, byType, netByType, buildingId: item.row.ma_can || null, snapshotSource: item.row.nguon_snapshot || null, snapshotFallback: !hasSnapshot });
     });
   }
   return result;

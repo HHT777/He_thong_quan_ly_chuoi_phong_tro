@@ -2,6 +2,7 @@ const sequelize = require("../config/database");
 const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, ThongBao } = require("../models");
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
+const { buildSnapshot } = require("./receiptSnapshot.service");
 
 async function confirm(id, actorId) {
   return sequelize.transaction(async (transaction) => {
@@ -35,6 +36,7 @@ async function confirm(id, actorId) {
       trang_thai_ghi_nhan: "HIEU_LUC",
       ma_giao_dich_thanh_toan: payment.ma_giao_dich,
       ma_can: bill.hopDong.phongTro.ma_can,
+      ...await buildSnapshot(bill, amount, transaction),
     }, { transaction });
     await billService.updateBillStatus(bill.ma_thanh_toan, transaction);
     await writeAuditLog({

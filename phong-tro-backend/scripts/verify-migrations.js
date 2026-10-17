@@ -60,6 +60,7 @@ async function run() {
     await connection.query(baselineSql());
     const [beforeRows] = await connection.query("SELECT (SELECT COUNT(*) FROM HopDong) contracts, (SELECT COUNT(*) FROM PhongTro) rooms, (SELECT COUNT(*) FROM TaiKhoan) accounts");
     const [beforeBilling] = await connection.query("SELECT (SELECT COUNT(*) FROM ThongBao) notifications, (SELECT COALESCE(SUM(soTienConNo),0) FROM ThanhToan) outstanding");
+    const [beforeRevenue] = await connection.query("SELECT COUNT(*) receipts, COALESCE(SUM(soTien),0) netRevenue FROM KhoanThu WHERE trangThaiGhiNhan='HIEU_LUC'");
     await connection.query(`
       SET FOREIGN_KEY_CHECKS=0;
       DROP TABLE IF EXISTS GiaoDichHoanCoc, LichSuChuyenPhong, LichSuGiaHanHopDong, LichSuSuaHopDong;
@@ -74,11 +75,12 @@ async function run() {
       ALTER TABLE ChiSoDien DROP INDEX uq_ChiSoDien_nghiepVu, ADD UNIQUE INDEX uq_ChiSoDien_ky1 (maPhong, thang, nam), DROP COLUMN khoaNghiepVu, DROP COLUMN loaiChiSo;
       ALTER TABLE GiaoDichThanhToan DROP COLUMN nguonThanhToan;
       ALTER TABLE BienBanTraPhong DROP COLUMN snapshotJson, DROP COLUMN congThucQuyetToan, DROP COLUMN soTienNoSauThanhLy, DROP COLUMN giaTriQuyetToanRong, DROP COLUMN tienPhongTraTruocDuocHoan, DROP COLUMN tienCocBanDau, DROP COLUMN ngayQuyetToan, DROP COLUMN laDuLieuLegacy;
+      ALTER TABLE KhoanThu DROP CONSTRAINT ck_KhoanThu_015_snapshot, DROP CONSTRAINT ck_KhoanThu_015_nguon, DROP COLUMN nguonSnapshot, DROP COLUMN giamTruPhanBo, DROP COLUMN doanhThuGop;
       ALTER TABLE HopDong DROP COLUMN goiGiaHanChoPhep, DROP COLUMN phiDichVu, DROP COLUMN daCoBanGiayKy;
       SET FOREIGN_KEY_CHECKS=1;
     `);
     const migrations = fs.readdirSync(path.resolve(__dirname, "../migrations"))
-      .filter((name) => /^(00[4-9]|01[0-4])_.*\.sql$/.test(name))
+      .filter((name) => /^(00[4-9]|01[0-5])_.*\.sql$/.test(name))
       .sort();
     for (let pass = 1; pass <= 2; pass += 1) {
       for (const name of migrations) {
@@ -89,9 +91,11 @@ async function run() {
     const [afterRows] = await connection.query("SELECT (SELECT COUNT(*) FROM HopDong) contracts, (SELECT COUNT(*) FROM PhongTro) rooms, (SELECT COUNT(*) FROM TaiKhoan) accounts");
     if (JSON.stringify(beforeRows[0]) !== JSON.stringify(afterRows[0])) throw new Error("Migration changed existing core row counts");
     const [afterBilling] = await connection.query("SELECT (SELECT COUNT(*) FROM ThongBao) notifications, (SELECT COALESCE(SUM(soTienConNo),0) FROM ThanhToan) outstanding, (SELECT COUNT(*) FROM ThanhToan WHERE daGui=false OR daNhacHan=false OR quaHan=false OR daChotCongNo=false OR ngayGui IS NULL OR ngayNhacHan IS NULL OR ngayQuaHan IS NULL OR ngayChotCongNo IS NULL) unprotectedLegacyBills");
+    const [afterRevenue] = await connection.query("SELECT COUNT(*) receipts, SUM(nguonSnapshot='SUY_DIEN') backfilled, COALESCE(SUM(soTien),0) netRevenue, COALESCE(SUM(IF(nguonSnapshot IS NULL,soTien,doanhThuGop-giamTruPhanBo)),0) reportNet FROM KhoanThu WHERE trangThaiGhiNhan='HIEU_LUC'");
     if (Number(beforeBilling[0].notifications) !== Number(afterBilling[0].notifications)) throw new Error("Migration emitted legacy notifications");
     if (Number(beforeBilling[0].outstanding) !== Number(afterBilling[0].outstanding)) throw new Error("Migration changed legacy outstanding balances");
     if (Number(afterBilling[0].unprotectedLegacyBills) !== 0) throw new Error("Migration left legacy bills eligible for cron spam");
+    if (Number(beforeRevenue[0].netRevenue) !== Number(afterRevenue[0].reportNet)) throw new Error("Migration 015 changed legacy net report revenue");
     const expected = documentedSchema();
     const actual = await actualSchema(connection);
     const expectedNames = new Set([...expected.keys()].map((table) => table.toLowerCase()));
@@ -101,7 +105,7 @@ async function run() {
     if (missingTables.length || extraTables.length || columnMismatches.length) {
       throw new Error(JSON.stringify({ missingTables, extraTables, columnMismatches }));
     }
-    console.log(JSON.stringify({ database, passes: 2, migrations, preservedRows: afterRows[0], legacyBackfill: afterBilling[0], tables: actual.size }));
+    console.log(JSON.stringify({ database, passes: 2, migrations, preservedRows: afterRows[0], legacyBackfill: afterBilling[0], receiptBackfill: { before: beforeRevenue[0], after: afterRevenue[0] }, tables: actual.size }));
   } finally {
     await connection.end();
     const cleanup = await mysql.createConnection(options(false));

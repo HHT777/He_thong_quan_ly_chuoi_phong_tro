@@ -204,6 +204,8 @@ const KhoanThu = sequelize.define("KhoanThu", {
   ngay_ghi_nhan: { type: DataTypes.DATEONLY, field: "ngayGhiNhan", allowNull: false }, ghi_chu: { type: DataTypes.STRING(1000), field: "ghiChu", allowNull: true },
   trang_thai_ghi_nhan: { type: DataTypes.STRING(50), field: "trangThaiGhiNhan", allowNull: false }, ly_do_huy: { type: DataTypes.STRING(1000), field: "lyDoHuy", allowNull: true },
   ngay_huy: { type: DataTypes.DATE, field: "ngayHuy", allowNull: true }, ma_giao_dich_thanh_toan: { ...ref("maGiaoDichThanhToan", true), unique: true }, ma_can: ref("maCan"),
+  doanh_thu_gop: money("doanhThuGop", true), giam_tru_phan_bo: money("giamTruPhanBo", true),
+  nguon_snapshot: { type: DataTypes.STRING(20), field: "nguonSnapshot", allowNull: true },
 }, opts("KhoanThu"));
 const KhoanKhauTru = sequelize.define("KhoanKhauTru", {
   ma_khau_tru: id("maKhauTru"), loai_khau_tru: { type: DataTypes.STRING(50), field: "loaiKhauTru", allowNull: false },

@@ -13,6 +13,10 @@ const checks = {
   activeReservationRoomState: `SELECT COUNT(*) violations FROM DatGiuPhong g JOIN PhongTro p ON p.maPhong=g.maPhong WHERE g.trangThai='DANG_GIU' AND p.trangThai<>'DA_GIU'`,
   heldRoomWithoutReservation: `SELECT COUNT(*) violations FROM (SELECT p.maPhong FROM PhongTro p LEFT JOIN DatGiuPhong g ON g.maPhong=p.maPhong AND g.trangThai='DANG_GIU' WHERE p.trangThai='DA_GIU' GROUP BY p.maPhong HAVING COUNT(g.maDatGiu)<>1) x`,
   reservationContractOverlap: `SELECT COUNT(*) violations FROM DatGiuPhong g JOIN HopDong h ON h.maPhong=g.maPhong AND h.trangThai IN ('DANG_HIEU_LUC','SAP_HET_HAN') WHERE g.trangThai='DANG_GIU'`,
+  recordedReceiptSnapshots: `SELECT COUNT(*) violations FROM KhoanThu WHERE nguonSnapshot='GHI_NHAN' AND (doanhThuGop IS NULL OR giamTruPhanBo IS NULL)`,
+  receiptSnapshotArithmetic: `SELECT COUNT(*) violations FROM KhoanThu WHERE nguonSnapshot='GHI_NHAN' AND ABS(doanhThuGop-giamTruPhanBo-soTien)>0.001`,
+  allocatedDiscounts: `SELECT COUNT(*) violations FROM (SELECT g.maThanhToan,COALESCE(SUM(k.giamTruPhanBo),0) allocated,COALESCE(x.discountTotal,0) available FROM GiaoDichThanhToan g JOIN KhoanThu k ON k.maGiaoDichThanhToan=g.maGiaoDich AND k.trangThaiGhiNhan='HIEU_LUC' LEFT JOIN (SELECT maThanhToan,SUM(IF(loaiKhoan='GIAM_TRU',ABS(soTien),0)) discountTotal FROM ChiTietThanhToan GROUP BY maThanhToan) x ON x.maThanhToan=g.maThanhToan GROUP BY g.maThanhToan,x.discountTotal HAVING allocated>available+0.001) q`,
+  snapshotReportTotals: `SELECT COUNT(*) violations FROM (SELECT ngayGhiNhan,SUM(soTien) net,SUM(doanhThuGop-giamTruPhanBo) snapshotNet FROM KhoanThu WHERE trangThaiGhiNhan='HIEU_LUC' AND nguonSnapshot IS NOT NULL GROUP BY ngayGhiNhan HAVING ABS(net-snapshotNet)>0.001) q`,
 };
 
 (async () => {

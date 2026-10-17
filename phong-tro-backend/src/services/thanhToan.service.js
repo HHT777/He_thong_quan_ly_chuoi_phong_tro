@@ -4,6 +4,7 @@ const sequelize = require("../config/database");
 const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, ThongBao } = require("../models");
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
+const { buildSnapshot } = require("./receiptSnapshot.service");
 
 function deterministicUuid(value) {
   const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split("");
@@ -42,6 +43,7 @@ class ThanhToanService {
         ngay_ghi_nhan: data.ngay_thanh_toan || new Date(), ghi_chu: data.ghi_chu || data.phuong_thuc || null,
         trang_thai_ghi_nhan: "HIEU_LUC", ma_giao_dich_thanh_toan: row.ma_giao_dich,
         ma_can: bill.hopDong.phongTro.ma_can,
+        ...await buildSnapshot(bill, amount, transaction),
       }, { transaction });
       await billService.updateBillStatus(bill.ma_thanh_toan, transaction);
       if (actorId) await writeAuditLog({
