@@ -77,6 +77,7 @@ class ManagementController {
 
   async listKhachThue(req, res, next) {
     try {
+      require("../utils/queryValidation").validateQuery(req.query, { strings: ["q"] });
       const where = {}; if (req.query.q) { const { Op } = require("sequelize"); const escaped = String(req.query.q).replace(/[\\%_]/g, (char) => `\\${char}`); where[Op.or] = [{ ho_ten: { [Op.like]: `%${escaped}%` } }, { so_dien_thoai: { [Op.like]: `%${escaped}%` } }, { cccd_giay_to: { [Op.like]: `%${escaped}%` } }]; }
       const data = await KhachThue.findAll({ where,
         include: [

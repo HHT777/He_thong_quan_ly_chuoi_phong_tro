@@ -27,6 +27,7 @@ class HopDongController {
 
   async getHopDongList(req, res, next) {
     try {
+      require("../utils/queryValidation").validateQuery(req.query, { strings: ["ma_khach_thue", "ma_phong", "trang_thai"], positiveIntegers: ["page", "limit"] });
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;

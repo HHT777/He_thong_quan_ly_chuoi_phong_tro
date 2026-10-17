@@ -36,6 +36,7 @@ class MeterReadingController {
   async landlordSubmit(req, res, next) { try { landlord(req); header(req, "Idempotency-Key"); res.apiSuccess(await service.submitForLandlord({ period: req.body.period, readingValue: req.body.readingValue, uploadToken: req.body.uploadToken }, req.user.ma_tai_khoan), null, 201); } catch (e) { next(e); } }
   async list(req, res, next) {
     try {
+      require("../utils/queryValidation").validateQuery(req.query, { periods: ["period"], strings: ["status", "buildingId"], positiveIntegers: ["page", "pageSize"] });
       const page = Math.max(1, Number(req.query.page || 1)); const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize || 20)));
       const where = { da_xoa: false }; if (req.query.period) Object.assign(where, service.parsePeriod(req.query.period)); if (req.query.status) where.trang_thai_xac_nhan = req.query.status;
       const include = service.include.map((item) => item.as === "phongTro" && req.query.buildingId ? { ...item, required: true, where: { ma_can: req.query.buildingId } } : item);

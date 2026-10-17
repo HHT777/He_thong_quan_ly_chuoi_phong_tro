@@ -8,6 +8,7 @@ const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
+const { validateQuery } = require("../utils/queryValidation");
 const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
 const billingAdjustmentDefinitionService = require("../services/billingAdjustmentDefinition.service");
@@ -134,6 +135,7 @@ router.post("/bills/generate", landlord, async (req, res, next) => {
 });
 router.get("/debt", async (req, res, next) => {
   try {
+    validateQuery(req.query);
     return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined }));
   } catch (e) { next(e); }
 });
@@ -368,6 +370,7 @@ router.post("/notifications/broadcast", landlord, async (req, res, next) => {
 });
 router.get("/reports/cashflow", landlord, async (req, res, next) => {
   try {
+    validateQuery(req.query, { allowed: ["from", "to", "buildingId", "periodType", "periodValue"] });
     return data(res, await cashflowReportService.getCashflow({
       from: req.query.from,
       to: req.query.to,

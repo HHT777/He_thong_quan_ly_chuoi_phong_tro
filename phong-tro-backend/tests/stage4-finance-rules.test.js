@@ -14,11 +14,11 @@ test("CT-006 cashflow filters both sources by inclusive period and building", ()
   const { receiptWhere, expenseWhere } = reportService.buildWhere({
     from: "2099-01-01",
     to: "2099-12-31",
-    buildingId: "none",
+    buildingId: "00000000-0000-4000-8000-000000000001",
   });
   assert.equal(receiptWhere.trang_thai_ghi_nhan, "HIEU_LUC");
-  assert.equal(receiptWhere.ma_can, "none");
-  assert.equal(expenseWhere.ma_can, "none");
+  assert.equal(receiptWhere.ma_can, "00000000-0000-4000-8000-000000000001");
+  assert.equal(expenseWhere.ma_can, "00000000-0000-4000-8000-000000000001");
   assert.deepEqual(receiptWhere.ngay_ghi_nhan[Op.between], ["2099-01-01", "2099-12-31"]);
   assert.deepEqual(expenseWhere.ngay_phat_sinh[Op.between], ["2099-01-01", "2099-12-31"]);
 });

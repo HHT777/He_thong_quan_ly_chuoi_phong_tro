@@ -25,6 +25,7 @@ class DatCocController {
 
   async getDatCocList(req, res, next) {
     try {
+      require("../utils/queryValidation").validateQuery(req.query, { strings: ["trang_thai", "ma_hop_dong"], positiveIntegers: ["page", "limit"] });
       const pagination = paginationService.paginate(req);
       const { count, data } = await datCocService.getDatCocList(
         req.query,

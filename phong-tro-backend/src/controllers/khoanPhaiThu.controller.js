@@ -5,6 +5,7 @@ const {
   thanhToanValidation,
 } = require("../validations/khoanPhaiThu.validation");
 const paginationService = require("../utils/pagination.util");
+const { validateQuery } = require("../utils/queryValidation");
 
 class KhoanPhaiThuController {
   async createKhoanPhaiThu(req, res, next) {
@@ -30,6 +31,7 @@ class KhoanPhaiThuController {
 
   async getKhoanPhaiThuList(req, res, next) {
     try {
+      validateQuery(req.query, { strings: ["ma_phong", "ma_khach_thue", "trang_thai_thanh_toan", "ma_can", "buildingId"], periods: ["ky"], positiveIntegers: ["page", "limit"] });
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;
@@ -163,6 +165,7 @@ class ThanhToanController {
 
   async getThanhToanList(req, res, next) {
     try {
+      validateQuery(req.query, { strings: ["ma_khoan_phai_thu", "ma_thanh_toan"], positiveIntegers: ["page", "limit"] });
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;
@@ -212,15 +215,16 @@ class ThanhToanController {
 
   async getPaymentStats(req, res, next) {
     try {
-      const startDate = new Date(req.query.startDate);
-      const endDate = new Date(req.query.endDate);
-
       if (!req.query.startDate || !req.query.endDate) {
         return res.status(400).json({
           success: false,
           message: "Vui lòng cung cấp startDate và endDate",
         });
       }
+      validateQuery(req.query, { dates: ["startDate", "endDate"] });
+      if (req.query.startDate > req.query.endDate) throw { status: 400, code: "INVALID_QUERY_PARAMETER", message: "startDate không được sau endDate" };
+      const startDate = new Date(req.query.startDate);
+      const endDate = new Date(req.query.endDate);
 
       const stats = await thanhToanService.getPaymentStats(startDate, endDate);
 

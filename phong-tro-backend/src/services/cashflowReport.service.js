@@ -13,7 +13,7 @@ const {
 
 function parseDate(value, field) {
   if (value === undefined) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw { status: 400, code: "INVALID_REPORT_PERIOD", message: `${field} phải có định dạng YYYY-MM-DD` };
   }
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -34,17 +34,37 @@ function buildDateCondition(from, to) {
 }
 
 function normalizeFilters(filters = {}) {
-  if (filters.periodType && filters.periodValue && !filters.from && !filters.to) {
-    const value = String(filters.periodValue);
-    if (filters.periodType === "month" && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)) { const [year, month] = value.split("-").map(Number); filters = { ...filters, from: `${value}-01`, to: `${year}-${String(month).padStart(2, "0")}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}` }; }
-    if (filters.periodType === "quarter" && /^\d{4}-[1-4]$/.test(value)) { const [year, quarter] = value.split("-").map(Number); const start = (quarter - 1) * 3 + 1; const end = start + 2; filters = { ...filters, from: `${year}-${String(start).padStart(2, "0")}-01`, to: `${year}-${String(end).padStart(2, "0")}-${new Date(Date.UTC(year, end, 0)).getUTCDate()}` }; }
-    if (filters.periodType === "year" && /^\d{4}$/.test(value)) filters = { ...filters, from: `${value}-01-01`, to: `${value}-12-31` };
+  const bad = (code, message) => { throw { status: 400, code, message }; };
+  const hasType = filters.periodType !== undefined;
+  const hasValue = filters.periodValue !== undefined;
+  const hasDates = filters.from !== undefined || filters.to !== undefined;
+  if (hasType !== hasValue) bad("REPORT_PERIOD_INCOMPLETE", "Cần cung cấp đủ loại kỳ và giá trị kỳ báo cáo");
+  if (hasType && hasDates) bad("REPORT_PERIOD_CONFLICT", "Không dùng kỳ báo cáo cùng khoảng ngày");
+  if (hasType) {
+    const type = filters.periodType;
+    const value = filters.periodValue;
+    if (!["month", "quarter", "year"].includes(type)) bad("REPORT_PERIOD_TYPE_INVALID", "Loại kỳ báo cáo không hợp lệ");
+    if (typeof value !== "string") bad("REPORT_PERIOD_VALUE_INVALID", "Giá trị kỳ báo cáo không hợp lệ");
+    const year = Number(value.slice(0, 4));
+    const validYear = year >= 1900 && year <= 2100;
+    if (!validYear || (type === "month" && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value))
+      || (type === "quarter" && !/^\d{4}-[1-4]$/.test(value))
+      || (type === "year" && !/^\d{4}$/.test(value))) bad("REPORT_PERIOD_VALUE_INVALID", "Giá trị kỳ báo cáo không hợp lệ");
+    if (type === "month") { const month = Number(value.slice(5)); return { ...filters, from: `${value}-01`, to: `${value}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}` }; }
+    if (type === "quarter") { const start = (Number(value.slice(5)) - 1) * 3 + 1; const end = start + 2; return { ...filters, from: `${year}-${String(start).padStart(2, "0")}-01`, to: `${year}-${String(end).padStart(2, "0")}-${new Date(Date.UTC(year, end, 0)).getUTCDate()}` }; }
+    return { ...filters, from: `${value}-01-01`, to: `${value}-12-31` };
   }
-  return filters;
+  if (hasDates) return filters;
+  // SRS UC-19 / FR-132: default to the current month in Vietnam.
+  const now = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date());
+  return normalizeFilters({ ...filters, periodType: "month", periodValue: now });
 }
 
 function buildWhere(filters = {}) {
   filters = normalizeFilters(filters);
+  if (filters.buildingId !== undefined && (typeof filters.buildingId !== "string" || !/^[0-9a-fA-F-]{36}$/.test(filters.buildingId))) {
+    throw { status: 400, code: "INVALID_REPORT_BUILDING", message: "Mã căn trọ không hợp lệ" };
+  }
   const from = parseDate(filters.from, "from");
   const to = parseDate(filters.to, "to");
   const date = buildDateCondition(from, to);
