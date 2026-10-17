@@ -59,6 +59,7 @@ function toDto(row) {
     room: { id: room.ma_phong || plain.ma_phong, code: room.so_phong || null, buildingId: room.ma_can || null, buildingName: room.canTro?.ten_can || null },
     previousReading: plain.previousReading ?? null,
     readingValue: Number(plain.chi_so_moi),
+    readingType: plain.loai_chi_so || "DINH_KY",
     status: plain.trang_thai_xac_nhan,
     unitPriceVnd: Number(plain.don_gia_ap_dung),
     evidenceImage: plain.anh_cong_to_url ? { id: plain.ma_chi_so, downloadUrl: `/api/v1/private-files/${plain.ma_chi_so}` } : null,
