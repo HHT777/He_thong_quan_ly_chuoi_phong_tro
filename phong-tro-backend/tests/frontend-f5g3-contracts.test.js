@@ -8,6 +8,7 @@ test("FR-195 contract screen pre-fills reservation and transfers only to server-
   assert.match(source, /chi_so_dien_ban_dau/);
   assert.match(source, /da_co_ban_giay_ky/);
   assert.match(source, /ma_dat_giu/);
+  assert.match(source, /onCreated: \(\) => sessionStorage\.removeItem/);
   assert.match(source, /\/hop-dong\/\$\{encodeURIComponent\(row\.ma_hop_dong\)\}\/history/);
   assert.match(source, /room\.trang_thai === "TRONG"/);
   assert.match(source, /finalElectricityReading/);

@@ -34,6 +34,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   create: {
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
+    onCreated: () => sessionStorage.removeItem("qlpt:contract-reservation"),
     initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "" }),
     fields: [
       { name: "ma_dat_giu", label: "Mã giữ phòng (nếu có)" },

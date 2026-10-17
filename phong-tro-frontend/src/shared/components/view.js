@@ -664,6 +664,7 @@ export async function renderList(context, config) {
         openCreateModal(config, async (body) => {
           const headers = typeof config.create.headers === "function" ? config.create.headers(body) : config.create.headers;
           await context.api.post(config.create.endpoint || config.endpoint, body, headers);
+          config.create.onCreated?.(body);
           await renderList(context, config);
         });
       });
