@@ -35,6 +35,7 @@ const errorHandler = (err, req, res, next) => {
   // Default error
   res.status(err.status || 500).json({
     success: false,
+    ...(err.code && { code: err.code }),
     message: err.message || "Lỗi máy chủ nội bộ",
     ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
   });

@@ -29,3 +29,20 @@ test("F.5 VND and required-reason validation rejects blank, text, negative and d
   assert.throws(() => requiredText("   ", "Lý do"), /bắt buộc/);
   assert.equal(requiredText("  hợp lệ  ", "Lý do"), "hợp lệ");
 });
+
+test("FR-143 request key survives same-tab reload without storing request content", async () => {
+  const { createRequestKeyStore } = await moduleUnderTest();
+  const data = new Map();
+  const sessionStorage = { getItem: (key) => data.get(key) || null, setItem: (key, value) => data.set(key, value) };
+  let sequence = 0;
+  const factory = () => `retry-${++sequence}`;
+  const payload = { bill: "bill-1", amount: 100, date: "2026-10-17", ghi_chu: "private note" };
+  const first = createRequestKeyStore(factory, sessionStorage).keyFor("payment:bill-1", payload);
+  const reloaded = createRequestKeyStore(factory, sessionStorage);
+  assert.equal(reloaded.keyFor("payment:bill-1", payload), first);
+  assert.equal(JSON.stringify([...data]).includes("private note"), false);
+  assert.notEqual(reloaded.keyFor("payment:bill-1", { ...payload, amount: 200 }), first);
+  const second = reloaded.keyFor("payment:bill-1", { ...payload, amount: 200 });
+  reloaded.complete("payment:bill-1");
+  assert.notEqual(createRequestKeyStore(factory, sessionStorage).keyFor("payment:bill-1", { ...payload, amount: 200 }), second);
+});
