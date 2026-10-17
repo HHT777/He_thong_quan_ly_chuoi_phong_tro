@@ -23,11 +23,21 @@ export default {
         ],
         submit: async (raw) => { await context.api.post("/v1/reservations", { ...raw, amount: integerVnd(raw.amount, "Tiền giữ"), terms: requiredText(raw.terms, "Điều kiện") }); await this.render(context); },
       }));
-      content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Phòng</th><th>Người giữ</th><th>Tiền giữ</th><th>Hạn</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${holds.map((row, index) => `<tr><td>${escapeHtml(row.phongTro?.so_phong || row.ma_phong)}</td><td>${escapeHtml(row.ho_ten_nguoi_giu)}</td><td>${escapeHtml(money(row.so_tien_giu))}</td><td>${escapeHtml(date(row.han_giu))}</td><td>${escapeHtml(row.trang_thai)} ${row.quaHan ? '<span class="badge badge--checkout">Quá hạn — phòng vẫn đang giữ, cần Chủ trọ xử lý</span>' : ""}</td><td>${row.trang_thai === "DANG_GIU" ? `<button data-extend="${index}">Gia hạn</button> <button data-cancel="${index}">Hủy</button> <button data-convert="${index}">Lập hợp đồng</button>` : "—"}</td></tr>`).join("")}</tbody></table></div><p data-message role="status"></p>`;
+      content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Phòng</th><th>Người giữ</th><th>Tiền giữ</th><th>Hạn</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${holds.map((row, index) => `<tr><td>${escapeHtml(row.phongTro?.so_phong || row.ma_phong)}</td><td>${escapeHtml(row.ho_ten_nguoi_giu)}</td><td>${escapeHtml(money(row.so_tien_giu))}</td><td>${escapeHtml(date(row.han_giu))}</td><td>${escapeHtml(row.trang_thai)} ${row.quaHan ? '<span class="badge badge--checkout">Quá hạn — phòng vẫn đang giữ, cần Chủ trọ xử lý</span>' : ""}</td><td>${row.trang_thai === "DANG_GIU" ? `<button data-history="${index}">Lịch sử gia hạn</button> <button data-extend="${index}">Gia hạn</button> <button data-cancel="${index}">Hủy</button> <button data-convert="${index}">Lập hợp đồng</button>` : "—"}</td></tr>`).join("")}</tbody></table></div><p data-message role="status"></p>`;
       const message = content.querySelector("[data-message]");
       content.addEventListener("click", async (event) => {
-        const button = event.target.closest("[data-extend],[data-cancel],[data-convert]"); if (!button) return;
-        const row = holds[Number(button.dataset.extend ?? button.dataset.cancel ?? button.dataset.convert)];
+        const button = event.target.closest("[data-history],[data-extend],[data-cancel],[data-convert]"); if (!button) return;
+        const row = holds[Number(button.dataset.history ?? button.dataset.extend ?? button.dataset.cancel ?? button.dataset.convert)];
+        if (button.dataset.history != null) {
+          button.disabled = true;
+          try {
+            const history = (await context.api.get(`/v1/reservations/${encodeURIComponent(row.ma_dat_giu)}/extension-history`)).data || [];
+            const overlay = document.createElement("div"); overlay.className = "modal-overlay";
+            overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Lịch sử gia hạn giữ phòng</h3>${history.map((item) => `<p>${escapeHtml(date(item.extendedAt))}: ${escapeHtml(date(item.oldExpiry))} → ${escapeHtml(date(item.newExpiry))}; người thực hiện ${escapeHtml(item.actorId)}.</p>`).join("") || "Chưa gia hạn."}<button type="button" data-close>Đóng</button></div>`;
+            overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove()); document.body.appendChild(overlay);
+          } catch (error) { message.textContent = error.message; } finally { button.disabled = false; }
+          return;
+        }
         if (button.dataset.convert != null) {
           sessionStorage.setItem("qlpt:contract-reservation", JSON.stringify({ roomId: row.ma_phong, reservationId: row.ma_dat_giu }));
           location.hash = "#/residents-contracts/contracts"; return;
@@ -40,10 +50,13 @@ export default {
           title: "Hủy giữ phòng và ghi nhận hoàn tiền", submitLabel: "Xác nhận hủy",
           fields: [{ name: "refundAmount", label: `Tiền hoàn (tiền đã giữ: ${money(row.so_tien_giu)})`, type: "number", value: row.so_tien_giu, required: true }, { name: "reason", label: "Lý do hủy", type: "textarea", required: true }],
           submit: async (raw) => {
-            if (!await confirmAction("Hủy giữ phòng sẽ giải phóng phòng và ghi nhận phần tiền không hoàn là doanh thu. Tiếp tục?")) return false;
             const refundAmount = integerVnd(raw.refundAmount, "Tiền hoàn");
+            const quoteUrl = `/v1/reservations/${encodeURIComponent(row.ma_dat_giu)}/cancellation-quote?refundAmount=${encodeURIComponent(refundAmount)}`;
+            const quote = (await context.api.get(quoteUrl)).data;
+            if (!await confirmAction(`Hủy sẽ giải phóng phòng. Hoàn ${money(quote.refundAmount)}, không hoàn ${money(quote.nonRefundAmount)}. Căn cứ: ${quote.basis}. Tiếp tục?`)) return false;
             button.disabled = true;
-            try { const result = await context.api.post(`/v1/reservations/${encodeURIComponent(row.ma_dat_giu)}/cancel`, { refundAmount, reason: requiredText(raw.reason, "Lý do hủy") }); message.textContent = `Đã hủy; tiền hoàn theo server: ${money(result.data.so_tien_hoan)}.`; await this.render(context); }
+            try { const result = await context.api.post(`/v1/reservations/${encodeURIComponent(row.ma_dat_giu)}/cancel`, { refundAmount, expectedRefundAmount: quote.refundAmount, reason: requiredText(raw.reason, "Lý do hủy") }); message.textContent = `Đã hủy; tiền hoàn theo server: ${money(result.data.so_tien_hoan)}.`; await this.render(context); }
+            catch (error) { if (error.code !== "RESERVATION_REFUND_QUOTE_CHANGED") throw error; const refreshed = (await context.api.get(quoteUrl)).data; throw new Error(`Báo giá đã thay đổi: hoàn ${money(refreshed.refundAmount)}, không hoàn ${money(refreshed.nonRefundAmount)}. Hãy xác nhận lại.`); }
             finally { button.disabled = false; }
           },
         });

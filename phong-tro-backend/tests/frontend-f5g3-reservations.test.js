@@ -11,6 +11,11 @@ test("FR-167..170 reservation screen uses server overdue, vacant rooms and cance
   assert.match(source, /\/extend`/);
   assert.match(source, /\/cancel`/);
   assert.match(source, /result\.data\.so_tien_hoan/);
+  assert.match(source, /\/extension-history`/);
+  assert.match(source, /\/cancellation-quote\?refundAmount=/);
+  assert.match(source, /expectedRefundAmount: quote\.refundAmount/);
+  assert.match(source, /RESERVATION_REFUND_QUOTE_CHANGED/);
+  assert.match(source, /Hãy xác nhận lại/);
   assert.match(source, /qlpt:contract-reservation/);
   assert.doesNotMatch(source, /\bfetch\(/);
 });
