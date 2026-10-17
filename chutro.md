@@ -640,4 +640,17 @@ Clone sạch kiểm chứng tại HEAD `00ecf38ee85a1798c851fd3206dd8c53d8439f21
 | Frontend Vite build | **Chưa chạy** theo phạm vi chỉ thị; không ghi nhận đạt |
 | MySQL 8.0.16 | **Chưa xác minh**; cổng thực tế chạy trên 8.0.46 |
 
+## Đính chính lịch sử trường báo cáo trước F.5 Nhóm 2 (2026-10-17)
+
+Đính chính mục 0.1: **trước F.1, `totalRevenue` không phải số gộp**. Tại C.2 và ngay trước F.1, trường này là tiền thực nhận cộng khấu trừ cọc; chính commit F.1 `f87b28b` mới đổi nó sang số gộp. Commit `0f65ddb` sau đó khôi phục nghĩa thực nhận và tách số gộp sang `grossRevenue`. Lịch sử contract chính xác:
+
+| Mốc | Công thức `totalRevenue` | Nghĩa |
+|---|---|---|
+| C.2 `a47ea58` | `cashReceipts + depositDeductions` | Thực nhận |
+| Trước F.1 `f87b28b^` | `cashReceipts + depositDeductions` | Thực nhận; không đổi so với C.2 |
+| Sau F.1 `f87b28b` | `grossCashRevenue + depositDeductions` | Số gộp trước giảm trừ; lợi nhuận trừ `discounts` riêng |
+| Sau `0f65ddb` | `cashReceipts + depositDeductions`; `grossRevenue = totalRevenue + discounts` | `totalRevenue` trở lại thực nhận; số gộp có trường riêng |
+
+Contract hiện hành tiếp tục theo `0f65ddb`: `totalRevenue`/`totalCollected` là thực nhận, `grossRevenue` là trước giảm trừ, `discounts` là giảm trừ đã phân bổ, và `profit = totalRevenue - totalExpenses`. Các consumer mới không được suy diễn `totalRevenue` là số gộp.
+
 Số vi phạm snapshot: `recordedReceiptSnapshots=0`, `receiptSnapshotArithmetic=0`, `allocatedDiscounts=0`, `snapshotReportTotals=0`. Không phát hiện lệch báo cáo sau backfill. Không làm F.5, in hợp đồng, Excel, liên kết sự cố, npm audit, dữ liệu hoàn cọc legacy hoặc thu hồi token.
