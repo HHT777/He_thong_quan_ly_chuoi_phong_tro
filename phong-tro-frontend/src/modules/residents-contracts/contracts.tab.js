@@ -1,5 +1,15 @@
 import { listTab } from "../../shared/components/tab-factory.js";
-import { date, money } from "../../shared/components/view.js";
+import { date, money, openFormModal, escapeHtml } from "../../shared/components/view.js";
+import { integerVnd, requiredText } from "../../core/idempotency.js";
+const reservationPrefill = () => {
+  try { return JSON.parse(sessionStorage.getItem("qlpt:contract-reservation") || "null"); } catch (_) { return null; }
+};
+const safeHistory = (item) => {
+  const row = item.data || {};
+  const type = { CHANGE: "Sửa hợp đồng", RENEWAL: "Gia hạn", ROOM_TRANSFER: "Chuyển phòng" }[item.type] || "Lịch sử";
+  const fields = item.type === "RENEWAL" ? ["ngay_ket_thuc_cu", "ngay_ket_thuc_moi", "so_thang"] : item.type === "ROOM_TRANSFER" ? ["ma_phong_cu", "ma_phong_moi", "ngay_chuyen"] : ["du_lieu_truoc", "du_lieu_sau"];
+  return { type, date: date(item.occurredAt), detail: fields.map((key) => `${key}: ${typeof row[key] === "object" ? "(đã thay đổi)" : row[key] ?? "—"}`).join(" · ") };
+};
 const numericContractValues = (raw) => ({
   ...raw,
   gia_thue: Number(raw.gia_thue),
@@ -19,7 +29,9 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   create: {
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
+    initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "" }),
     fields: [
+      { name: "ma_dat_giu", label: "Mã giữ phòng (nếu có)" },
       { name: "ma_khach_thue", label: "Mã khách thuê", required: true },
       { name: "ma_phong", label: "Mã phòng", required: true },
       { name: "ngay_bat_dau", label: "Ngày bắt đầu", type: "date", required: true },
@@ -33,9 +45,35 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
       { name: "dieu_khoan", label: "Điều khoản", type: "textarea", required: true },
       { name: "da_co_ban_giay_ky", label: "Đã có bản giấy ký", type: "checkbox", required: true },
     ],
-    map: numericContractValues,
+    map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; return result; },
   },
   rowActions: [{
+    id: "history", label: "Lịch sử", run: async (context, row) => {
+      const result = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/history`);
+      const entries = (result.data || []).map(safeHistory);
+      const overlay = document.createElement("div"); overlay.className = "modal-overlay";
+      overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Lịch sử hợp đồng</h3><div>${entries.map((item) => `<p><strong>${escapeHtml(item.type)}</strong> — ${escapeHtml(item.date)}<br>${escapeHtml(item.detail)}</p>`).join("") || "Chưa có lịch sử."}</div><button type="button" data-close>Đóng</button></div>`;
+      overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove()); document.body.appendChild(overlay);
+    },
+  }, {
+    id: "transfer", label: "Chuyển phòng", visible: (row) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(row.trang_thai),
+    run: async (context, row) => {
+      const rooms = (await context.api.get("/phong?limit=100")).data || [];
+      const vacant = rooms.filter((room) => room.trang_thai === "TRONG" && room.ma_phong !== row.ma_phong);
+      if (!vacant.length) throw new Error("Không có phòng trống để chuyển.");
+      openFormModal({ title: "Chuyển phòng", submitLabel: "Xác nhận chuyển", fields: [
+        { name: "targetRoomId", label: "Phòng đích trống", options: vacant.map((room) => ({ value: room.ma_phong, label: room.so_phong })), required: true },
+        { name: "transferDate", label: "Ngày chuyển", type: "date", required: true },
+        { name: "finalElectricityReading", label: "Chỉ số cuối phòng cũ", type: "number", required: true },
+        { name: "initialElectricityReading", label: "Chỉ số đầu phòng mới", type: "number", required: true },
+        { name: "newRent", label: "Giá thuê mới", type: "number", required: true },
+        { name: "reason", label: "Lý do", type: "textarea", required: true },
+      ], initial: { newRent: row.gia_thue }, submit: async (raw) => {
+        if (!window.confirm("Chuyển phòng sẽ chốt điện phòng cũ và cập nhật hợp đồng. Tiếp tục?")) return;
+        await context.api.post(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/transfers`, { targetRoomId: raw.targetRoomId, transferDate: raw.transferDate, finalElectricityReading: integerVnd(raw.finalElectricityReading, "Chỉ số cuối"), initialElectricityReading: integerVnd(raw.initialElectricityReading, "Chỉ số đầu"), newRent: integerVnd(raw.newRent, "Giá thuê mới", { positive: true }), reason: requiredText(raw.reason, "Lý do") });
+      } });
+    },
+  }, {
     id: "renew",
     label: "Gia hạn",
     visible: (row) => ["DANG_HIEU_LUC", "SAP_HET_HAN", "HET_HAN"].includes(row.trang_thai),

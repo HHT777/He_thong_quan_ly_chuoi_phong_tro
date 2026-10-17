@@ -161,6 +161,7 @@ function openCreateModal(config, onCreated) {
   return openFormModal({
     title: config.create.label || "Thêm mới",
     fields: config.create.fields,
+    initial: typeof config.create.initial === "function" ? config.create.initial() : config.create.initial || {},
     submitLabel: config.create.label || "Thêm mới",
     submit: (raw) => onCreated(config.create.map ? config.create.map(raw) : raw),
   });
