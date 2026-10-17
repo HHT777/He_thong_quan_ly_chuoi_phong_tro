@@ -31,7 +31,7 @@ export default {
       const message = form.querySelector("[data-message]");
       const history = content.querySelector("[data-history]");
       const renderHistory = () => {
-        history.innerHTML = readings.filter((row) => row.room?.id === form.elements.roomId.value).map((row) => `<tr><td>${escapeHtml(row.room?.code || row.room?.id)}</td><td>${escapeHtml(row.period)}</td><td>${escapeHtml(typeLabels[row.type] || row.type || "Định kỳ")}</td><td>${escapeHtml(row.readingValue)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(date(row.submittedAt))}</td><td>${row.status === "CHO_XAC_NHAN" ? `<button type="button" data-confirm="${escapeHtml(row.id)}">Xác nhận</button>` : ""}</td></tr>`).join("");
+        history.innerHTML = readings.filter((row) => row.room?.id === form.elements.roomId.value).map((row) => `<tr><td>${escapeHtml(row.room?.code || row.room?.id)}</td><td>${escapeHtml(row.period)}</td><td>${escapeHtml(typeLabels[row.type] || row.type || "Chưa rõ loại")}</td><td>${escapeHtml(row.readingValue)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(date(row.submittedAt))}</td><td>${row.status === "CHO_XAC_NHAN" ? `<button type="button" data-confirm="${escapeHtml(row.id)}">Xác nhận</button>` : ""}</td></tr>`).join("");
       };
       renderHistory();
       for (const name of ["roomId", "period", "file"]) form.elements[name].addEventListener("change", () => { token = null; renderHistory(); });
