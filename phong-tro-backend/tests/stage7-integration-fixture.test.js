@@ -32,3 +32,24 @@ test("CT-016 integration tests obtain logins from environment-backed fixture con
     assert.doesNotMatch(source, /login\(["'][^"']+["']\)/, file);
   }
 });
+
+test("CT-016 test auth defaults require test mode and a protected database suffix", () => {
+  const { applyTestAuthDefaults } = require("../src/config/environment");
+  const safe = applyTestAuthDefaults({ NODE_ENV: "test", DB_NAME: "qlpt_test" });
+  assert.match(safe.JWT_SECRET, /^[a-f0-9]{96}$/);
+  assert.equal(safe.JWT_EXPIRE, "7d");
+
+  const production = applyTestAuthDefaults({ NODE_ENV: "production", DB_NAME: "qlpt_test" });
+  assert.equal(production.JWT_SECRET, undefined);
+  const unsafe = applyTestAuthDefaults({ NODE_ENV: "test", DB_NAME: "phong_tro" });
+  assert.equal(unsafe.JWT_SECRET, undefined);
+});
+
+test("CT-016 production startup rejects a missing JWT secret", () => {
+  const { assertRuntimeAuthConfig } = require("../src/config/environment");
+  assert.throws(
+    () => assertRuntimeAuthConfig({ NODE_ENV: "production", JWT_EXPIRE: "7d" }),
+    /JWT_SECRET is required/,
+  );
+  assert.doesNotThrow(() => assertRuntimeAuthConfig({ NODE_ENV: "production", JWT_SECRET: "secret", JWT_EXPIRE: "7d" }));
+});

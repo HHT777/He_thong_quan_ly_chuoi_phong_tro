@@ -1,4 +1,5 @@
 require("dotenv").config();
+require("./config/environment").assertRuntimeAuthConfig();
 const app = require("./app");
 const sequelize = require("./config/database");
 const { initCronJobs } = require("./jobs/cron.jobs");

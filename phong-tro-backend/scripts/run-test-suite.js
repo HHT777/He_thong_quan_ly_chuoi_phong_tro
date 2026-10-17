@@ -6,6 +6,7 @@ const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const bcrypt = require("bcryptjs");
 const mysql = require("mysql2/promise");
+const { applyTestAuthDefaults } = require("../src/config/environment");
 
 const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
@@ -125,7 +126,7 @@ async function runIntegration() {
   const port = Number(process.env.TEST_PORT || 3101);
   const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
   const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), "qlpt-integration-"));
-  const env = {
+  const env = applyTestAuthDefaults({
     ...process.env,
     NODE_ENV: "test",
     DB_HOST: process.env.TEST_DB_HOST || process.env.DB_HOST,
@@ -138,7 +139,7 @@ async function runIntegration() {
     PORT: String(port),
     TEST_BASE_URL: baseUrl,
     UPLOAD_DIR: uploadDir,
-  };
+  });
   let server;
   try {
     await resetAndSeed(databaseName);

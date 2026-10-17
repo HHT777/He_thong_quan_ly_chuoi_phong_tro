@@ -33,7 +33,12 @@ DB_PASSWORD=
 PORT=3001
 NODE_ENV=development
 JWT_SECRET=replace_with_a_long_random_secret
+JWT_EXPIRE=7d
 ```
+
+`JWT_SECRET` và `JWT_EXPIRE` là bắt buộc khi chạy server thật; tiến trình sẽ
+dừng ngay lúc khởi động nếu thiếu. Không có secret mặc định cho development
+hoặc production.
 
 ### 3. Database
 
@@ -75,9 +80,6 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=phong_tro
-JWT_SECRET=replace_with_test_jwt_secret
-JWT_EXPIRE=1h
-
 TEST_DB_NAME=qlpt_integration_ci
 TEST_LANDLORD_USERNAME=owner_ci
 TEST_LANDLORD_PASSWORD=replace_with_test_password
@@ -87,6 +89,12 @@ TEST_OTHER_TENANT_USERNAME=tenant2_ci
 TEST_OTHER_TENANT_PASSWORD=replace_with_test_password
 TEST_NEW_ACCOUNT_PASSWORD=replace_with_test_password
 ```
+
+Khi runner tạo server với `NODE_ENV=test` và database có hậu tố `_test` hoặc
+`_ci`, runner tự sinh `JWT_SECRET` ngẫu nhiên cho đúng lần chạy và đặt
+`JWT_EXPIRE=7d` nếu hai biến này chưa được cung cấp. Cơ chế này không hoạt động
+với tên database khác hoặc ở development/production. Có thể truyền rõ hai biến
+để kiểm tra một cấu hình JWT cụ thể.
 
 Nếu DB test chạy trên máy chủ khác, có thể đặt thêm `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`. Tài khoản DB test cần quyền tạo và xóa đúng database test.
 
