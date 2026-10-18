@@ -26,7 +26,7 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - Sandbox từng gặp `npm ci` frontend lỗi `EPERM spawn`; người dùng tự `npm run build` ngoài sandbox. Không báo "build pass" khi chưa chạy thật; báo rõ file frontend đã đổi.
 
 ## 3. Mốc kiểm chứng gần nhất (cập nhật khi bàn giao)
-- HEAD trước commit cập nhật này: `60c7962` | nhánh `authz` | tag mốc `checkpoint-before-authz`.
+- HEAD trước commit cập nhật này: `3745649` | nhánh `authz` | tag mốc `checkpoint-before-authz`.
 - Unit: 116/116 | Integration MySQL 8: 58/58 với `AUTHZ_GROUP=contract` (57 test cũ + 1 test authz nhóm hợp đồng). Toàn bộ test authz Giai đoạn 1 chưa xanh vì các nhóm khác chưa vá.
 - `scripts/check-invariants.js`: 26 nhóm, 0 vi phạm ở DB seed và sau integration 58/58.
 - Migration 004 → 015 pass 2 lượt trên MySQL 8.0.46 và MariaDB 10.4.32, 37 bảng khớp `data2.md`. Chưa xác minh MySQL 8.0.16.
@@ -65,10 +65,11 @@ Giai đoạn 0, B (lịch sử hợp đồng 010, chuyển phòng 011), C (rút 
 
 ## 7. VIỆC ĐANG LÀM DỞ (làm tiếp từ đây)
 Đang làm authz Giai đoạn 1 theo yêu cầu mới; không làm Giai đoạn G. Bằng chứng đỏ trước vá: `ae53e8d`, `0239855` (26 route manifest + 2 trường hợp khách, 28 route đỏ). Test `tests/authz-phase1.integration.test.js` có thể lọc `AUTHZ_GROUP=contract` để chạy nhóm hợp đồng mà vẫn giữ suite cũ. Sau mỗi nhóm phải chạy unit + integration đầy đủ, làm phép thử phủ định, rồi cập nhật mục này bằng commit docs riêng.
-1. Đã xong nhóm hợp đồng/chuyển phòng `60c7962` (FR-035/041): Chủ trọ A không thể đọc/sửa/chuyển hợp đồng hoặc tạo hợp đồng bằng phòng của B; danh sách hợp đồng được lọc theo căn sở hữu. Test riêng nhóm hợp đồng 0 đỏ, phép thử phủ định bỏ `getHopDongById` check đã đỏ, khôi phục xanh; unit 116/116, integration 58/58, 26 bất biến 0.
-2. Còn làm: cọc; phiếu thu/generate/preview; thanh toán/hủy/mark-paid/mark-all/stats; điều chỉnh/giảm trừ/KhoanDieuChinh; tài khoản khách; quyết toán; hoàn cọc. Mỗi nhóm commit nhãn FR nghiệp vụ, sau đó commit docs AGENTS nhỏ. Test manifest route và `docs/AUTHZ_MATRIX.md` chưa làm.
-3. Ngoài phạm vi Giai đoạn 1: thông báo giữ phòng quá hạn hiện gửi cho mọi Chủ trọ đang hoạt động (`reservation.service.js`); fixture test authz khóa tạm tài khoản B sau test để không làm sai test cũ, nhưng lỗi cross-owner production chưa được sửa. Ghi vào ma trận Giai đoạn 2, không che giấu.
-4. Không có file frontend thay đổi, frontend build chưa chạy. Mốc tiếp tục: unit ≥ 116, integration ≥ 57, 26 bất biến 0.
+1. Đã xong nhóm hợp đồng/chuyển phòng `60c7962` (FR-035/041): Chủ trọ A không thể đọc/sửa/chuyển hợp đồng hoặc tạo hợp đồng bằng phòng của B; danh sách hợp đồng được lọc theo căn sở hữu. Test riêng nhóm hợp đồng 0 đỏ, phép thử phủ định bỏ `getHopDongById` check đã đỏ, khôi phục xanh.
+2. Đã xong nhóm cọc `3745649` (FR-043/044): tạo cọc trên hợp đồng B, xác nhận/hủy/đọc cọc B bị 404 như ID không tồn tại; danh sách chỉ chứa cọc của A. Phép thử phủ định bỏ `getDatCocById` check cho ra 200 khi A xem/xác nhận/hủy cọc B, có thay đổi `TienCoc`; khôi phục xanh. Sau nhóm: unit 116/116, integration 58/58, 26 bất biến 0.
+3. Còn làm: phiếu thu/generate/preview; thanh toán/hủy/mark-paid/mark-all/stats; điều chỉnh/giảm trừ/KhoanDieuChinh; tài khoản khách; quyết toán; hoàn cọc. Mỗi nhóm commit nhãn FR nghiệp vụ, sau đó commit docs AGENTS nhỏ. Test manifest route và `docs/AUTHZ_MATRIX.md` chưa làm.
+4. Ngoài phạm vi Giai đoạn 1: thông báo giữ phòng quá hạn hiện gửi cho mọi Chủ trọ đang hoạt động (`reservation.service.js`); fixture test authz khóa tạm tài khoản B sau test để không làm sai test cũ, nhưng lỗi cross-owner production chưa được sửa. Ghi vào ma trận Giai đoạn 2, không che giấu.
+5. Không có file frontend thay đổi, frontend build chưa chạy. Mốc tiếp tục: unit ≥ 116, integration ≥ 57, 26 bất biến 0.
 
 ## 8. Việc CÒN LẠI SAU NHÓM 3 (theo thứ tự đề xuất)
 - Giai đoạn G: in hợp đồng (FR-184), xuất Excel báo cáo (FR-194), liên kết sự cố mới/cũ.
