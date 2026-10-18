@@ -33,4 +33,9 @@ test("authz route manifest: inventory changes require explicit review", () => {
   const digest = crypto.createHash("sha256").update(signatures.sort().join("\n")).digest("hex");
   assert.equal(digest, "c8bf62b38c40c50ed003a5e05e9432b9f7f20e93035bf8ddd370c92977e1f6fe",
     "Route signature changed: review ownership scope and update the manifest deliberately");
+  const matrix = fs.readFileSync(path.resolve(__dirname, "../../docs/AUTHZ_MATRIX.md"), "utf8");
+  const documented = [...matrix.matchAll(/^\| ([A-Za-z]+\.routes\.js) \| (GET|POST|PUT|PATCH|DELETE) \| (\/[^| ]*) \|/gm)]
+    .map((match) => `${match[1]} ${match[2]} ${match[3]}`);
+  assert.equal(documented.length, 117, "Each route requires one explicit matrix row");
+  assert.deepEqual(documented.sort(), signatures, "Route inventory and authorization matrix differ");
 });
