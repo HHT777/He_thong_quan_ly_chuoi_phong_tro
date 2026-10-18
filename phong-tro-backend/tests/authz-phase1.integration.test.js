@@ -277,7 +277,8 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   ];
 
   const groupFilter = process.env.AUTHZ_GROUP;
-  const selectedRoutes = groupFilter === "contract"
+  const routeFilter = process.env.AUTHZ_ROUTE;
+  const groupedRoutes = groupFilter === "contract"
     ? routes.filter((r) => r.name.includes("/api/hop-dong"))
     : groupFilter === "deposit" ? routes.filter((r) => r.name.includes("/api/dat-coc"))
       : groupFilter === "bill" ? routes.filter((r) => r.name.startsWith("POST /api/khoan-phai-thu (") || /\/api\/v1\/bills\/(preview|generate)/.test(r.name))
@@ -286,7 +287,11 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
             : groupFilter === "account" ? routes.filter((r) => r.name.includes("/api/v1/accounts"))
               : groupFilter === "settlement" ? routes.filter((r) => r.name.includes("/settle"))
                 : groupFilter === "refund" ? routes.filter((r) => r.name.includes("/deposit-refunds")) : routes;
-  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
+  const selectedRoutes = routeFilter ? groupedRoutes.filter((r) => r.name.startsWith(routeFilter)) : groupedRoutes;
+  const statsRoute = "GET /api/khoan-phai-thu/payment/stats";
+  const statsSelected = routeFilter === statsRoute;
+  if (routeFilter) assert.equal(selectedRoutes.length, statsSelected ? 0 : 1, `AUTHZ_ROUTE must select exactly one route: ${routeFilter}`);
+  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (statsSelected || (!routeFilter && !groupFilter) ? 1 : 0)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
   async function fingerprint() {
@@ -303,13 +308,15 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     ...(result.body?.data?.total_amount !== undefined ? { totalAmount: result.body.data.total_amount } : {}),
   } });
   const failures = [];
-  if (!groupFilter || groupFilter === "payment") {
-    const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA) });
+  if (statsSelected || (!routeFilter && (!groupFilter || groupFilter === "payment"))) {
+    const mutationHeader = process.env.AUTHZ_MUTATION_ROUTE === statsRoute
+      ? { "X-Authz-Mutation-Route": statsRoute } : {};
+    const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA, mutationHeader) });
     if (stats.response.status !== 200 || Number(stats.body?.data?.total_amount) !== 0) {
       failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
     }
   }
-  if (!groupFilter || groupFilter === "settlement") {
+  if (!routeFilter && (!groupFilter || groupFilter === "settlement")) {
     const ownMoveOuts = await request("/api/v1/move-outs", { headers: headers(landlordA) });
     const foreignMoveOuts = await request("/api/v1/move-outs", { headers: headers(landlordB) });
     if (ownMoveOuts.response.status !== 200 || ownMoveOuts.body.data?.some((row) => row.ma_hop_dong === exitB.contract.ma_hop_dong)
@@ -321,7 +328,10 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     const before = await fingerprint();
     // 1. Cross-landlord call (A accessing B's resource)
     const idempotent = /payment\/create|mark-paid|mark-all-paid/.test(r.path);
-    const optsB = { method: r.method, headers: headers(landlordA, idempotent ? { "Idempotency-Key": crypto.randomUUID() } : {}) };
+    const mutationHeader = process.env.AUTHZ_MUTATION_ROUTE === r.name
+      ? { "X-Authz-Mutation-Route": r.name } : {};
+    const optsB = { method: r.method, headers: headers(landlordA,
+      { ...(idempotent ? { "Idempotency-Key": crypto.randomUUID() } : {}), ...mutationHeader }) };
     if (r.body) optsB.body = JSON.stringify(r.body);
     const resB = await request(r.path, optsB);
     const afterForeign = await fingerprint();
@@ -346,14 +356,20 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     if (!isDeniedB || changedForeign.length || !sameResponse) failures.push({ route: r.name, target: "cross-landlord", actual: visible(resB), expected: visible(resFake), changedTables: changedForeign });
     if (!isDeniedFake || changedMissing.length) failures.push({ route: r.name, target: "non-existent", actual: visible(resFake), changedTables: changedMissing });
   }
-  if (groupFilter === "contract") {
+  if (routeFilter && process.env.AUTHZ_MUTATION_ROUTE) {
+    const control = await request(`/api/hop-dong/${rentalB.contract.ma_hop_dong}`, { headers: headers(landlordA) });
+    if (control.response.status !== 404 || (control.body?.code || control.body?.error?.code) !== "RESOURCE_NOT_FOUND") {
+      failures.push({ route: "GET /api/hop-dong/:id", target: "unmutated-control", actual: visible(control) });
+    }
+  }
+  if (!routeFilter && groupFilter === "contract") {
     const list = await request("/api/hop-dong", { headers: headers(landlordA) });
     const contracts = Array.isArray(list.body?.data) ? list.body.data : [];
     if (list.response.status !== 200 || contracts.some((row) => row.ma_hop_dong === rentalB.contract.ma_hop_dong)) {
       failures.push({ route: "GET /api/hop-dong", target: "cross-landlord-list", actual: visible(list), changedTables: [] });
     }
   }
-  if (groupFilter === "deposit") {
+  if (!routeFilter && groupFilter === "deposit") {
     const ownDeposit = await TienCoc.findOne({ where: { ma_hop_dong: rentalA.contract.ma_hop_dong } });
     const own = await request(`/api/dat-coc/${ownDeposit.ma_tien_coc}`, { headers: headers(landlordA) });
     if (own.response.status !== 200) failures.push({ route: "GET /api/dat-coc/:id", target: "own-deposit-read", actual: visible(own) });
@@ -368,7 +384,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/dat-coc/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (groupFilter === "bill") {
+  if (!routeFilter && groupFilter === "bill") {
     const ownCreated = await request("/api/khoan-phai-thu", { method: "POST", headers: headers(landlordA),
       body: JSON.stringify({ ma_hop_dong: rentalA.contract.ma_hop_dong, ky: "2026-11", tien_phong: 2000000, tong_phai_thanh_toan: 2000000 }) });
     if (ownCreated.response.status !== 201) failures.push({ route: "POST /api/khoan-phai-thu", target: "own-bill-create", actual: visible(ownCreated) });
@@ -385,7 +401,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/khoan-phai-thu/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (groupFilter === "payment") {
+  if (!routeFilter && groupFilter === "payment") {
     const list = await request("/api/khoan-phai-thu/payment/list", { headers: headers(landlordA) });
     if (list.response.status !== 200 || list.body.data?.some((row) => row.ma_giao_dich === payB.ma_giao_dich)) {
       failures.push({ route: "GET /api/khoan-phai-thu/payment/list", target: "cross-landlord-list", actual: visible(list) });
@@ -396,7 +412,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/khoan-phai-thu/payment/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (groupFilter === "adjustment") {
+  if (!routeFilter && groupFilter === "adjustment") {
     const list = await request("/api/v1/billing-adjustments", { headers: headers(landlordA) });
     if (list.response.status !== 200 || list.body.data?.some((row) => row.ma_khoan_dieu_chinh === adjB.ma_khoan_dieu_chinh)) {
       failures.push({ route: "GET /api/v1/billing-adjustments", target: "cross-landlord-list", actual: visible(list) });
@@ -407,19 +423,19 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/v1/billing-adjustments?contractId=", target: "cross-landlord-filter", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (groupFilter === "account") {
+  if (!routeFilter && groupFilter === "account") {
     const ownReset = await request("/api/v1/accounts/reset-password", { method: "POST", headers: headers(landlordA),
       body: JSON.stringify({ tenantId: rentalA.tenant.ma_khach_thue }) });
     if (ownReset.response.status !== 200) failures.push({ route: "POST /api/v1/accounts/reset-password", target: "own-account", actual: visible(ownReset) });
   }
-  if (groupFilter === "settlement") {
+  if (!routeFilter && groupFilter === "settlement") {
     const foreign = await request(`/api/v1/move-outs/${exitB.contract.ma_hop_dong}/context`, { headers: headers(landlordA) });
     const absent = await request(`/api/v1/move-outs/${dummyId}/context`, { headers: headers(landlordA) });
     if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
       failures.push({ route: "GET /api/v1/move-outs/:contractId/context", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (!groupFilter || groupFilter === "payment") {
+  if (!routeFilter && (!groupFilter || groupFilter === "payment")) {
     const ownDebt = await request("/api/v1/debt", { headers: headers(landlordA) });
     const foreignDebt = await request("/api/v1/debt", { headers: headers(landlordB) });
     if (ownDebt.response.status !== 200 || ownDebt.body.data?.some((row) => row.ma_thanh_toan === billB.ma_thanh_toan)
@@ -431,7 +447,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     { route: `GET /api/hop-dong/${rentalB.contract.ma_hop_dong}`, missing: `GET /api/hop-dong/${dummyId}` },
     { route: `GET /api/khoan-phai-thu/${billB.ma_thanh_toan}`, missing: `GET /api/khoan-phai-thu/${dummyId}` },
   ]) {
-    if (groupFilter && !["contract", "bill"].includes(groupFilter)) continue;
+    if (routeFilter || (groupFilter && !["contract", "bill"].includes(groupFilter))) continue;
     if (groupFilter === "contract" && item.route.includes("khoan-phai-thu")) continue;
     if (groupFilter === "bill" && item.route.includes("hop-dong")) continue;
     const [, path] = item.route.split(" ");
@@ -442,13 +458,13 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: item.route, target: "tenant-cross-access", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  if (!groupFilter) { const tenantWrite = await request("/api/v1/bills/generate", {
+  if (!groupFilter && !routeFilter) { const tenantWrite = await request("/api/v1/bills/generate", {
     method: "POST", headers: headers(rentalA.tenantToken),
     body: JSON.stringify({ period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong] }),
   });
   if (tenantWrite.response.status !== 403) failures.push({ route: "POST /api/v1/bills/generate", target: "tenant-role", actual: visible(tenantWrite) }); }
 
-  console.log(`Phase 1 Unpatched/Failing checks count: ${failures.length} (total routes: ${routes.length + (groupFilter ? 0 : 1)})`);
+  console.log(`Phase 1 Unpatched/Failing checks count: ${failures.length} (total routes: ${selectedRoutes.length + (statsSelected || (!routeFilter && !groupFilter) ? 1 : 0)})`);
   if (failures.length > 0) {
     console.log(`AUTHZ_RED_ROUTES ${new Set(failures.map((item) => item.route)).size}`);
     for (const failure of failures) {
