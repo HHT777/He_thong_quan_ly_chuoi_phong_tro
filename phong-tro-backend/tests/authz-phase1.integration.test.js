@@ -277,7 +277,9 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   ];
 
   const groupFilter = process.env.AUTHZ_GROUP;
-  const selectedRoutes = groupFilter === "contract" ? routes.filter((r) => r.name.includes("/api/hop-dong")) : routes;
+  const selectedRoutes = groupFilter === "contract"
+    ? routes.filter((r) => r.name.includes("/api/hop-dong"))
+    : groupFilter === "deposit" ? routes.filter((r) => r.name.includes("/api/dat-coc")) : routes;
   console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
@@ -335,6 +337,21 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     const contracts = Array.isArray(list.body?.data) ? list.body.data : [];
     if (list.response.status !== 200 || contracts.some((row) => row.ma_hop_dong === rentalB.contract.ma_hop_dong)) {
       failures.push({ route: "GET /api/hop-dong", target: "cross-landlord-list", actual: visible(list), changedTables: [] });
+    }
+  }
+  if (groupFilter === "deposit") {
+    const ownDeposit = await TienCoc.findOne({ where: { ma_hop_dong: rentalA.contract.ma_hop_dong } });
+    const own = await request(`/api/dat-coc/${ownDeposit.ma_tien_coc}`, { headers: headers(landlordA) });
+    if (own.response.status !== 200) failures.push({ route: "GET /api/dat-coc/:id", target: "own-deposit-read", actual: visible(own) });
+    const list = await request("/api/dat-coc", { headers: headers(landlordA) });
+    const deposits = Array.isArray(list.body?.data) ? list.body.data : [];
+    if (list.response.status !== 200 || deposits.some((row) => row.ma_tien_coc === depositB.ma_tien_coc)) {
+      failures.push({ route: "GET /api/dat-coc", target: "cross-landlord-list", actual: visible(list), changedTables: [] });
+    }
+    const foreign = await request(`/api/dat-coc/${depositB.ma_tien_coc}`, { headers: headers(landlordA) });
+    const absent = await request(`/api/dat-coc/${dummyId}`, { headers: headers(landlordA) });
+    if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
+      failures.push({ route: "GET /api/dat-coc/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
   for (const item of [

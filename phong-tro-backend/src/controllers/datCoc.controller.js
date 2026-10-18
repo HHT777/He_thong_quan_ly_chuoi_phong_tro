@@ -11,7 +11,7 @@ class DatCocController {
         return next(error);
       }
 
-      const datCoc = await datCocService.createDatCoc(value);
+      const datCoc = await datCocService.createDatCoc(value, req.user);
 
       res.status(201).json({
         success: true,
@@ -30,6 +30,7 @@ class DatCocController {
       const { count, data } = await datCocService.getDatCocList(
         req.query,
         pagination,
+        req.user,
       );
 
       const response = paginationService.buildResponse(
@@ -52,7 +53,7 @@ class DatCocController {
 
   async getDatCocById(req, res, next) {
     try {
-      const datCoc = await datCocService.getDatCocById(req.params.id);
+      const datCoc = await datCocService.getDatCocById(req.params.id, req.user);
 
       res.json({
         success: true,
@@ -72,7 +73,7 @@ class DatCocController {
         return next(error);
       }
 
-      const datCoc = await datCocService.updateDatCoc(req.params.id, value);
+      const datCoc = await datCocService.updateDatCoc(req.params.id, value, req.user);
 
       res.json({
         success: true,
@@ -86,7 +87,7 @@ class DatCocController {
 
   async confirmDeposit(req, res, next) {
     try {
-      const datCoc = await datCocService.confirmDeposit(req.params.id);
+      const datCoc = await datCocService.confirmDeposit(req.params.id, req.user);
 
       res.json({
         success: true,
@@ -102,7 +103,7 @@ class DatCocController {
     try {
       const datCoc = await datCocService.cancelDeposit(
         req.params.id,
-        req.body.reason,
+        req.user,
       );
 
       res.json({
