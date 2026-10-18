@@ -295,7 +295,7 @@ router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) =>
   } catch (e) { next(e); }
 });
 router.get("/move-outs/:contractId/context", landlord, async (req, res, next) => {
-  try { return data(res, await moveOutService.getContext(req.params.contractId)); } catch (e) { next(e); }
+  try { return data(res, await moveOutService.getContext(req.params.contractId, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/move-outs/:id/deposit-refunds", landlord, async (req, res, next) => {
   try { return data(res, await moveOutService.recordDepositRefund(req.params.id, req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
