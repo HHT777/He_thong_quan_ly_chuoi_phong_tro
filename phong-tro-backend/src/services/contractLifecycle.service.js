@@ -63,7 +63,7 @@ function renewalMonths(oldEndDate, newEndDate) {
   const months = (newDate.getUTCFullYear() - oldDate.getUTCFullYear()) * 12 + newDate.getUTCMonth() - oldDate.getUTCMonth();
   const expected = new Date(oldDate);
   expected.setUTCMonth(expected.getUTCMonth() + months);
-  return expected.toISOString().slice(0, 10) === String(newEndDate) && [6, 12].includes(months) ? months : null;
+  return `${expected.getUTCFullYear()}-${String(expected.getUTCMonth() + 1).padStart(2, "0")}-${String(expected.getUTCDate()).padStart(2, "0")}` === String(newEndDate) && [6, 12].includes(months) ? months : null;
 }
 
 module.exports = { recordChange, recordRenewal, getHistory, renewalMonths };

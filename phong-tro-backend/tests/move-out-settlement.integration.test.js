@@ -4,10 +4,12 @@ const {
   TaiKhoan, HopDong, PhongTro, TaiSan, TienCoc, ChiSoDien, ThanhToan,
   ChiTietThanhToan, GiaoDichThanhToan, KhoanThu, KhoanKhauTru,
   BienBanTraPhong, GiaoDichHoanCoc, ViPhamHopDong, SuCo,
-  ChiPhiSuCoKhachThue,
+  ChiPhiSuCoKhachThue, YeuCauTraPhong,
 } = require("../src/models");
 const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const moveOutService = require("../src/services/moveOut.service");
+const cashflowReportService = require("../src/services/cashflowReport.service");
+const { businessDate } = require("../src/utils/businessDate.util");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
 // Business dates use Vietnam time; UTC's previous day would miss receipts near midnight.
@@ -43,6 +45,30 @@ function baseSettlement(overrides = {}) {
     ...overrides,
   };
 }
+
+test("FR-187/188 Vietnam business day controls settlement, meter month and refund at UTC month boundary", async () => {
+  const instant = new Date("2026-10-31T19:00:00.000Z"); // 2026-11-01 02:00 in Vietnam.
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "settlement-vietnam-boundary");
+  const requestId = await prepareMoveOut(landlord, fresh);
+  // Legacy approved requests may lack a stored date; exercise the settlement fallback clock.
+  await YeuCauTraPhong.update({ ngay_tra_da_duyet: null }, { where: { ma_yeu_cau: requestId } });
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  const settled = await moveOutService.settle(fresh.contract.ma_hop_dong, baseSettlement({ deduction: 1 }), actor.ma_tai_khoan, { now: instant });
+  assert.equal(settled.report.ngay_quyet_toan, "2026-11-01");
+  assert.equal(settled.report.ngay_kiem_tra, "2026-11-01");
+  const finalReading = await ChiSoDien.findOne({ where: { ma_phong: fresh.room.ma_phong, loai_chi_so: "CHOT_TRA_PHONG", khoa_nghiep_vu: fresh.contract.ma_hop_dong } });
+  assert.equal(Number(finalReading.nam), 2026);
+  assert.equal(Number(finalReading.thang), 11);
+  assert.equal(businessDate(finalReading.ngay_ghi_nhan), "2026-11-01");
+  const november = await cashflowReportService.getCashflow({ periodType: "month", periodValue: "2026-11", buildingId: fresh.building.ma_can });
+  const october = await cashflowReportService.getCashflow({ periodType: "month", periodValue: "2026-10", buildingId: fresh.building.ma_can });
+  assert.equal(november.depositDeductions, Math.min(Number(settled.report.tien_coc_ban_dau), Number(settled.report.tong_khoan_khau_tru)));
+  assert.equal(november.totalRevenue, november.depositDeductions);
+  assert.equal(october.depositDeductions, 0);
+  const refund = await moveOutService.recordDepositRefund(settled.report.ma_bien_ban, { soTien: 1, khoaChongTrung: `vn-boundary-${fresh.contract.ma_hop_dong}` }, actor.ma_tai_khoan, { now: instant });
+  assert.equal(refund.ngay_hoan, "2026-11-01");
+});
 
 test("FR-096/187/188 settlement context, detailed deductions, debt offset and partial refund", async () => {
   const landlord = await login(integration.landlord);

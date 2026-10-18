@@ -9,12 +9,12 @@ const reservationService = require("../services/reservation.service");
 const moveOutRequestService = require("../services/moveOutRequest.service");
 const billingCronService = require("../services/billingCron.service");
 const debtLifecycleService = require("../services/debtLifecycle.service");
+const { businessDate, addBusinessDays } = require("../utils/businessDate.util");
 
-async function updateContractStates() {
-  const now = new Date();
+async function updateContractStates({ now = new Date() } = {}) {
   const config = await getPersistedSystemConfig();
-  const warningDate = new Date(now);
-  warningDate.setDate(warningDate.getDate() + config.contractWarningDays);
+  const today = businessDate(now, config.timezone);
+  const warningDate = addBusinessDays(today, config.contractWarningDays);
   const expiring = await HopDong.findAll({
     where: { trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] }, ngay_ket_thuc: { [Op.lte]: warningDate } },
     include: [{ model: KhachThue, as: "khachThue" }],
@@ -22,7 +22,7 @@ async function updateContractStates() {
   for (const contract of expiring) {
     await sequelize.transaction(async (transaction) => {
       const locked = await HopDong.findByPk(contract.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE });
-      const expired = new Date(locked.ngay_ket_thuc) < now;
+      const expired = String(locked.ngay_ket_thuc) < today;
       const nextState = expired ? "HET_HAN" : "SAP_HET_HAN";
       if (locked.trang_thai !== nextState) await locked.update({ trang_thai: nextState }, { transaction });
       const landlordAccountId = await getLandlordAccountForRoom(locked.ma_phong, transaction);
@@ -38,7 +38,7 @@ async function updateContractStates() {
 }
 
 function localHour(now, timezone) { return Number(new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", hourCycle: "h23" }).format(now)); }
-function localDate(now, timezone) { return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now); }
+const localDate = businessDate;
 async function scheduled(name, hourKey, work, now = new Date()) {
   const config = await getPersistedSystemConfig();
   if (localHour(now, config.timezone) !== config[hourKey]) return { due: false };

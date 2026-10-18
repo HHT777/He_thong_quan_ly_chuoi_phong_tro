@@ -4,9 +4,10 @@ const { DatGiuPhong, LichSuGiaHanGiuPhong, PhongTro, KhoanThu } = require("../mo
 const { writeAuditLog } = require("./auditLog.service");
 const { assertLandlordOwnsRoom } = require("./propertyAccess.service");
 const { getLandlordAccountForRoom } = require("./ownership.service");
+const { businessDate } = require("../utils/businessDate.util");
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
-const dateOnly = (value) => new Date(value).toISOString().slice(0, 10);
+const dateOnly = businessDate;
 function cents(value) {
   const text = String(value ?? "");
   if (!/^\d+(?:\.\d{1,2})?$/.test(text)) throw fail(422, "INVALID_REFUND_AMOUNT", "Số tiền hoàn không hợp lệ");

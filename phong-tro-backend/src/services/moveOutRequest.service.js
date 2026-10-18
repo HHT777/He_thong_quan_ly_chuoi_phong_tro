@@ -4,23 +4,12 @@ const {
   TaiKhoan, KhachThue, HopDong, PhongTro, YeuCau, YeuCauTraPhong, BienBanTraPhong, ThongBao,
 } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
+const { businessDate, addBusinessDays } = require("../utils/businessDate.util");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 
-function dateOnly(value = new Date()) {
-  if (typeof value === "string") return value.slice(0, 10);
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(value);
-  const part = (type) => parts.find((item) => item.type === type)?.value;
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-function addDays(value, days) {
-  const date = new Date(`${dateOnly(value)}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
+const dateOnly = businessDate;
+const addDays = addBusinessDays;
 
 async function approve({ request, approvedDate, earlyReturnReason, actorId, transaction }) {
   const detail = await YeuCauTraPhong.findOne({
