@@ -31,7 +31,7 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - `scripts/check-invariants.js`: 26 nhóm, 0 vi phạm ở DB seed và sau integration 58/58.
 - Migration 004 → 015 pass 2 lượt trên MySQL 8.0.46 và MariaDB 10.4.32, 37 bảng khớp `data2.md`. Chưa xác minh MySQL 8.0.16.
 - Frontend build: người dùng xác nhận "build OK cho bản hiện tại" trước đợt F.5 Nhóm 3 bổ sung; CHƯA chạy hoặc xác nhận build sau Nhóm 3.
-- Worktree trước commit bàn giao: không có file tracked sửa đổi; 9 đường dẫn untracked chủ ý gồm 6 model và 3 tài liệu cấu trúc (xem mục 4). Không stage, sửa hoặc xóa chúng.
+- Worktree trước commit bàn giao: không có file tracked sửa đổi; 10 đường dẫn untracked chủ ý gồm 6 model, 3 tài liệu cấu trúc và `docs/TASK_AUTHZ.md`. Không stage, sửa hoặc xóa chúng.
 - Quy tắc: mọi thay đổi không được làm giảm các mốc trên.
 
 ## 4. Quy tắc bắt buộc
