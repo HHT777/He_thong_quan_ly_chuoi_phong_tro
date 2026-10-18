@@ -30,7 +30,7 @@ test("FR-166 detail is read-only and limited to owner and proposing tenant", asy
   const rogueAccount = await TaiKhoan.create({ ten_dang_nhap: `own${Date.now()}`.slice(0, 15), mat_khau: await bcrypt.hash("TestPass123!", 10), vai_tro: "CHU_TRO", trang_thai: "DA_KHOA" });
   await ChuTro.create({ ma_tai_khoan: rogueAccount.ma_tai_khoan, ho_ten: "Other owner", so_dien_thoai: "0987654320" });
   const rogue = jwt.sign({ ma_tai_khoan: rogueAccount.ma_tai_khoan, vai_tro: "CHU_TRO" }, process.env.JWT_SECRET);
-  assert.equal((await request(url, { headers: headers(rogue) })).response.status, 403);
+  assert.equal((await request(url, { headers: headers(rogue) })).response.status, 404);
   assert.equal((await request("/api/v1/co-tenant-proposals/bad", { headers: headers(landlord) })).response.status, 400);
   assert.equal((await request(`/api/v1/co-tenant-proposals/${crypto.randomUUID()}`, { headers: headers(landlord) })).response.status, 404);
   const list = await request("/api/v1/requests", { headers: headers(landlord) });

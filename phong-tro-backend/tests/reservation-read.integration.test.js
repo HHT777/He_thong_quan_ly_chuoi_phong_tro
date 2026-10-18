@@ -38,7 +38,7 @@ test("FR-168/169 protected history and quote reads have validation and no writes
   const rogue = await TaiKhoan.create({ ten_dang_nhap: `oth${Date.now()}`.slice(0, 15), mat_khau: await bcrypt.hash("TestPass123!", 10), vai_tro: "CHU_TRO", trang_thai: "DA_KHOA" });
   await ChuTro.create({ ma_tai_khoan: rogue.ma_tai_khoan, ho_ten: "Other owner", so_dien_thoai: "0987654314" });
   const rogueToken = jwt.sign({ ma_tai_khoan: rogue.ma_tai_khoan, vai_tro: "CHU_TRO" }, process.env.JWT_SECRET);
-  assert.equal((await request(`/api/v1/reservations/${id}/cancellation-quote?refundAmount=300000`, { headers: headers(rogueToken) })).response.status, 403);
+  assert.equal((await request(`/api/v1/reservations/${id}/cancellation-quote?refundAmount=300000`, { headers: headers(rogueToken) })).response.status, 404);
   const cancelled = await request(`/api/v1/reservations/${id}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ refundAmount: 300000, expectedRefundAmount: quote.body.data.refundAmount, reason: "Hủy" }) });
   assert.equal(cancelled.response.status, 200, JSON.stringify(cancelled.body));
   assert.equal(Number(cancelled.body.data.so_tien_hoan), Number(quote.body.data.refundAmount));

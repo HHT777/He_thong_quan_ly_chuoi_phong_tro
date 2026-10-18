@@ -61,7 +61,7 @@ async function resolveBuildingId(resourceType, id, transaction) {
       return row ? { item: row, buildingId: row.ma_can, landlordId: row.ma_chu_tro } : null;
     }
     case "room": {
-      const row = await PhongTro.findByPk(id, { attributes: ["ma_phong", "ma_can"], transaction });
+      const row = await PhongTro.findByPk(id, { attributes: ["ma_phong", "ma_can", "so_nguoi_toi_da"], transaction });
       return row ? { item: row, buildingId: row.ma_can } : null;
     }
     case "contract": {
