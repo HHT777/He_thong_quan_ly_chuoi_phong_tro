@@ -26,9 +26,9 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - Sandbox từng gặp `npm ci` frontend lỗi `EPERM spawn`; người dùng tự `npm run build` ngoài sandbox. Không báo "build pass" khi chưa chạy thật; báo rõ file frontend đã đổi.
 
 ## 3. Mốc kiểm chứng gần nhất (cập nhật khi bàn giao)
-- HEAD trước commit bàn giao: `4b3e94e5985a22f6ee0e7ce1ff10ee79e5a5eedd` | tag mới nhất: `checkpoint-before-f5-g3b`.
-- Unit: 107/107 (lần chạy cuối sau test `innerHTML`) | Integration MySQL 8: 57/57 (lần chạy cuối trước commit test `innerHTML`; commit cuối chỉ thêm unit test).
-- `scripts/check-invariants.js`: 19 nhóm, 0 vi phạm; chạy tự động cuối integration trước khi dọn DB, exit code 0 ở lần chạy 57/57.
+- HEAD trước commit cập nhật này: `60c7962` | nhánh `authz` | tag mốc `checkpoint-before-authz`.
+- Unit: 116/116 | Integration MySQL 8: 58/58 với `AUTHZ_GROUP=contract` (57 test cũ + 1 test authz nhóm hợp đồng). Toàn bộ test authz Giai đoạn 1 chưa xanh vì các nhóm khác chưa vá.
+- `scripts/check-invariants.js`: 26 nhóm, 0 vi phạm ở DB seed và sau integration 58/58.
 - Migration 004 → 015 pass 2 lượt trên MySQL 8.0.46 và MariaDB 10.4.32, 37 bảng khớp `data2.md`. Chưa xác minh MySQL 8.0.16.
 - Frontend build: người dùng xác nhận "build OK cho bản hiện tại" trước đợt F.5 Nhóm 3 bổ sung; CHƯA chạy hoặc xác nhận build sau Nhóm 3.
 - Worktree trước commit bàn giao: không có file tracked sửa đổi; 9 đường dẫn untracked chủ ý gồm 6 model và 3 tài liệu cấu trúc (xem mục 4). Không stage, sửa hoặc xóa chúng.
@@ -64,13 +64,11 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 Giai đoạn 0, B (lịch sử hợp đồng 010, chuyển phòng 011), C (rút duyệt, ngày trả, quyết toán 012), D (phiếu thu, công nợ, 013), E (cấu hình DB, token ảnh điện ký HMAC, audit đầy đủ, thông báo khóa sự kiện 014, validation), F.0–F.4 (báo cáo BR-44 + snapshot 015, người ở cùng, giữ phòng, OCR Chủ trọ), tương thích MySQL 8, F.5 Nhóm 1 (quyết toán, phiếu thu), Nhóm 2 (công nợ, báo cáo), vá tham số kỳ báo cáo trả 400, hai lần thu một phần. F.5 Nhóm 3: ba API đọc và UI tương ứng, test ranh giới giờ Việt Nam và bộ quét `innerHTML` (xem mục 7); chưa có xác nhận build sau Nhóm 3.
 
 ## 7. VIỆC ĐANG LÀM DỞ (làm tiếp từ đây)
-F.5 Nhóm 3 đã hoàn tất phần được duyệt, CHỜ người dùng xác nhận "build nhóm 3 OK" trước khi làm tiếp. Không tự bắt đầu nhóm/giai đoạn mới.
-1. API chi tiết đề xuất người ở cùng và UI duyệt sau khi đối chiếu định danh: `3f2715c`, `de8bd02`; test `co-tenant-detail.*` và `frontend-f5g3-cotenants.test.js`.
-2. DTO `readingType` bốn loại và UI nhãn tiếng Việt: `1a8ba8f`, `fb0e4d7`; test `meter-reading-types.*`, `frontend-f5g3-meter.test.js`.
-3. Giữ phòng: lịch sử gia hạn, báo giá hoàn chung hàm với hủy, 409 khi `expectedRefundAmount` lệch, UI xác nhận: `a17f861`, `97cb88b`; test `reservation-read.*`, `frontend-f5g3-reservations.test.js`.
-4. Ranh giới tháng báo cáo/cron giờ Việt Nam và quét `innerHTML`: `127f5b1`, `4b3e94e`; test `report-vietnam-boundary.test.js`, `frontend-innerhtml-safety.test.js`. Bộ quét hiện là kiểm tra tĩnh theo mẫu, không thay thế kiểm thử XSS runtime.
-5. Rủi ro cần xin quyết định: các thao tác ghi cũ `create/extend` giữ phòng và luồng duyệt người ở cùng chưa được mở rộng kiểm tra cùng quyền sở hữu như các API đọc mới và hủy giữ phòng. Người dùng đã được hỏi nhưng chưa trả lời. Không tự sửa lan sang backend trước khi có chỉ thị.
-Mốc tiếp tục: unit ≥ 107, integration ≥ 57. Bản Nhóm 3 chưa được người dùng xác nhận build; dừng chờ.
+Đang làm authz Giai đoạn 1 theo yêu cầu mới; không làm Giai đoạn G. Bằng chứng đỏ trước vá: `ae53e8d`, `0239855` (26 route manifest + 2 trường hợp khách, 28 route đỏ). Test `tests/authz-phase1.integration.test.js` có thể lọc `AUTHZ_GROUP=contract` để chạy nhóm hợp đồng mà vẫn giữ suite cũ. Sau mỗi nhóm phải chạy unit + integration đầy đủ, làm phép thử phủ định, rồi cập nhật mục này bằng commit docs riêng.
+1. Đã xong nhóm hợp đồng/chuyển phòng `60c7962` (FR-035/041): Chủ trọ A không thể đọc/sửa/chuyển hợp đồng hoặc tạo hợp đồng bằng phòng của B; danh sách hợp đồng được lọc theo căn sở hữu. Test riêng nhóm hợp đồng 0 đỏ, phép thử phủ định bỏ `getHopDongById` check đã đỏ, khôi phục xanh; unit 116/116, integration 58/58, 26 bất biến 0.
+2. Còn làm: cọc; phiếu thu/generate/preview; thanh toán/hủy/mark-paid/mark-all/stats; điều chỉnh/giảm trừ/KhoanDieuChinh; tài khoản khách; quyết toán; hoàn cọc. Mỗi nhóm commit nhãn FR nghiệp vụ, sau đó commit docs AGENTS nhỏ. Test manifest route và `docs/AUTHZ_MATRIX.md` chưa làm.
+3. Ngoài phạm vi Giai đoạn 1: thông báo giữ phòng quá hạn hiện gửi cho mọi Chủ trọ đang hoạt động (`reservation.service.js`); fixture test authz khóa tạm tài khoản B sau test để không làm sai test cũ, nhưng lỗi cross-owner production chưa được sửa. Ghi vào ma trận Giai đoạn 2, không che giấu.
+4. Không có file frontend thay đổi, frontend build chưa chạy. Mốc tiếp tục: unit ≥ 116, integration ≥ 57, 26 bất biến 0.
 
 ## 8. Việc CÒN LẠI SAU NHÓM 3 (theo thứ tự đề xuất)
 - Giai đoạn G: in hợp đồng (FR-184), xuất Excel báo cáo (FR-194), liên kết sự cố mới/cũ.
