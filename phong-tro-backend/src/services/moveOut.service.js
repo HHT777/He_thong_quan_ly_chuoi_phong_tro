@@ -111,6 +111,7 @@ async function recordDepositRefund(reportId, payload, actorId) {
   const key = String(payload.khoaChongTrung || "").trim(); const refundAmount = amount(payload.soTien, "Số tiền hoàn");
   if (!key || refundAmount <= 0) throw fail(422, "Thiếu thông tin hoàn cọc", "INVALID_DEPOSIT_REFUND");
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(ownerUser(actorId), "moveOut", reportId, { transaction });
     const old = await GiaoDichHoanCoc.findOne({ where: { khoa_chong_trung: key }, transaction, lock: transaction.LOCK.UPDATE });
     if (old) { if (old.ma_bien_ban_tra_phong !== reportId || Number(old.so_tien) !== refundAmount) throw fail(409, "Khóa chống trùng xung đột", "IDEMPOTENCY_CONFLICT"); return old; }
     const report = await BienBanTraPhong.findByPk(reportId, { transaction, lock: transaction.LOCK.UPDATE });
