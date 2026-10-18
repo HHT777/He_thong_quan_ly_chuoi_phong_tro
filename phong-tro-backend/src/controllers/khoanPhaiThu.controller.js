@@ -154,6 +154,7 @@ class ThanhToanController {
       const { count, data } = await thanhToanService.getThanhToanList(
         filters,
         pagination,
+        req.user,
       );
 
       const response = paginationService.buildResponse(
@@ -176,13 +177,7 @@ class ThanhToanController {
 
   async getThanhToanById(req, res, next) {
     try {
-      const thanhToan = await thanhToanService.getThanhToanById(req.params.id);
-      if (
-        req.user.vai_tro === "KHACH_THUE" &&
-        String(thanhToan.thanhToan?.hopDong?.ma_khach_thue) !== String(req.user.ma_khach_thue)
-      ) {
-        return res.status(403).json({ success: false, message: "Bạn chỉ được xem thanh toán của mình" });
-      }
+      const thanhToan = await thanhToanService.getThanhToanById(req.params.id, req.user);
 
       res.json({
         success: true,
@@ -207,7 +202,7 @@ class ThanhToanController {
       const startDate = new Date(req.query.startDate);
       const endDate = new Date(req.query.endDate);
 
-      const stats = await thanhToanService.getPaymentStats(startDate, endDate);
+      const stats = await thanhToanService.getPaymentStats(startDate, endDate, req.user);
 
       res.json({
         success: true,

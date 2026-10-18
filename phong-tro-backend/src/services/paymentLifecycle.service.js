@@ -4,6 +4,8 @@ const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro } = require(".
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
 const { buildSnapshot } = require("./receiptSnapshot.service");
+const { assertOwned } = require("./ownership.service");
+const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 function deterministicUuid(value) { const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split(""); hex[12] = "4"; hex[16] = ((parseInt(hex[16], 16) & 3) | 8).toString(16); return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`; }
@@ -21,12 +23,13 @@ async function recordRemaining(bill, key, actorId, transaction, now = new Date()
 }
 async function markPaid(billId, key, actorId) {
   if (!key) throw fail(400, "Thiếu Idempotency-Key", "IDEMPOTENCY_KEY_REQUIRED");
-  return sequelize.transaction(async (transaction) => { const bill = await ThanhToan.findByPk(billId, { transaction, lock: transaction.LOCK.UPDATE }); if (!bill) throw fail(404, "Không tìm thấy phiếu", "BILL_NOT_FOUND"); if (bill.loai_thanh_toan === "SAU_THANH_LY") throw fail(409, "Không dùng Đã đóng cho nợ sau thanh lý", "POST_LIQUIDATION_NOT_SUPPORTED"); return { payment: await recordRemaining(bill, key, actorId, transaction), bill: await billService.updateBillStatus(billId, transaction) }; });
+  return sequelize.transaction(async (transaction) => { const bill = await ThanhToan.findByPk(billId, { transaction, lock: transaction.LOCK.UPDATE }); await assertOwned(ownerUser(actorId), "bill", billId, { transaction }); if (bill.loai_thanh_toan === "SAU_THANH_LY") throw fail(409, "Không dùng Đã đóng cho nợ sau thanh lý", "POST_LIQUIDATION_NOT_SUPPORTED"); return { payment: await recordRemaining(bill, key, actorId, transaction), bill: await billService.updateBillStatus(billId, transaction) }; });
 }
 async function markAllPaid({ buildingId, period, key, actorId, failAfter }) {
   if (!key) throw fail(400, "Thiếu Idempotency-Key", "IDEMPOTENCY_KEY_REQUIRED");
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || ""); if (!buildingId || !match) throw fail(422, "Căn và kỳ YYYY-MM là bắt buộc", "INVALID_MARK_ALL_SCOPE");
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(ownerUser(actorId), "building", buildingId, { transaction });
     const bills = await ThanhToan.findAll({ where: { nam: Number(match[1]), thang: Number(match[2]), loai_thanh_toan: "DINH_KY" }, include: [{ model: HopDong, as: "hopDong", required: true, include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: buildingId } }] }], transaction, lock: transaction.LOCK.UPDATE, order: [["ma_thanh_toan", "ASC"]] });
     const payments = []; for (const bill of bills) { const row = await recordRemaining(bill, key, actorId, transaction); if (row) payments.push(row); if (failAfter && payments.length >= failAfter) throw fail(500, "Lỗi mô phỏng giữa giao dịch", "INJECTED_FAILURE"); }
     return { processed: payments.length, payments };
@@ -35,7 +38,8 @@ async function markAllPaid({ buildingId, period, key, actorId, failAfter }) {
 async function cancel(paymentId, reason, actorId) {
   reason = String(reason || "").trim(); if (!reason) throw fail(422, "Lý do hủy là bắt buộc", "PAYMENT_CANCEL_REASON_REQUIRED");
   return sequelize.transaction(async (transaction) => {
-    const payment = await GiaoDichThanhToan.findByPk(paymentId, { transaction, lock: transaction.LOCK.UPDATE }); if (!payment) throw fail(404, "Không tìm thấy lần thu", "PAYMENT_NOT_FOUND");
+    const payment = await GiaoDichThanhToan.findByPk(paymentId, { transaction, lock: transaction.LOCK.UPDATE });
+    await assertOwned(ownerUser(actorId), "payment", paymentId, { transaction });
     if (payment.nguon_thanh_toan !== "THU_TIEN") throw fail(409, "Không được hủy khoản khấu trừ cọc", "DEPOSIT_OFFSET_CANNOT_CANCEL");
     if (payment.trang_thai_xac_nhan === "DA_HUY") throw fail(409, "Lần thu đã bị hủy", "PAYMENT_ALREADY_CANCELLED");
     if (payment.trang_thai_xac_nhan !== "DA_XAC_NHAN") throw fail(409, "Chỉ được hủy lần thu đã xác nhận", "PAYMENT_NOT_CONFIRMED");

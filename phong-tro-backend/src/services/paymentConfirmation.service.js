@@ -3,11 +3,12 @@ const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, Th
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
 const { buildSnapshot } = require("./receiptSnapshot.service");
+const { assertOwned } = require("./ownership.service");
 
 async function confirm(id, actorId) {
   return sequelize.transaction(async (transaction) => {
     const payment = await GiaoDichThanhToan.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!payment) throw { status: 404, code: "PAYMENT_NOT_FOUND", message: "Không tìm thấy giao dịch thanh toán" };
+    await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "payment", id, { transaction });
     if (payment.trang_thai_xac_nhan === "DA_HUY") {
       throw { status: 409, code: "PAYMENT_CANCELLED", message: "Không thể xác nhận giao dịch đã hủy" };
     }

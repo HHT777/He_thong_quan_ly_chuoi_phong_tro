@@ -280,7 +280,8 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   const selectedRoutes = groupFilter === "contract"
     ? routes.filter((r) => r.name.includes("/api/hop-dong"))
     : groupFilter === "deposit" ? routes.filter((r) => r.name.includes("/api/dat-coc"))
-      : groupFilter === "bill" ? routes.filter((r) => r.name.startsWith("POST /api/khoan-phai-thu (") || /\/api\/v1\/bills\/(preview|generate)/.test(r.name)) : routes;
+      : groupFilter === "bill" ? routes.filter((r) => r.name.startsWith("POST /api/khoan-phai-thu (") || /\/api\/v1\/bills\/(preview|generate)/.test(r.name))
+        : groupFilter === "payment" ? routes.filter((r) => /payment\/create|payment\/:id\/confirm|mark-paid|mark-all-paid|payments\/:id\/cancel/.test(r.name)) : routes;
   console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
@@ -298,7 +299,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     ...(result.body?.data?.total_amount !== undefined ? { totalAmount: result.body.data.total_amount } : {}),
   } });
   const failures = [];
-  if (!groupFilter) {
+  if (!groupFilter || groupFilter === "payment") {
     const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA) });
     if (stats.response.status !== 200 || Number(stats.body?.data?.total_amount) !== 0) {
       failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
@@ -370,6 +371,17 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     const absent = await request(`/api/khoan-phai-thu/${dummyId}`, { headers: headers(landlordA) });
     if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
       failures.push({ route: "GET /api/khoan-phai-thu/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
+    }
+  }
+  if (groupFilter === "payment") {
+    const list = await request("/api/khoan-phai-thu/payment/list", { headers: headers(landlordA) });
+    if (list.response.status !== 200 || list.body.data?.some((row) => row.ma_giao_dich === payB.ma_giao_dich)) {
+      failures.push({ route: "GET /api/khoan-phai-thu/payment/list", target: "cross-landlord-list", actual: visible(list) });
+    }
+    const foreign = await request(`/api/khoan-phai-thu/payment/${payB.ma_giao_dich}`, { headers: headers(landlordA) });
+    const absent = await request(`/api/khoan-phai-thu/payment/${dummyId}`, { headers: headers(landlordA) });
+    if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
+      failures.push({ route: "GET /api/khoan-phai-thu/payment/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
   for (const item of [
