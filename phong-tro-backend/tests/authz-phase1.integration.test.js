@@ -35,7 +35,7 @@ async function setupTwoLandlords() {
   assert.notEqual(rentalA.room.ma_phong, rentalB.room.ma_phong);
   await PhongTro.update({ so_phong: rentalA.room.so_phong }, { where: { ma_phong: rentalB.room.ma_phong } });
 
-  return { landlordA, landlordB, rentalA, rentalB };
+  return { landlordA, landlordB, rogueAccountId: rogueAccount.ma_tai_khoan, rentalA, rentalB };
 }
 
 async function prepareApprovedMoveOut(landlordToken, rental) {
@@ -53,7 +53,7 @@ async function prepareApprovedMoveOut(landlordToken, rental) {
 }
 
 test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contract resources", async () => {
-  const { landlordA, landlordB, rentalA, rentalB } = await setupTwoLandlords();
+  const { landlordA, landlordB, rogueAccountId, rentalA, rentalB } = await setupTwoLandlords();
 
   // Create Bill & Payment & Recurring Adjustment for Landlord B
   const billBRes = await request("/api/khoan-phai-thu", {
@@ -276,7 +276,9 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     },
   ];
 
-  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${routes.length + 1} ROUTES (including stats) ===`);
+  const groupFilter = process.env.AUTHZ_GROUP;
+  const selectedRoutes = groupFilter === "contract" ? routes.filter((r) => r.name.includes("/api/hop-dong")) : routes;
+  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
   async function fingerprint() {
@@ -293,11 +295,13 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     ...(result.body?.data?.total_amount !== undefined ? { totalAmount: result.body.data.total_amount } : {}),
   } });
   const failures = [];
-  const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA) });
-  if (stats.response.status !== 200 || Number(stats.body?.data?.total_amount) !== 0) {
-    failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
+  if (!groupFilter) {
+    const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA) });
+    if (stats.response.status !== 200 || Number(stats.body?.data?.total_amount) !== 0) {
+      failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
+    }
   }
-  for (const r of routes) {
+  for (const r of selectedRoutes) {
     const before = await fingerprint();
     // 1. Cross-landlord call (A accessing B's resource)
     const idempotent = /payment\/create|mark-paid|mark-all-paid/.test(r.path);
@@ -326,10 +330,19 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     if (!isDeniedB || changedForeign.length || !sameResponse) failures.push({ route: r.name, target: "cross-landlord", actual: visible(resB), expected: visible(resFake), changedTables: changedForeign });
     if (!isDeniedFake || changedMissing.length) failures.push({ route: r.name, target: "non-existent", actual: visible(resFake), changedTables: changedMissing });
   }
+  if (groupFilter === "contract") {
+    const list = await request("/api/hop-dong", { headers: headers(landlordA) });
+    const contracts = Array.isArray(list.body?.data) ? list.body.data : [];
+    if (list.response.status !== 200 || contracts.some((row) => row.ma_hop_dong === rentalB.contract.ma_hop_dong)) {
+      failures.push({ route: "GET /api/hop-dong", target: "cross-landlord-list", actual: visible(list), changedTables: [] });
+    }
+  }
   for (const item of [
     { route: `GET /api/hop-dong/${rentalB.contract.ma_hop_dong}`, missing: `GET /api/hop-dong/${dummyId}` },
     { route: `GET /api/khoan-phai-thu/${billB.ma_thanh_toan}`, missing: `GET /api/khoan-phai-thu/${dummyId}` },
   ]) {
+    if (groupFilter && groupFilter !== "contract") continue;
+    if (groupFilter === "contract" && item.route.includes("khoan-phai-thu")) continue;
     const [, path] = item.route.split(" ");
     const [, missingPath] = item.missing.split(" ");
     const foreign = await request(path, { headers: headers(rentalA.tenantToken) });
@@ -338,11 +351,11 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: item.route, target: "tenant-cross-access", actual: visible(foreign), expected: visible(absent) });
     }
   }
-  const tenantWrite = await request("/api/v1/bills/generate", {
+  if (!groupFilter) { const tenantWrite = await request("/api/v1/bills/generate", {
     method: "POST", headers: headers(rentalA.tenantToken),
     body: JSON.stringify({ period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong] }),
   });
-  if (tenantWrite.response.status !== 403) failures.push({ route: "POST /api/v1/bills/generate", target: "tenant-role", actual: visible(tenantWrite) });
+  if (tenantWrite.response.status !== 403) failures.push({ route: "POST /api/v1/bills/generate", target: "tenant-role", actual: visible(tenantWrite) }); }
 
   console.log(`Phase 1 Unpatched/Failing checks count: ${failures.length} (total routes: ${routes.length})`);
   if (failures.length > 0) {
@@ -353,5 +366,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
         changedTables: failure.changedTables }));
     }
   }
+  // Restore single-active-landlord fixture for unrelated legacy integration tests.
+  await TaiKhoan.update({ trang_thai: "DA_KHOA" }, { where: { ma_tai_khoan: rogueAccountId } });
   assert.equal(failures.length, 0, `Có ${failures.length} kiểm tra vi phạm authorization theo chiều ngang!`);
 });

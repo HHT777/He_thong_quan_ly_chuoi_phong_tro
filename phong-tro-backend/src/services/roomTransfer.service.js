@@ -2,6 +2,7 @@ const sequelize = require("../config/database");
 const { HopDong, PhongTro, ChiSoDien, ThanhVienPhong, KhachThue, ThongBao, LichSuChuyenPhong } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const lifecycle = require("./contractLifecycle.service");
+const { assertOwned } = require("./ownership.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const dateOnly = (value) => String(value || new Date().toISOString().slice(0, 10)).slice(0, 10);
@@ -54,6 +55,9 @@ async function transfer(contractId, payload, actorId) {
 
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findByPk(contractId, { transaction, lock: transaction.LOCK.UPDATE });
+    const actor = { vai_tro: "CHU_TRO", ma_tai_khoan: actorId };
+    await assertOwned(actor, "contract", contractId, { transaction });
+    await assertOwned(actor, "room", targetRoomId, { transaction });
     if (!contract || !["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(contract.trang_thai)) throw fail(409, "Hợp đồng không còn hiệu lực để chuyển phòng", "CONTRACT_NOT_TRANSFERABLE");
     if (String(contract.ma_phong) === targetRoomId) throw fail(409, "Phòng đích phải khác phòng hiện tại", "SAME_TRANSFER_ROOM");
     const [sourceRoom, targetRoom] = await Promise.all([

@@ -35,6 +35,7 @@ class HopDongController {
       const { count, data } = await hopDongService.getHopDongList(
         filters,
         pagination,
+        req.user,
       );
 
       const response = paginationService.buildResponse(
@@ -57,18 +58,7 @@ class HopDongController {
 
   async getHopDongById(req, res, next) {
     try {
-      const hopDong = await hopDongService.getHopDongById(req.params.id);
-      if (
-        req.user.vai_tro === "KHACH_THUE" &&
-        hopDong.ma_khach_thue !== req.user.ma_khach_thue
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Bạn chỉ được xem hợp đồng của mình",
-          });
-      }
+      const hopDong = await hopDongService.getHopDongById(req.params.id, req.user);
 
       res.json({
         success: true,
@@ -144,7 +134,7 @@ class HopDongController {
 
   async getExpiringContracts(req, res, next) {
     try {
-      const expiring = await hopDongService.getExpiringContracts();
+      const expiring = await hopDongService.getExpiringContracts(30, req.user);
 
       res.json({
         success: true,

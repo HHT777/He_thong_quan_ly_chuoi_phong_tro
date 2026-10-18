@@ -37,7 +37,8 @@ test("FR-042 contract creation is recorded and history respects tenant ownership
   assert.ok(afterChanges.body.data.some((entry) => entry.type === "RENEWAL" && Number(entry.data.so_thang) === 6));
   const other = await login(integration.otherTenant);
   const forbidden = await request(`/api/hop-dong/${fresh.contract.ma_hop_dong}/history`, { headers: { Authorization: `Bearer ${other}` } });
-  assert.equal(forbidden.response.status, 403);
+  assert.equal(forbidden.response.status, 404);
+  assert.equal(forbidden.body.code, "RESOURCE_NOT_FOUND");
 });
 
 test("FR-108 rejects renewal approval unless the contract is SAP_HET_HAN", async () => {
