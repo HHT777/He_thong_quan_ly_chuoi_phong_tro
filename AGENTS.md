@@ -8,11 +8,21 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - `docs/OCR_SETUP.md`: tích hợp OCR. README backend: cách chạy test và kiểm chứng MySQL 8.
 
 ## 2. Môi trường kiểm thử
-- MySQL 8.0.46 trong container `qlpt-mysql8`, kết nối TCP cục bộ qua cổng 3307. MariaDB 10.4 qua TCP cục bộ cổng 3306. Triển khai thật là MySQL ≥ 8.0.16. Sandbox của Codex KHÔNG dùng được lệnh `docker`; chỉ dùng TCP. Lấy thông tin đăng nhập từ môi trường kiểm thử, không ghi vào tài liệu hoặc log.
+- MySQL 8.0.46 trong container `qlpt-mysql8`, kết nối TCP cục bộ qua cổng 3307. MariaDB 10.4 qua TCP cục bộ cổng 3306. Triển khai thật là MySQL ≥ 8.0.16. Lấy thông tin đăng nhập từ môi trường kiểm thử, không ghi vào tài liệu hoặc log.
 - Biến test: `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`, `TEST_DB_NAME` (kết thúc `_test`/`_ci`), `MIGRATION_TEST_DB_NAME`, cùng các biến fixture `TEST_*` (xem README). Ở chế độ test, JWT tự bootstrap; ở production thiếu `JWT_SECRET`/`JWT_EXPIRE` thì khởi động thất bại.
 - Mất kết nối DB: thử lại tối đa 5 lần cách nhau 10 giây rồi dừng, báo lỗi nguyên văn.
 - TUYỆT ĐỐI không chạy migration lên database thật của người dùng; chỉ DB tạm/DB test.
-- Frontend: sandbox từng lỗi `npm ci` với `EPERM spawn`. Người dùng tự `npm run build` ngoài sandbox. KHÔNG bao giờ báo "build pass" khi chưa chạy thật.
+- AN TOÀN: chỉ thao tác trên DB tạm/DB test (tên kết thúc `_test`/`_ci`). TUYỆT ĐỐI không chạy migration, seed hay lệnh xóa lên DB dev/thật của người dùng. Trước mọi lệnh có thể xóa dữ liệu hoặc ghi đè (`DROP`, `TRUNCATE`, `rm -rf`, `git reset --hard`, `git clean`, `git checkout .`, `docker rm`, `docker volume rm`) PHẢI hỏi người dùng trong chat.
+- Không commit/push lên nhánh chính khi chưa được hỏi. Không `git push`. Làm trên nhánh riêng nếu người dùng yêu cầu.
+- Không in hoặc commit bí mật (`.env`, JWT secret, mật khẩu thật).
+
+### Khi chạy trong IDE
+- Agent chạy trực tiếp trên máy người dùng có thể dùng `docker`, `npm ci`, `npm run build` và đọc log. Phải tự chạy frontend build và báo kết quả hoặc lỗi nguyên văn; không báo đạt khi chưa chạy.
+- Nếu container kiểm thử dừng, có thể khởi động lại bằng công cụ IDE phù hợp rồi đợi DB sẵn sàng. Không dùng thao tác xóa container hoặc volume khi chưa hỏi người dùng.
+
+### Khi chạy trong sandbox Codex
+- KHÔNG dùng lệnh `docker`; chỉ kết nối DB qua TCP cục bộ. Mất kết nối thì thử lại tối đa 5 lần cách nhau 10 giây rồi dừng, báo lỗi nguyên văn.
+- Sandbox từng gặp `npm ci` frontend lỗi `EPERM spawn`; người dùng tự `npm run build` ngoài sandbox. Không báo "build pass" khi chưa chạy thật; báo rõ file frontend đã đổi.
 
 ## 3. Mốc kiểm chứng gần nhất (cập nhật khi bàn giao)
 - HEAD trước commit bàn giao: `4b3e94e5985a22f6ee0e7ce1ff10ee79e5a5eedd` | tag mới nhất: `checkpoint-before-f5-g3b`.
