@@ -15,6 +15,7 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - AN TOÀN: chỉ thao tác trên DB tạm/DB test (tên kết thúc `_test`/`_ci`). TUYỆT ĐỐI không chạy migration, seed hay lệnh xóa lên DB dev/thật của người dùng. Trước mọi lệnh có thể xóa dữ liệu hoặc ghi đè (`DROP`, `TRUNCATE`, `rm -rf`, `git reset --hard`, `git clean`, `git checkout .`, `docker rm`, `docker volume rm`) PHẢI hỏi người dùng trong chat.
 - Không commit/push lên nhánh chính khi chưa được hỏi. Không `git push`. Làm trên nhánh riêng nếu người dùng yêu cầu.
 - Không in hoặc commit bí mật (`.env`, JWT secret, mật khẩu thật).
+- Riêng lượt authz đã được duyệt reset DUY NHẤT `qlpt_authz_test` qua TCP `127.0.0.1:3307`; kiểm tra chính xác và log tên DB/host/cổng trước mỗi `DROP`/`CREATE`. DB khác vẫn phải hỏi.
 
 ### Khi chạy trong IDE
 - Agent chạy trực tiếp trên máy người dùng có thể dùng `docker`, `npm ci`, `npm run build` và đọc log. Phải tự chạy frontend build và báo kết quả hoặc lỗi nguyên văn; không báo đạt khi chưa chạy.
@@ -43,6 +44,7 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 - Audit: dùng helper audit, TRONG transaction, không lưu mật khẩu/hash/token/định danh nhạy cảm; mỗi thao tác đúng một bản ghi.
 - Test: mỗi test nằm trong file được commit; test race/bảo vệ dữ liệu phải có PHÉP THỬ PHỦ ĐỊNH (vô hiệu hóa mã được kiểm tra, xác nhận test đỏ, khôi phục). Không nới test cho qua; lỗi thật thì sửa nguyên nhân gốc.
 - Báo cáo trung thực: nêu rõ cái gì chưa chạy. Mọi khẳng định "ĐÃ CÓ" kèm tên file test hoặc hash commit.
+- Mô hình có nhiều Chủ trọ: căn thuộc `CanTro.maChuTro`; tài nguyên suy chủ sở hữu qua căn/phòng/hợp đồng. ID không tồn tại và ID thuộc Chủ trọ/khách khác cùng trả HTTP 404, mã `RESOURCE_NOT_FOUND`, không lộ ID; sai vai trò trả 403. Loại tài nguyên chưa khai báo phải từ chối mặc định (500 mã `OWNERSHIP_RESOURCE_UNMAPPED` và log), không cho qua. Route mới phải khai báo phạm vi sở hữu và có test với hai Chủ trọ. Quyết định này không cho phép tự thay đổi nghiệp vụ tiền hoặc DDL.
 
 ## 5. Quyết định nghiệp vụ ĐÃ CHỐT (không đổi nếu chưa hỏi người dùng)
 - `POST /api/hop-dong/:id/renew` bị khóa; gia hạn chỉ qua yêu cầu 6/12 tháng, hợp đồng phải `SAP_HET_HAN`.
