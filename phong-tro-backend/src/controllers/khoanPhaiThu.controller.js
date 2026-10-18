@@ -39,6 +39,7 @@ class KhoanPhaiThuController {
       const { count, data } = await khoanPhaiThuService.getKhoanPhaiThuList(
         filters,
         pagination,
+        req.user,
       );
 
       const response = paginationService.buildResponse(
@@ -63,18 +64,8 @@ class KhoanPhaiThuController {
     try {
       const khoan = await khoanPhaiThuService.getKhoanPhaiThuById(
         req.params.id,
+        req.user,
       );
-      if (
-        req.user.vai_tro === "KHACH_THUE" &&
-        khoan.hopDong?.ma_khach_thue !== req.user.ma_khach_thue
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Bạn chỉ được xem khoản phải thu của mình",
-          });
-      }
 
       res.json({
         success: true,
@@ -88,19 +79,9 @@ class KhoanPhaiThuController {
 
   async getOutstandingBills(req, res, next) {
     try {
-      if (
-        req.user.vai_tro === "KHACH_THUE" &&
-        String(req.params.khachThueId) !== String(req.user.ma_khach_thue)
-      ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            message: "Bạn chỉ được xem hóa đơn của mình",
-          });
-      }
       const data = await khoanPhaiThuService.getOutstandingBills(
         req.params.khachThueId,
+        req.user,
       );
 
       res.json({
@@ -115,7 +96,7 @@ class KhoanPhaiThuController {
 
   async getOverdueBills(req, res, next) {
     try {
-      const data = await khoanPhaiThuService.getOverdueBills();
+      const data = await khoanPhaiThuService.getOverdueBills(req.user);
 
       res.json({
         success: true,

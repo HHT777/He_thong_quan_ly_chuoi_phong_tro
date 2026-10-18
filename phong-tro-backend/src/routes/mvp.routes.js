@@ -141,7 +141,7 @@ router.post("/billing-adjustments/:id/toggle", landlord, async (req, res, next) 
 });
 
 router.post("/bills/preview", landlord, async (req, res, next) => {
-  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds)); } catch (e) { next(e); }
+  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 
 router.post("/bills/generate", landlord, async (req, res, next) => {
