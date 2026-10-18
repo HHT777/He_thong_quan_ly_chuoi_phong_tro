@@ -411,6 +411,14 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/v1/move-outs/:contractId/context", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
     }
   }
+  if (!groupFilter || groupFilter === "payment") {
+    const ownDebt = await request("/api/v1/debt", { headers: headers(landlordA) });
+    const foreignDebt = await request("/api/v1/debt", { headers: headers(landlordB) });
+    if (ownDebt.response.status !== 200 || ownDebt.body.data?.some((row) => row.ma_thanh_toan === billB.ma_thanh_toan)
+      || foreignDebt.response.status !== 200 || !foreignDebt.body.data?.some((row) => row.ma_thanh_toan === billB.ma_thanh_toan)) {
+      failures.push({ route: "GET /api/v1/debt", target: "cross-landlord-list", actual: visible(ownDebt) });
+    }
+  }
   for (const item of [
     { route: `GET /api/hop-dong/${rentalB.contract.ma_hop_dong}`, missing: `GET /api/hop-dong/${dummyId}` },
     { route: `GET /api/khoan-phai-thu/${billB.ma_thanh_toan}`, missing: `GET /api/khoan-phai-thu/${dummyId}` },

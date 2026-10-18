@@ -153,7 +153,7 @@ router.post("/bills/generate", landlord, async (req, res, next) => {
 router.get("/debt", async (req, res, next) => {
   try {
     validateQuery(req.query);
-    return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined }));
+    return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined, requester: req.user }));
   } catch (e) { next(e); }
 });
 router.post("/bills/:id/mark-paid", landlord, async (req, res, next) => { try { return data(res, await paymentLifecycleService.markPaid(req.params.id, req.get("Idempotency-Key"), req.user.ma_tai_khoan), 201); } catch (e) { next(e); } });
