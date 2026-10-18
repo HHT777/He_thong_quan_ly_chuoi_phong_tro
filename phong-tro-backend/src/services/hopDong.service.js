@@ -223,11 +223,11 @@ class HopDongService {
     return hopDong;
   }
 
-  async getExpiringContracts(daysBeforeExpiry = 30, requester) {
+  async getExpiringContracts(daysBeforeExpiry = 30, requester, { now = new Date() } = {}) {
     /**
      * BR-02: Cảnh báo ít nhất 1 tháng trước khi hết hạn
      */
-    const today = businessDate();
+    const today = businessDate(now);
     const expiryDate = addBusinessDays(today, daysBeforeExpiry);
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
 
