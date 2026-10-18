@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("node:crypto");
+const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const { TaiKhoan, ChuTro, TienCoc, ThanhToan, GiaoDichThanhToan, KhoanDieuChinh, PhongTro,
   HopDong, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan } = require("../src/models");
 const { integration, request, headers, login, createFreshRental, createBaseRental } = require("./helpers/integration-api");
@@ -37,6 +38,20 @@ async function setupTwoLandlords() {
   return { landlordA, landlordB, rentalA, rentalB };
 }
 
+async function prepareApprovedMoveOut(landlordToken, rental) {
+  const created = await request("/api/v1/requests", {
+    method: "POST", headers: headers(rental.tenantToken),
+    body: JSON.stringify({ type: "TRA_PHONG", content: "Trả phòng kiểm thử quyền", date: new Date().toISOString(), earlyReturnReason: "Hai bên thống nhất" }),
+  });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const approved = await request(`/api/v1/requests/${created.body.data.ma_yeu_cau}`, {
+    method: "PATCH", headers: headers(landlordToken),
+    body: JSON.stringify({ status: "DA_DUYET", reason: "Đã kiểm tra", earlyReturnReason: "Hai bên thống nhất" }),
+  });
+  assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
+  await moveOutRequestService.processDueMoveOuts({ now: new Date() });
+}
+
 test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contract resources", async () => {
   const { landlordA, landlordB, rentalA, rentalB } = await setupTwoLandlords();
 
@@ -64,6 +79,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   });
   assert.equal(payBRes.response.status, 201, JSON.stringify(payBRes.body));
   const payB = payBRes.body.data;
+  assert.equal((await GiaoDichThanhToan.findByPk(payB.ma_giao_dich)).trang_thai_xac_nhan, "DA_XAC_NHAN");
 
   const depositB = await TienCoc.findOne({ where: { ma_hop_dong: rentalB.contract.ma_hop_dong } });
 
@@ -80,6 +96,18 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   });
   assert.equal(adjBRes.response.status, 201, JSON.stringify(adjBRes.body));
   const adjB = adjBRes.body.data;
+  const vacantA = await createBaseRental(landlordA, "authz-vacant-a");
+  const transferB = await createFreshRental(landlordB, "authz-transfer-b");
+  const exitB = await createFreshRental(landlordB, "authz-exit-b");
+  await prepareApprovedMoveOut(landlordB, exitB);
+  const refundB = await createFreshRental(landlordB, "authz-refund-b");
+  await prepareApprovedMoveOut(landlordB, refundB);
+  const ownedSettlement = await request(`/api/v1/move-outs/${refundB.contract.ma_hop_dong}/settle`, {
+    method: "POST", headers: headers(landlordB),
+    body: JSON.stringify({ assetsChecked: true, debtReviewed: true, roomCondition: "Tốt", deduction: 0, finalElectricityReading: 0 }),
+  });
+  assert.equal(ownedSettlement.response.status, 200, JSON.stringify(ownedSettlement.body));
+  const refundReportId = ownedSettlement.body.data.report.ma_bien_ban;
 
   const dummyId = crypto.randomUUID();
 
@@ -89,8 +117,8 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     {
       name: "POST /api/hop-dong (create contract using room B)",
       method: "POST", path: "/api/hop-dong",
-      body: { ma_khach_thue: rentalA.tenant.ma_khach_thue, ma_phong: rentalB.room.ma_phong, ngay_bat_dau: "2026-11-01", ngay_ket_thuc: "2027-10-31", gia_thue: 2000000, tien_coc: 2000000, don_gia_dien: 3500, don_gia_nuoc: 100000, dieu_khoan: "Test", da_co_ban_giay_ky: true },
-      fakeBody: { ma_khach_thue: rentalA.tenant.ma_khach_thue, ma_phong: dummyId, ngay_bat_dau: "2026-11-01", ngay_ket_thuc: "2027-10-31", gia_thue: 2000000, tien_coc: 2000000, don_gia_dien: 3500, don_gia_nuoc: 100000, dieu_khoan: "Test", da_co_ban_giay_ky: true },
+      body: { ma_khach_thue: rentalA.tenant.ma_khach_thue, ma_phong: rentalB.room.ma_phong, ngay_bat_dau: "2026-11-01", ngay_ket_thuc: "2027-10-31", gia_thue: 2000000, tien_coc: 2000000, don_gia_dien: 3500, chi_so_dien_ban_dau: 0, don_gia_nuoc: 100000, dieu_khoan: "Test", da_co_ban_giay_ky: true },
+      fakeBody: { ma_khach_thue: rentalA.tenant.ma_khach_thue, ma_phong: dummyId, ngay_bat_dau: "2026-11-01", ngay_ket_thuc: "2027-10-31", gia_thue: 2000000, tien_coc: 2000000, don_gia_dien: 3500, chi_so_dien_ban_dau: 0, don_gia_nuoc: 100000, dieu_khoan: "Test", da_co_ban_giay_ky: true },
     },
     {
       name: "GET /api/hop-dong/:id (read contract B)",
@@ -100,16 +128,16 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     {
       name: "PUT /api/hop-dong/:id (update contract B)",
       method: "PUT", path: `/api/hop-dong/${rentalB.contract.ma_hop_dong}`,
-      body: { gia_thue: 3000000 },
+      body: { gia_thue: 3000000, reason: "Điều chỉnh theo thỏa thuận" },
       fakePath: `/api/hop-dong/${dummyId}`,
-      fakeBody: { gia_thue: 3000000 },
+      fakeBody: { gia_thue: 3000000, reason: "Điều chỉnh theo thỏa thuận" },
     },
     {
       name: "POST /api/hop-dong/:id/transfers (transfer contract B)",
-      method: "POST", path: `/api/hop-dong/${rentalB.contract.ma_hop_dong}/transfers`,
-      body: { targetRoomId: rentalA.room.ma_phong, transferDate: "2026-11-15", note: "Lấn sân" },
+      method: "POST", path: `/api/hop-dong/${transferB.contract.ma_hop_dong}/transfers`,
+      body: { targetRoomId: vacantA.room.ma_phong, transferDate: "2026-11-15", reason: "Chuyển phòng", finalElectricityReading: 100, initialElectricityReading: 0, newRent: 2500000 },
       fakePath: `/api/hop-dong/${dummyId}/transfers`,
-      fakeBody: { targetRoomId: rentalA.room.ma_phong, transferDate: "2026-11-15", note: "Lấn sân" },
+      fakeBody: { targetRoomId: vacantA.room.ma_phong, transferDate: "2026-11-15", reason: "Chuyển phòng", finalElectricityReading: 100, initialElectricityReading: 0, newRent: 2500000 },
     },
     // 2. Deposit
     {
@@ -188,14 +216,14 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     },
     {
       name: "PATCH /api/v1/billing-adjustments/:id (update recurring adj B)",
-      method: "PATCH", path: `/api/v1/billing-adjustments/${adjB.id}`,
+      method: "PATCH", path: `/api/v1/billing-adjustments/${adjB.ma_khoan_dieu_chinh}`,
       body: { amount: 60000 },
       fakePath: `/api/v1/billing-adjustments/${dummyId}`,
       fakeBody: { amount: 60000 },
     },
     {
       name: "POST /api/v1/billing-adjustments/:id/toggle (toggle recurring adj B)",
-      method: "POST", path: `/api/v1/billing-adjustments/${adjB.id}/toggle`,
+      method: "POST", path: `/api/v1/billing-adjustments/${adjB.ma_khoan_dieu_chinh}/toggle`,
       body: { enabled: false, reason: "Tắt trộm" },
       fakePath: `/api/v1/billing-adjustments/${dummyId}/toggle`,
       fakeBody: { enabled: false, reason: "Tắt trộm" },
@@ -204,14 +232,14 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     {
       name: "POST /api/v1/bills/preview (preview mixed contracts)",
       method: "POST", path: "/api/v1/bills/preview",
-      body: { period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong, rentalB.contract.ma_hop_dong] },
-      fakeBody: { period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong, dummyId] },
+      body: { period: "2027-01", contractIds: [rentalA.contract.ma_hop_dong, rentalB.contract.ma_hop_dong] },
+      fakeBody: { period: "2027-01", contractIds: [rentalA.contract.ma_hop_dong, dummyId] },
     },
     {
       name: "POST /api/v1/bills/generate (generate mixed contracts)",
       method: "POST", path: "/api/v1/bills/generate",
-      body: { period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong, rentalB.contract.ma_hop_dong] },
-      fakeBody: { period: "2026-11", contractIds: [rentalA.contract.ma_hop_dong, dummyId] },
+      body: { period: "2027-02", contractIds: [rentalA.contract.ma_hop_dong, rentalB.contract.ma_hop_dong] },
+      fakeBody: { period: "2027-02", contractIds: [rentalA.contract.ma_hop_dong, dummyId] },
     },
     {
       name: "POST /api/v1/bills/:id/mark-paid (mark paid bill B)",
@@ -234,21 +262,21 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     // 7. Move-out
     {
       name: "POST /api/v1/move-outs/:contractId/settle (settle move-out contract B)",
-      method: "POST", path: `/api/v1/move-outs/${rentalB.contract.ma_hop_dong}/settle`,
-      body: { moveOutDate: "2026-11-01", handoverNotes: "Test", deductions: [] },
+      method: "POST", path: `/api/v1/move-outs/${exitB.contract.ma_hop_dong}/settle`,
+      body: { assetsChecked: true, debtReviewed: true, roomCondition: "Bình thường", deduction: 0, finalElectricityReading: 0 },
       fakePath: `/api/v1/move-outs/${dummyId}/settle`,
-      fakeBody: { moveOutDate: "2026-11-01", handoverNotes: "Test", deductions: [] },
+      fakeBody: { assetsChecked: true, debtReviewed: true, roomCondition: "Bình thường", deduction: 0, finalElectricityReading: 0 },
     },
     {
       name: "POST /api/v1/move-outs/:id/deposit-refunds (deposit refund B)",
-      method: "POST", path: `/api/v1/move-outs/${rentalB.contract.ma_hop_dong}/deposit-refunds`,
+      method: "POST", path: `/api/v1/move-outs/${refundReportId}/deposit-refunds`,
       body: { khoaChongTrung: `refund-${dummyId}`, soTien: 100000, ngayHoan: "2026-11-01" },
       fakePath: `/api/v1/move-outs/${dummyId}/deposit-refunds`,
-      fakeBody: { khoaChongTrung: `refund-${dummyId}`, soTien: 100000, ngayHoan: "2026-11-01" },
+      fakeBody: { khoaChongTrung: `refund-missing-${dummyId}`, soTien: 100000, ngayHoan: "2026-11-01" },
     },
   ];
 
-  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${routes.length} ROUTES ===`);
+  console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${routes.length + 1} ROUTES (including stats) ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
   async function fingerprint() {
@@ -262,12 +290,18 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   const visible = (result) => ({ status: result.response.status, body: {
     code: result.body?.code || result.body?.error?.code || null,
     message: result.body?.message || result.body?.error?.message || null,
+    ...(result.body?.data?.total_amount !== undefined ? { totalAmount: result.body.data.total_amount } : {}),
   } });
   const failures = [];
+  const stats = await request("/api/khoan-phai-thu/payment/stats?startDate=2026-11-01&endDate=2026-11-30", { headers: headers(landlordA) });
+  if (stats.response.status !== 200 || Number(stats.body?.data?.total_amount) !== 0) {
+    failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
+  }
   for (const r of routes) {
     const before = await fingerprint();
     // 1. Cross-landlord call (A accessing B's resource)
-    const optsB = { method: r.method, headers: headers(landlordA) };
+    const idempotent = /payment\/create|mark-paid|mark-all-paid/.test(r.path);
+    const optsB = { method: r.method, headers: headers(landlordA, idempotent ? { "Idempotency-Key": crypto.randomUUID() } : {}) };
     if (r.body) optsB.body = JSON.stringify(r.body);
     const resB = await request(r.path, optsB);
     const afterForeign = await fingerprint();
@@ -277,7 +311,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     
     // 2. Non-existent resource call
     const fakePath = r.fakePath || r.path;
-    const optsFake = { method: r.method, headers: headers(landlordA) };
+    const optsFake = { method: r.method, headers: headers(landlordA, idempotent ? { "Idempotency-Key": crypto.randomUUID() } : {}) };
     if (r.fakeBody) optsFake.body = JSON.stringify(r.fakeBody);
     else if (r.body) optsFake.body = JSON.stringify(r.body);
     const resFake = await request(fakePath, optsFake);
