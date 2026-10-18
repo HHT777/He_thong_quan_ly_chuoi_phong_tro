@@ -12,11 +12,13 @@ const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
 const mode = process.argv[2];
 
-function testFiles(integration) {
-  return fs.readdirSync(testsDir)
-    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration)
+function testFiles(integration, filter = process.argv[3]) {
+  const files = fs.readdirSync(testsDir)
+    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration && (!filter || name.includes(filter)))
     .sort()
     .map((name) => path.join("tests", name));
+  if (files.length === 0) throw new Error(`No ${integration ? "integration" : "unit"} test files match filter: ${filter || "(none)"}`);
+  return files;
 }
 
 function runNodeTests(files, env = process.env) {
@@ -122,6 +124,7 @@ async function waitUntilReady(baseUrl, server) {
 
 async function runIntegration() {
   const databaseName = safeDatabaseName();
+  const selectedTests = testFiles(true);
   required("TEST_NEW_ACCOUNT_PASSWORD");
   const port = Number(process.env.TEST_PORT || 3101);
   const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
@@ -145,7 +148,7 @@ async function runIntegration() {
     await resetAndSeed(databaseName);
     server = spawn(process.execPath, ["src/index.js"], { cwd: root, env, stdio: "inherit" });
     await waitUntilReady(baseUrl, server);
-    const testStatus = runNodeTests(testFiles(true), env);
+    const testStatus = runNodeTests(selectedTests, env);
     if (testStatus !== 0) return testStatus;
     const invariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
     return invariant.status ?? 1;
@@ -162,7 +165,9 @@ async function main() {
   else throw new Error("Usage: node scripts/run-test-suite.js <unit|integration>");
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(error.message);
   process.exitCode = 1;
 });
+
+module.exports = { testFiles, safeDatabaseName };
