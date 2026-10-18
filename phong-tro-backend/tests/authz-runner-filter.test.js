@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { testFiles, safeDatabaseName } = require("../scripts/run-test-suite");
+const { testFiles, safeDatabaseName, assertAuthorizedDatabaseTarget } = require("../scripts/run-test-suite");
 
 test("authz runner rejects a zero-match filter before resetting any database", () => {
   assert.throws(() => testFiles(true, "__no_such_authz_test__"), /No integration test files match filter/);
@@ -31,5 +31,27 @@ test("authz runner keeps strict test database name guard", () => {
     else process.env.TEST_DB_NAME = previous;
     if (originalDevName === undefined) delete process.env.DB_NAME;
     else process.env.DB_NAME = originalDevName;
+  }
+});
+
+test("authz runner refuses any destructive target outside approved MySQL TCP database", () => {
+  const prior = Object.fromEntries(["TEST_DB_ALLOWED_NAME", "TEST_DB_HOST", "TEST_DB_PORT"].map((key) => [key, process.env[key]]));
+  try {
+    process.env.TEST_DB_ALLOWED_NAME = "qlpt_authz_test";
+    process.env.TEST_DB_HOST = "127.0.0.1";
+    process.env.TEST_DB_PORT = "3307";
+    assert.doesNotThrow(() => assertAuthorizedDatabaseTarget("qlpt_authz_test", "DROP"));
+    for (const name of ["qlpt", "qlpt_test", "qlpt_migration_ci"]) {
+      assert.throws(() => assertAuthorizedDatabaseTarget(name, "DROP"), /outside approved scope/);
+    }
+    process.env.TEST_DB_PORT = "3306";
+    assert.throws(() => assertAuthorizedDatabaseTarget("qlpt_authz_test", "DROP"), /outside approved scope/);
+    process.env.TEST_DB_PORT = "3307";
+    process.env.TEST_DB_HOST = "localhost";
+    assert.throws(() => assertAuthorizedDatabaseTarget("qlpt_authz_test", "DROP"), /outside approved scope/);
+  } finally {
+    for (const [key, value] of Object.entries(prior)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
   }
 });
