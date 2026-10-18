@@ -281,7 +281,8 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     ? routes.filter((r) => r.name.includes("/api/hop-dong"))
     : groupFilter === "deposit" ? routes.filter((r) => r.name.includes("/api/dat-coc"))
       : groupFilter === "bill" ? routes.filter((r) => r.name.startsWith("POST /api/khoan-phai-thu (") || /\/api\/v1\/bills\/(preview|generate)/.test(r.name))
-        : groupFilter === "payment" ? routes.filter((r) => /payment\/create|payment\/:id\/confirm|mark-paid|mark-all-paid|payments\/:id\/cancel/.test(r.name)) : routes;
+        : groupFilter === "payment" ? routes.filter((r) => /payment\/create|payment\/:id\/confirm|mark-paid|mark-all-paid|payments\/:id\/cancel/.test(r.name))
+          : groupFilter === "adjustment" ? routes.filter((r) => /\/discounts|\/adjustments|\/billing-adjustments/.test(r.name)) : routes;
   console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
@@ -382,6 +383,17 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     const absent = await request(`/api/khoan-phai-thu/payment/${dummyId}`, { headers: headers(landlordA) });
     if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
       failures.push({ route: "GET /api/khoan-phai-thu/payment/:id", target: "cross-landlord-read", actual: visible(foreign), expected: visible(absent) });
+    }
+  }
+  if (groupFilter === "adjustment") {
+    const list = await request("/api/v1/billing-adjustments", { headers: headers(landlordA) });
+    if (list.response.status !== 200 || list.body.data?.some((row) => row.ma_khoan_dieu_chinh === adjB.ma_khoan_dieu_chinh)) {
+      failures.push({ route: "GET /api/v1/billing-adjustments", target: "cross-landlord-list", actual: visible(list) });
+    }
+    const foreign = await request(`/api/v1/billing-adjustments?contractId=${rentalB.contract.ma_hop_dong}`, { headers: headers(landlordA) });
+    const absent = await request(`/api/v1/billing-adjustments?contractId=${dummyId}`, { headers: headers(landlordA) });
+    if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
+      failures.push({ route: "GET /api/v1/billing-adjustments?contractId=", target: "cross-landlord-filter", actual: visible(foreign), expected: visible(absent) });
     }
   }
   for (const item of [

@@ -3,6 +3,7 @@ const { ThanhToan, ChiTietThanhToan } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const { BILL_LINE_TYPES, ALLOWED_BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { roundedMoney, assertBillDetailTotal } = require("../utils/billLine.util");
+const { assertOwned } = require("./ownership.service");
 
 const fail = (status, code, message, details) => Object.assign(new Error(message), { status, code, details });
 
@@ -19,7 +20,7 @@ async function adjust(billId, payload, actorId) {
   const { reason, delta } = validateInput(payload);
   return sequelize.transaction(async (transaction) => {
     const bill = await ThanhToan.findByPk(billId, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!bill) throw fail(404, "BILL_NOT_FOUND", "Khoản phải thu không tồn tại");
+    await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "bill", billId, { transaction });
     const details = await ChiTietThanhToan.findAll({ where: { ma_thanh_toan: bill.ma_thanh_toan }, transaction, lock: transaction.LOCK.UPDATE });
     assertBillDetailTotal(details, bill.tong_phai_tra);
     const oldTotal = roundedMoney(bill.tong_phai_tra);

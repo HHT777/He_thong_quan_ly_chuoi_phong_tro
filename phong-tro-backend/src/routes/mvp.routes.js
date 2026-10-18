@@ -128,7 +128,7 @@ async function adjustBill(req, res, next) {
 router.post("/bills/:id/adjustments", landlord, adjustBill);
 
 router.get("/billing-adjustments", landlord, async (req, res, next) => {
-  try { return data(res, await billingAdjustmentDefinitionService.list(req.query.contractId)); } catch (e) { next(e); }
+  try { return data(res, await billingAdjustmentDefinitionService.list(req.query.contractId, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/billing-adjustments", landlord, async (req, res, next) => {
   try { return data(res, await billingAdjustmentDefinitionService.create(req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
