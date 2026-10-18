@@ -16,7 +16,10 @@ async function request(path, options = {}) {
       DEPOSIT_OFFSET_CANNOT_CANCEL: "Khoản khấu trừ cọc không được phép hủy.",
       IDEMPOTENCY_CONFLICT: "Yêu cầu đã được gửi với nội dung khác.",
     };
-    const error = new Error(friendly[code] || payload.error?.message || payload.message || `Yêu cầu thất bại (${response.status})`);
+    const message = response.status === 404 && code === "RESOURCE_NOT_FOUND"
+      ? "Không tìm thấy hoặc bạn không có quyền với đối tượng này"
+      : friendly[code] || payload.error?.message || payload.message || `Yêu cầu thất bại (${response.status})`;
+    const error = new Error(message);
     error.status = response.status;
     error.code = code;
     error.details = payload.error?.details || payload.details;

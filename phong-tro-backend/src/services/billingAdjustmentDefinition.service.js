@@ -1,9 +1,11 @@
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const { KhoanDieuChinh, HopDong } = require("../models");
+const { KhoanDieuChinh, HopDong, PhongTro } = require("../models");
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { writeAuditLog } = require("./auditLog.service");
 const { parsePeriod } = require("../utils/billingPeriod.util");
+const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
+const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
 
@@ -28,6 +30,7 @@ async function create(payload, actorId) {
   const contractId = payload.contractId ?? payload.maHopDong;
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findByPk(contractId, { transaction, lock: transaction.LOCK.UPDATE });
+    await assertOwned(ownerUser(actorId), "contract", contractId, { transaction });
     if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(404, "CONTRACT_NOT_ACTIVE", "Hợp đồng không còn hiệu lực");
     const row = await KhoanDieuChinh.create({
       ma_hop_dong: contractId, loai_khoan: value.type, ten_ly_do: value.name, so_tien: value.amount,
@@ -42,7 +45,7 @@ async function create(payload, actorId) {
 async function update(id, payload, actorId) {
   return sequelize.transaction(async (transaction) => {
     const row = await KhoanDieuChinh.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!row) throw fail(404, "ADJUSTMENT_NOT_FOUND", "Khoản điều chỉnh không tồn tại");
+    await assertOwned(ownerUser(actorId), "adjustment", id, { transaction });
     if (row.trang_thai !== "DANG_AP_DUNG") throw fail(409, "ADJUSTMENT_DISABLED", "Khoản đã tắt không thể sửa");
     const before = row.get({ plain: true }); const value = normalize(payload, row);
     await row.update({ loai_khoan: value.type, ten_ly_do: value.name, so_tien: value.amount, che_do: value.mode, thang_ap_dung: value.period?.month || null, nam_ap_dung: value.period?.year || null, ngay_bat_dau: value.startDate, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: actorId }, { transaction });
@@ -56,7 +59,7 @@ async function setEnabled(id, enabled, reasonValue, actorId) {
   if (!enabled && !reason) throw fail(422, "DISABLE_REASON_REQUIRED", "Lý do tắt khoản điều chỉnh là bắt buộc");
   return sequelize.transaction(async (transaction) => {
     const row = await KhoanDieuChinh.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!row) throw fail(404, "ADJUSTMENT_NOT_FOUND", "Khoản điều chỉnh không tồn tại");
+    await assertOwned(ownerUser(actorId), "adjustment", id, { transaction });
     const next = enabled ? "DANG_AP_DUNG" : "DA_TAT";
     if (row.trang_thai === next) return row;
     const before = row.get({ plain: true });
@@ -76,6 +79,14 @@ async function applicable(contractId, period, options = {}) {
   });
 }
 
-async function list(contractId) { return KhoanDieuChinh.findAll({ where: contractId ? { ma_hop_dong: contractId } : {}, order: [["ngay_tao", "DESC"]] }); }
+async function list(contractId, actorId) {
+  const actor = ownerUser(actorId);
+  if (contractId) await assertOwned(actor, "contract", contractId);
+  const buildings = await getOwnedBuildingIds(actor);
+  return KhoanDieuChinh.findAll({ where: contractId ? { ma_hop_dong: contractId } : {},
+    include: [{ model: HopDong, as: "hopDong", required: true,
+      include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: buildings } } }] }],
+    order: [["ngay_tao", "DESC"]] });
+}
 
 module.exports = { normalize, create, update, setEnabled, applicable, list };

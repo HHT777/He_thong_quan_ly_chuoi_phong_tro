@@ -8,6 +8,8 @@ const contractLifecycle = require("./contractLifecycle.service");
 const { countBillableOccupants, calculateWaterCharge } = require("./occupancy.service");
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { elapsedMonthRatio } = require("../utils/billingPeriod.util");
+const { assertOwned } = require("./ownership.service");
+const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -25,7 +27,8 @@ async function approvedRequest(contractId, transaction) {
   for (const detail of details) if ((await YeuCau.findByPk(detail.ma_yeu_cau, { transaction }))?.trang_thai === "DA_PHE_DUYET") return detail;
   return null;
 }
-async function getContext(contractId) {
+async function getContext(contractId, actorId) {
+  if (actorId) await assertOwned(ownerUser(actorId), "contract", contractId);
   const contract = await HopDong.findByPk(contractId, { include: [{ model: KhachThue, as: "khachThue" }, { model: PhongTro, as: "phongTro" }] });
   if (!contract) throw fail(404, "Không tìm thấy hợp đồng", "CONTRACT_NOT_FOUND");
   if (contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng đã thanh lý", "CONTRACT_ALREADY_LIQUIDATED");
@@ -44,6 +47,7 @@ async function settle(contractId, payload, actorId) {
   const other = validateChecklist(payload);
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findByPk(contractId, { transaction, lock: transaction.LOCK.UPDATE });
+    await assertOwned(ownerUser(actorId), "contract", contractId, { transaction });
     if (!contract || contract.trang_thai === "DA_THANH_LY") throw fail(409, "Hợp đồng không còn hiệu lực", "CONTRACT_NOT_ACTIVE");
     if (await BienBanTraPhong.findOne({ where: { ma_hop_dong: contractId }, transaction, lock: transaction.LOCK.UPDATE })) throw fail(409, "Hợp đồng đã quyết toán", "MOVE_OUT_ALREADY_SETTLED");
     const room = await PhongTro.findByPk(contract.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
@@ -107,6 +111,7 @@ async function recordDepositRefund(reportId, payload, actorId) {
   const key = String(payload.khoaChongTrung || "").trim(); const refundAmount = amount(payload.soTien, "Số tiền hoàn");
   if (!key || refundAmount <= 0) throw fail(422, "Thiếu thông tin hoàn cọc", "INVALID_DEPOSIT_REFUND");
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(ownerUser(actorId), "moveOut", reportId, { transaction });
     const old = await GiaoDichHoanCoc.findOne({ where: { khoa_chong_trung: key }, transaction, lock: transaction.LOCK.UPDATE });
     if (old) { if (old.ma_bien_ban_tra_phong !== reportId || Number(old.so_tien) !== refundAmount) throw fail(409, "Khóa chống trùng xung đột", "IDEMPOTENCY_CONFLICT"); return old; }
     const report = await BienBanTraPhong.findByPk(reportId, { transaction, lock: transaction.LOCK.UPDATE });

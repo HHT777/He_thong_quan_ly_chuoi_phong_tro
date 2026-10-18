@@ -5,6 +5,7 @@ const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, Th
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
 const { buildSnapshot } = require("./receiptSnapshot.service");
+const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
 
 function deterministicUuid(value) {
   const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split("");
@@ -16,6 +17,7 @@ function deterministicUuid(value) {
 class ThanhToanService {
   async createThanhToan(data, idempotencyKey, actorId) {
     const billId = data.ma_khoan_phai_thu || data.ma_thanh_toan;
+    if (actorId) await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "bill", billId);
     const amount = Number(data.so_tien);
     const paymentId = deterministicUuid(`payment:${idempotencyKey}`);
     const existing = await GiaoDichThanhToan.findByPk(paymentId);
@@ -30,6 +32,7 @@ class ThanhToanService {
     }
     const payment = await sequelize.transaction(async (transaction) => {
       const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: PhongTro, as: "phongTro" }, { model: KhachThue, as: "khachThue" }] }], transaction, lock: transaction.LOCK.UPDATE });
+      if (actorId) await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "bill", billId, { transaction });
       if (!bill) throw { status: 404, message: "Khoản phải thu không tồn tại" };
       if (!Number.isFinite(amount) || amount <= 0) throw { status: 422, code: "INVALID_PAYMENT_AMOUNT", message: "Số tiền thanh toán phải lớn hơn 0" };
       if (amount > Number(bill.so_tien_con_no)) throw { status: 409, code: "PAYMENT_EXCEEDS_OUTSTANDING", message: "Số tiền thu không được vượt quá số còn thiếu", details: { remaining: Number(bill.so_tien_con_no) } };
@@ -57,24 +60,26 @@ class ThanhToanService {
     return payment;
   }
 
-  async getThanhToanList(filters, pagination) {
+  async getThanhToanList(filters, pagination, requester) {
     const where = {};
     if (filters.ma_khoan_phai_thu || filters.ma_thanh_toan) where.ma_thanh_toan = filters.ma_khoan_phai_thu || filters.ma_thanh_toan;
     const tenantWhere = filters.ma_khach_thue ? { ma_khach_thue: filters.ma_khach_thue } : undefined;
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const { count, rows } = await GiaoDichThanhToan.findAndCountAll({
       where, distinct: true, limit: pagination.limit, offset: pagination.offset,
       include: [{
         model: ThanhToan,
         as: "thanhToan",
-        required: Boolean(tenantWhere),
+        required: Boolean(tenantWhere) || Boolean(ownedBuildings),
         include: [{
           model: HopDong,
           as: "hopDong",
-          required: Boolean(tenantWhere),
+          required: Boolean(tenantWhere) || Boolean(ownedBuildings),
           where: tenantWhere,
           include: [
             { model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] },
-            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "so_phong"] },
+            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "so_phong"],
+              ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}) },
           ],
         }],
       }],
@@ -83,14 +88,16 @@ class ThanhToanService {
     return { count, total: count, data: rows };
   }
 
-  async getThanhToanById(id) {
+  async getThanhToanById(id, requester) {
+    if (requester) await assertOwned(requester, "payment", id);
     const row = await GiaoDichThanhToan.findByPk(id, { include: [{ model: ThanhToan, as: "thanhToan", include: [{ model: HopDong, as: "hopDong" }] }] });
     if (!row) throw { status: 404, message: "Không tìm thấy giao dịch thanh toán" };
     return row;
   }
   getPaymentsByBill(id) { return GiaoDichThanhToan.findAll({ where: { ma_thanh_toan: id }, order: [["thoi_diem_ghi_nhan", "DESC"]] }); }
   async getTotalPaidForBill(id) { return Number(await GiaoDichThanhToan.sum("so_tien", { where: { ma_thanh_toan: id, trang_thai_xac_nhan: "DA_XAC_NHAN" } }) || 0); }
-  async getPaymentStats(startDate, endDate) {
+  async getPaymentStats(startDate, endDate, requester) {
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const rows = await GiaoDichThanhToan.findAll({
       where: { thoi_diem_ghi_nhan: { [Op.between]: [startDate, endDate] }, trang_thai_xac_nhan: "DA_XAC_NHAN" },
       attributes: [
@@ -99,6 +106,9 @@ class ThanhToanService {
         [fn("COUNT", col("GiaoDichThanhToan.maGiaoDich")), "count"],
       ],
       group: ["nguon_thanh_toan"],
+      ...(ownedBuildings ? { include: [{ model: ThanhToan, as: "thanhToan", attributes: [], required: true,
+        include: [{ model: HopDong, as: "hopDong", attributes: [], required: true,
+          include: [{ model: PhongTro, as: "phongTro", attributes: [], required: true, where: { ma_can: { [Op.in]: ownedBuildings } } }] }] }] } : {}),
       raw: true,
     });
     const bySource = Object.fromEntries(rows.map((row) => [row.nguon_thanh_toan, {

@@ -18,6 +18,7 @@ const debtLifecycleService = require("../services/debtLifecycle.service");
 const paymentLifecycleService = require("../services/paymentLifecycle.service");
 const tenantAccountService = require("../services/tenantAccount.service");
 const reservationService = require("../services/reservation.service");
+const { getOwnedBuildingIds, notFoundError } = require("../services/ownership.service");
 const contractViolationService = require("../services/contractViolation.service");
 const contractLifecycleService = require("../services/contractLifecycle.service");
 const moveOutRequestService = require("../services/moveOutRequest.service");
@@ -128,7 +129,7 @@ async function adjustBill(req, res, next) {
 router.post("/bills/:id/adjustments", landlord, adjustBill);
 
 router.get("/billing-adjustments", landlord, async (req, res, next) => {
-  try { return data(res, await billingAdjustmentDefinitionService.list(req.query.contractId)); } catch (e) { next(e); }
+  try { return data(res, await billingAdjustmentDefinitionService.list(req.query.contractId, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/billing-adjustments", landlord, async (req, res, next) => {
   try { return data(res, await billingAdjustmentDefinitionService.create(req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
@@ -141,7 +142,7 @@ router.post("/billing-adjustments/:id/toggle", landlord, async (req, res, next) 
 });
 
 router.post("/bills/preview", landlord, async (req, res, next) => {
-  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds)); } catch (e) { next(e); }
+  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 
 router.post("/bills/generate", landlord, async (req, res, next) => {
@@ -152,7 +153,7 @@ router.post("/bills/generate", landlord, async (req, res, next) => {
 router.get("/debt", async (req, res, next) => {
   try {
     validateQuery(req.query);
-    return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined }));
+    return data(res, await debtLifecycleService.listDebt({ tenantId: req.user.vai_tro === "KHACH_THUE" ? req.user.ma_khach_thue : undefined, requester: req.user }));
   } catch (e) { next(e); }
 });
 router.post("/bills/:id/mark-paid", landlord, async (req, res, next) => { try { return data(res, await paymentLifecycleService.markPaid(req.params.id, req.get("Idempotency-Key"), req.user.ma_tai_khoan), 201); } catch (e) { next(e); } });
@@ -270,15 +271,20 @@ router.post("/requests/:id/revoke", landlord, async (req, res, next) => {
 
 router.get("/move-outs", landlord, async (req, res, next) => {
   try {
+    const buildingIds = await getOwnedBuildingIds(req.user);
+    const contracts = await HopDong.findAll({
+      attributes: ["ma_hop_dong"],
+      include: [{ model: PhongTro, as: "phongTro", attributes: [], required: true, where: { ma_can: { [Op.in]: buildingIds } } }],
+      raw: true,
+    });
+    const details = await YeuCauTraPhong.findAll({
+      where: { ma_hop_dong: { [Op.in]: contracts.map((row) => row.ma_hop_dong) } }, raw: true,
+    });
     const requests = await YeuCau.findAll({
-      where: { loai_yeu_cau: "TRA_PHONG" },
+      where: { loai_yeu_cau: "TRA_PHONG", ma_yeu_cau: { [Op.in]: details.map((row) => row.ma_yeu_cau) } },
       order: [["ngay_gui", "DESC"]],
       raw: true,
     });
-    const details = requests.length ? await YeuCauTraPhong.findAll({
-      where: { ma_yeu_cau: { [Op.in]: requests.map((row) => row.ma_yeu_cau) } },
-      raw: true,
-    }) : [];
     const contractByRequest = new Map(details.map((row) => [row.ma_yeu_cau, row.ma_hop_dong]));
     return data(res, requests.map((row) => ({ ...row, ma_hop_dong: contractByRequest.get(row.ma_yeu_cau) || null })));
   } catch (e) { next(e); }
@@ -295,7 +301,7 @@ router.post("/move-outs/:contractId/settle", landlord, async (req, res, next) =>
   } catch (e) { next(e); }
 });
 router.get("/move-outs/:contractId/context", landlord, async (req, res, next) => {
-  try { return data(res, await moveOutService.getContext(req.params.contractId)); } catch (e) { next(e); }
+  try { return data(res, await moveOutService.getContext(req.params.contractId, req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 router.post("/move-outs/:id/deposit-refunds", landlord, async (req, res, next) => {
   try { return data(res, await moveOutService.recordDepositRefund(req.params.id, req.body, req.user.ma_tai_khoan), 201); } catch (e) { next(e); }
@@ -364,9 +370,20 @@ router.post("/notifications/broadcast", landlord, async (req, res, next) => {
   try {
     const subject = String(req.body.subject || "").trim(); const content = String(req.body.content || "").trim();
     if (!subject || !content) throw fail(422, "Tiêu đề và nội dung thông báo là bắt buộc");
-    const where = { vai_tro: "KHACH_THUE", trang_thai: "HOAT_DONG" };
-    if (Array.isArray(req.body.recipientIds) && req.body.recipientIds.length) where.ma_tai_khoan = { [Op.in]: req.body.recipientIds };
+    const buildingIds = await getOwnedBuildingIds(req.user);
+    const contracts = await HopDong.findAll({
+      attributes: ["ma_khach_thue"],
+      include: [{ model: PhongTro, as: "phongTro", attributes: [], required: true, where: { ma_can: { [Op.in]: buildingIds } } }],
+      raw: true,
+    });
+    const tenantIds = [...new Set(contracts.map((row) => row.ma_khach_thue))];
+    const tenants = await KhachThue.findAll({ where: { ma_khach_thue: { [Op.in]: tenantIds } }, attributes: ["ma_tai_khoan"], raw: true });
+    const ownedAccountIds = [...new Set(tenants.map((row) => row.ma_tai_khoan).filter(Boolean))];
+    const requested = Array.isArray(req.body.recipientIds) && req.body.recipientIds.length ? [...new Set(req.body.recipientIds)] : null;
+    if (requested?.some((id) => !ownedAccountIds.includes(id))) throw notFoundError();
+    const where = { vai_tro: "KHACH_THUE", trang_thai: "HOAT_DONG", ma_tai_khoan: { [Op.in]: requested || ownedAccountIds } };
     const recipients = await TaiKhoan.findAll({ where, attributes: ["ma_tai_khoan"] });
+    if (requested && recipients.length !== requested.length) throw notFoundError();
     const crypto = require("node:crypto");
     const maBroadcast = String(req.body.maBroadcast || crypto.randomUUID());
     let sent = 0; let skipped = 0;

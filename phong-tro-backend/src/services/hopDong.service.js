@@ -11,6 +11,8 @@ const {
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const lifecycle = require("./contractLifecycle.service");
+const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
+const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 class HopDongService {
   async createHopDong(data, actorId) {
@@ -26,6 +28,8 @@ class HopDongService {
 
     // Verify room exists
     const phong = await PhongTro.findByPk(data.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
+    await assertOwned(ownerUser(actorId), "room", data.ma_phong, { transaction });
+    await assertOwned(ownerUser(actorId), "tenant", data.ma_khach_thue, { transaction });
     if (!phong) {
       throw {
         status: 404,
@@ -118,7 +122,7 @@ class HopDongService {
     });
   }
 
-  async getHopDongList(filters, pagination) {
+  async getHopDongList(filters, pagination, requester) {
     const where = {};
 
     if (filters.ma_khach_thue) {
@@ -133,6 +137,7 @@ class HopDongService {
       where.trang_thai = filters.trang_thai;
     }
 
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const { count, rows } = await HopDong.findAndCountAll({
       where,
       include: [
@@ -145,6 +150,7 @@ class HopDongService {
           model: PhongTro,
           as: "phongTro",
           attributes: ["ma_phong", "gia_thue"],
+          ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}),
         },
       ],
       limit: pagination.limit,
@@ -152,10 +158,11 @@ class HopDongService {
       order: [["ngay_bat_dau", "DESC"]],
     });
 
-    return { total: count, data: rows };
+    return { count, total: count, data: rows };
   }
 
-  async getHopDongById(maHopDong) {
+  async getHopDongById(maHopDong, requester) {
+    if (requester) await assertOwned(requester, "contract", maHopDong);
     const hopDong = await HopDong.findByPk(maHopDong, {
       include: [
         {
@@ -183,6 +190,7 @@ class HopDongService {
     const { reason, ...patch } = data;
     return sequelize.transaction(async (transaction) => {
       const hopDong = await HopDong.findByPk(maHopDong, { transaction, lock: transaction.LOCK.UPDATE });
+      await assertOwned(ownerUser(actorId), "contract", maHopDong, { transaction });
       if (!hopDong) throw { status: 404, message: "Hợp đồng không tồn tại" };
       const before = hopDong.get({ plain: true });
       await hopDong.update(patch, { transaction });
@@ -192,9 +200,9 @@ class HopDongService {
   }
 
   async getHistory(maHopDong, requester) {
+    await assertOwned(requester, "contract", maHopDong);
     const hopDong = await HopDong.findByPk(maHopDong);
     if (!hopDong) throw { status: 404, message: "Hợp đồng không tồn tại" };
-    if (requester.vai_tro === "KHACH_THUE" && hopDong.ma_khach_thue !== requester.ma_khach_thue) throw { status: 403, message: "Bạn chỉ được xem lịch sử hợp đồng của mình" };
     return lifecycle.getHistory(maHopDong);
   }
 
@@ -214,13 +222,14 @@ class HopDongService {
     return hopDong;
   }
 
-  async getExpiringContracts(daysBeforeExpiry = 30) {
+  async getExpiringContracts(daysBeforeExpiry = 30, requester) {
     /**
      * BR-02: Cảnh báo ít nhất 1 tháng trước khi hết hạn
      */
     const now = new Date();
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + daysBeforeExpiry);
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
 
     return await HopDong.findAll({
       where: {
@@ -237,6 +246,7 @@ class HopDongService {
         {
           model: PhongTro,
           as: "phongTro",
+          ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}),
         },
       ],
     });

@@ -1,8 +1,9 @@
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const { DatGiuPhong, LichSuGiaHanGiuPhong, PhongTro, KhoanThu, ThongBao, TaiKhoan } = require("../models");
+const { DatGiuPhong, LichSuGiaHanGiuPhong, PhongTro, KhoanThu } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const { assertLandlordOwnsRoom } = require("./propertyAccess.service");
+const { getLandlordAccountForRoom } = require("./ownership.service");
 
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
 const dateOnly = (value) => new Date(value).toISOString().slice(0, 10);
@@ -101,14 +102,13 @@ async function cancel(id, payload, actorId, user) {
 async function notifyExpired({ now = new Date() } = {}) {
   return sequelize.transaction(async (transaction) => {
     const overdue = await DatGiuPhong.findAll({ where: { trang_thai: "DANG_GIU", han_giu: { [Op.lt]: dateOnly(now) } }, transaction, lock: transaction.LOCK.UPDATE });
-    const landlords = await TaiKhoan.findAll({ where: { vai_tro: "CHU_TRO", trang_thai: "HOAT_DONG" }, transaction, lock: transaction.LOCK.UPDATE });
     let created = 0;
     for (const item of overdue) {
-      for (const landlord of landlords) {
+      const accountId = await getLandlordAccountForRoom(item.ma_phong, transaction);
+      if (!accountId) throw new Error(`Missing landlord for reservation ${item.ma_dat_giu}`);
       const content = `Giữ phòng ${item.ma_dat_giu} đã quá hạn ${item.han_giu}.`;
-      const result = await require("./notification.service").createIdempotent({ ma_tai_khoan: landlord.ma_tai_khoan, loai_thong_bao: "GIU_PHONG_QUA_HAN", noi_dung: content, khoa_su_kien: `GIU_PHONG_HET_HAN:${item.ma_dat_giu}:${dateOnly(now)}`, thoi_diem_tao: new Date() }, { transaction });
+      const result = await require("./notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: "GIU_PHONG_QUA_HAN", noi_dung: content, khoa_su_kien: `GIU_PHONG_HET_HAN:${item.ma_dat_giu}:${dateOnly(now)}`, thoi_diem_tao: new Date() }, { transaction });
       if (result.created) created += 1;
-      }
     }
     return { overdue: overdue.length, created };
   });

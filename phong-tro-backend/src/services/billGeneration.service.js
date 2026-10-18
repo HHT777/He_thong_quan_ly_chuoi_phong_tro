@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
-const { HopDong, ChiSoDien } = require("../models");
+const { HopDong, ChiSoDien, PhongTro } = require("../models");
+const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
 const billService = require("./khoanPhaiThu.service");
 const meterReadingService = require("./meterReading.service");
 const adjustmentDefinitionService = require("./billingAdjustmentDefinition.service");
@@ -45,7 +46,7 @@ async function buildPreview(contract, period) {
   };
 }
 
-async function eligibleContracts(period, contractIds) {
+async function eligibleContracts(period, contractIds, actorId) {
   const { year, month } = parsePeriod(period);
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const end = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth(year, month)).padStart(2, "0")}`;
@@ -54,11 +55,17 @@ async function eligibleContracts(period, contractIds) {
     ngay_bat_dau: { [Op.lte]: end }, ngay_ket_thuc: { [Op.gte]: start },
   };
   if (Array.isArray(contractIds) && contractIds.length) where.ma_hop_dong = { [Op.in]: [...new Set(contractIds)] };
-  return HopDong.findAll({ where, order: [["ma_phong", "ASC"]] });
+  const actor = actorId ? { vai_tro: "CHU_TRO", ma_tai_khoan: actorId } : null;
+  if (actor && Array.isArray(contractIds) && contractIds.length) {
+    for (const id of new Set(contractIds)) await assertOwned(actor, "contract", id);
+  }
+  const ownedBuildings = actor ? await getOwnedBuildingIds(actor) : null;
+  return HopDong.findAll({ where, order: [["ma_phong", "ASC"]],
+    ...(ownedBuildings ? { include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: ownedBuildings } } }] } : {}) });
 }
 
-async function preview(period, contractIds) {
-  const contracts = await eligibleContracts(period, contractIds); const previews = []; const skipped = [];
+async function preview(period, contractIds, actorId) {
+  const contracts = await eligibleContracts(period, contractIds, actorId); const previews = []; const skipped = [];
   for (const contract of contracts) {
     try { previews.push(await buildPreview(contract, period)); }
     catch (error) { skipped.push({ contractId: contract.ma_hop_dong, roomId: contract.ma_phong, reason: error.code || error.message || "BILL_PREVIEW_FAILED" }); }
@@ -67,7 +74,7 @@ async function preview(period, contractIds) {
 }
 
 async function generate(period, actorId, contractIds) {
-  const result = await preview(period, contractIds); const created = []; const skipped = [...result.skipped];
+  const result = await preview(period, contractIds, actorId); const created = []; const skipped = [...result.skipped];
   for (const item of result.previews) {
     try {
       created.push(await billService.createKhoanPhaiThu({

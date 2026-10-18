@@ -4,6 +4,7 @@ const { ThanhToan, ChiTietThanhToan, GiaoDichThanhToan, HopDong, PhongTro, Khach
 const { writeAuditLog } = require("./auditLog.service");
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { sumSignedLineAmounts } = require("../utils/billLine.util");
+const { assertOwned, getOwnedBuildingIds, notFoundError } = require("./ownership.service");
 
 function splitPeriod(period) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || "");
@@ -23,7 +24,8 @@ class KhoanPhaiThuService {
       const contract = data.ma_hop_dong
         ? await HopDong.findByPk(data.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE })
         : await HopDong.findOne({ where: { ma_phong: data.ma_phong, ma_khach_thue: data.ma_khach_thue, trang_thai: { [Op.ne]: "DA_THANH_LY" } }, transaction, lock: transaction.LOCK.UPDATE });
-      if (!contract) throw { status: 404, message: "Không tìm thấy hợp đồng phù hợp" };
+      if (!contract) throw notFoundError();
+      if (actorId) await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "contract", contract.ma_hop_dong, { transaction });
       if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, code: "BILL_ALREADY_EXISTS", message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
       const lines = [
         { type: BILL_LINE_TYPES.RENT, amount: Number(data.tien_phong), description: "Tiền phòng" },
@@ -72,25 +74,31 @@ class KhoanPhaiThuService {
     return { where, contractWhere, buildingId };
   }
 
-  async getKhoanPhaiThuList(filters, pagination) {
+  async getKhoanPhaiThuList(filters, pagination, requester) {
     const { where, contractWhere, buildingId } = this.buildWhere(filters);
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const include = billInclude.map((item) => item.as === "hopDong" ? {
       ...item,
-      required: Object.keys(contractWhere).length > 0 || Boolean(buildingId),
+      required: Object.keys(contractWhere).length > 0 || Boolean(buildingId) || Boolean(ownedBuildings),
       where: contractWhere,
-      include: item.include.map((nested) => nested.as === "phongTro" && buildingId ? { ...nested, required: true, where: { ma_can: buildingId } } : nested),
+      include: item.include.map((nested) => nested.as === "phongTro" && (buildingId || ownedBuildings)
+        ? { ...nested, required: true, where: { ma_can: ownedBuildings
+          ? { [Op.in]: buildingId ? (ownedBuildings.includes(buildingId) ? [buildingId] : []) : ownedBuildings }
+          : buildingId } } : nested),
     } : item);
     const { count, rows } = await ThanhToan.findAndCountAll({ where, include, distinct: true, limit: pagination.limit, offset: pagination.offset, order: [["nam", "DESC"], ["thang", "DESC"]] });
     return { count, total: count, data: rows };
   }
 
-  async getKhoanPhaiThuById(id) {
+  async getKhoanPhaiThuById(id, requester) {
+    if (requester) await assertOwned(requester, "bill", id);
     const row = await ThanhToan.findByPk(id, { include: billInclude });
     if (!row) throw { status: 404, message: "Không tìm thấy khoản phải thu" };
     return row;
   }
 
-  async getOutstandingBills(tenantId) {
+  async getOutstandingBills(tenantId, requester) {
+    if (requester) await assertOwned(requester, "tenant", tenantId);
     return ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 } }, include: [{ model: HopDong, as: "hopDong", required: true, where: { ma_khach_thue: tenantId }, include: [{ model: PhongTro, as: "phongTro" }] }], order: [["nam", "ASC"], ["thang", "ASC"]] });
   }
 
@@ -103,8 +111,13 @@ class KhoanPhaiThuService {
     return bill;
   }
 
-  async getOverdueBills() {
-    return ThanhToan.findAll({ where: { qua_han: true, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, include: billInclude });
+  async getOverdueBills(requester) {
+    const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
+    return ThanhToan.findAll({ where: { qua_han: true, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" },
+      include: billInclude.map((item) => item.as === "hopDong" ? { ...item, required: true,
+        ...(requester?.vai_tro === "KHACH_THUE" ? { where: { ma_khach_thue: requester.ma_khach_thue } } : {}),
+        include: item.include.map((nested) => nested.as === "phongTro" && ownedBuildings
+          ? { ...nested, required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : nested) } : item) });
   }
 }
 

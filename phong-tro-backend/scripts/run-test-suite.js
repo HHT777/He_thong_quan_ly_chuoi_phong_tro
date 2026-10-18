@@ -12,11 +12,15 @@ const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
 const mode = process.argv[2];
 
-function testFiles(integration) {
-  return fs.readdirSync(testsDir)
-    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration)
+function testFiles(integration, filter = process.argv[3]) {
+  const excluded = filter?.startsWith("!") ? filter.slice(1) : null;
+  const files = fs.readdirSync(testsDir)
+    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration
+      && (!filter || (excluded ? !name.includes(excluded) : name.includes(filter))))
     .sort()
     .map((name) => path.join("tests", name));
+  if (files.length === 0) throw new Error(`No ${integration ? "integration" : "unit"} test files match filter: ${filter || "(none)"}`);
+  return files;
 }
 
 function runNodeTests(files, env = process.env) {
@@ -45,6 +49,16 @@ function safeDatabaseName() {
   return name;
 }
 
+function assertAuthorizedDatabaseTarget(name, operation) {
+  const expectedName = process.env.TEST_DB_ALLOWED_NAME;
+  const host = process.env.TEST_DB_HOST;
+  const port = Number(process.env.TEST_DB_PORT);
+  if (expectedName && (name !== expectedName || host !== "127.0.0.1" || port !== 3307)) {
+    throw new Error(`Refusing ${operation}: test DB target is outside approved scope`);
+  }
+  console.log(`[TEST DB ${operation}] name=${name} host=${host || process.env.DB_HOST} port=${port || process.env.DB_PORT}`);
+}
+
 function connectionOptions(database) {
   return {
     host: process.env.TEST_DB_HOST || required("DB_HOST"),
@@ -65,7 +79,9 @@ function validateLogin(name, value) {
 async function resetAndSeed(databaseName) {
   const admin = await mysql.createConnection(connectionOptions());
   const escapedName = `\`${databaseName}\``;
+  assertAuthorizedDatabaseTarget(databaseName, "DROP");
   await admin.query(`DROP DATABASE IF EXISTS ${escapedName}`);
+  assertAuthorizedDatabaseTarget(databaseName, "CREATE");
   await admin.query(`CREATE DATABASE ${escapedName} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await admin.end();
 
@@ -101,6 +117,7 @@ async function resetAndSeed(databaseName) {
 
 async function dropTestDatabase(databaseName) {
   const connection = await mysql.createConnection(connectionOptions());
+  assertAuthorizedDatabaseTarget(databaseName, "DROP");
   await connection.query(`DROP DATABASE IF EXISTS \`${databaseName}\``);
   await connection.end();
 }
@@ -122,6 +139,7 @@ async function waitUntilReady(baseUrl, server) {
 
 async function runIntegration() {
   const databaseName = safeDatabaseName();
+  const selectedTests = testFiles(true);
   required("TEST_NEW_ACCOUNT_PASSWORD");
   const port = Number(process.env.TEST_PORT || 3101);
   const baseUrl = process.env.TEST_BASE_URL || `http://127.0.0.1:${port}`;
@@ -143,10 +161,16 @@ async function runIntegration() {
   let server;
   try {
     await resetAndSeed(databaseName);
+    if (process.env.TEST_CHECK_SEED_INVARIANTS === "true") {
+      console.log(`[INVARIANTS seed] name=${databaseName} host=${env.DB_HOST} port=${env.DB_PORT}`);
+      const seedInvariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
+      if (seedInvariant.status !== 0) return seedInvariant.status ?? 1;
+    }
     server = spawn(process.execPath, ["src/index.js"], { cwd: root, env, stdio: "inherit" });
     await waitUntilReady(baseUrl, server);
-    const testStatus = runNodeTests(testFiles(true), env);
+    const testStatus = runNodeTests(selectedTests, env);
     if (testStatus !== 0) return testStatus;
+    console.log(`[INVARIANTS post-integration] name=${databaseName} host=${env.DB_HOST} port=${env.DB_PORT}`);
     const invariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
     return invariant.status ?? 1;
   } finally {
@@ -162,7 +186,9 @@ async function main() {
   else throw new Error("Usage: node scripts/run-test-suite.js <unit|integration>");
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
   console.error(error.message);
   process.exitCode = 1;
 });
+
+module.exports = { testFiles, safeDatabaseName, assertAuthorizedDatabaseTarget };

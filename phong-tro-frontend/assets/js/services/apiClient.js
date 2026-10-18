@@ -39,10 +39,11 @@
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
       }
-      const error = new Error(
-        body.error?.message || body.message || `Request failed (${response.status})`,
-      );
-      error.code = body.error?.code;
+      const code = body.error?.code || body.code;
+      const error = new Error(response.status === 404 && code === "RESOURCE_NOT_FOUND"
+        ? "Không tìm thấy hoặc bạn không có quyền với đối tượng này"
+        : body.error?.message || body.message || `Request failed (${response.status})`);
+      error.code = code;
       error.status = response.status;
       error.details = body.error?.details || body.details;
       throw error;
