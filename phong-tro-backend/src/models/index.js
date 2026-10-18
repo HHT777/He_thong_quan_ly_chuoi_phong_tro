@@ -1,5 +1,7 @@
 const bcrypt = require("bcryptjs");
 const models = require("./schema");
+// All canonical models inherit utf8mb4_unicode_ci from schema.js; do not let
+// Sequelize sync() pick a server-dependent table default for new tables.
 const AuditLog = require("./AuditLog");
 
 const {

@@ -15,6 +15,32 @@ function ddlTables() {
   return result;
 }
 
+test("canonical DDL and Sequelize models pin utf8mb4_unicode_ci", () => {
+  const documented = fs.readFileSync(path.resolve(__dirname, "../../data2.md"), "utf8");
+  const migrationDir = path.resolve(__dirname, "../migrations");
+  const migrations = fs.readdirSync(migrationDir).filter((name) => /^0(?:0[4-9]|1[0-5])_.*\.sql$/.test(name));
+  const definitions = [{ name: "data2.md", source: documented }, ...migrations.map((name) => ({ name, source: fs.readFileSync(path.join(migrationDir, name), "utf8") }))];
+  for (const { name, source } of definitions) {
+    const tables = [...source.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`([^`]+)`[\s\S]*?;/gi)];
+    const expectedCount = (source.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`/gi) || []).length;
+    assert.equal(tables.length, expectedCount, `${name}: all CREATE TABLE statements must declare charset and collation`);
+    for (const [statement, table] of tables) {
+      assert.match(statement, /DEFAULT\s+CHARSET=utf8mb4\s+COLLATE=utf8mb4_unicode_ci/i, `${name}:${table}`);
+    }
+    for (const line of source.split(/\r?\n/)) {
+      if (line.trim().startsWith("--")) continue;
+      if (/\b(?:ADD|MODIFY|CHANGE)\s+COLUMN\s+`[^`]+`\s+varchar\(\d+\)/i.test(line)) {
+        assert.match(line, /varchar\(\d+\)\s+CHARACTER\s+SET\s+utf8mb4\s+COLLATE\s+utf8mb4_unicode_ci/i, `${name}: altered varchar needs explicit collation`);
+      }
+    }
+  }
+  for (const model of Object.values(models)) {
+    if (!model?.tableName) continue;
+    assert.equal(model.options.charset, "utf8mb4", `${model.tableName} charset`);
+    assert.equal(model.options.collate, "utf8mb4_unicode_ci", `${model.tableName} collation`);
+  }
+});
+
 test("Sequelize maps every documented table and physical column", () => {
   const expected = ddlTables();
   assert.ok(expected.size >= 25);

@@ -3,13 +3,13 @@
 -- Rollback is manual because lifecycle/audit data must be exported before dropping columns/tables.
 SET @schema_name = DATABASE();
 
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='lyDoXuLy'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `lyDoXuLy` varchar(1000) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='lyDoXuLy'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `lyDoXuLy` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='ngayDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `ngayDuyet` timestamp NULL DEFAULT NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='ngayRutDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `ngayRutDuyet` timestamp NULL DEFAULT NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `nguoiXuLyId` varchar(36) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCau' AND column_name='nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD COLUMN `nguoiXuLyId` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='YeuCau' AND constraint_name='fk_YeuCau_nguoiXuLyId'), 'SELECT 1', 'ALTER TABLE `YeuCau` ADD CONSTRAINT `fk_YeuCau_nguoiXuLyId` FOREIGN KEY (`nguoiXuLyId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -21,7 +21,7 @@ SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schem
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='ngayTraDaDuyet'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `ngayTraDaDuyet` date NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='lyDoTraSom'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `lyDoTraSom` varchar(1000) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='YeuCauTraPhong' AND column_name='lyDoTraSom'), 'SELECT 1', 'ALTER TABLE `YeuCauTraPhong` ADD COLUMN `lyDoTraSom` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS `ChiPhiSuCoKhachThue` (
@@ -56,4 +56,4 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
 
 -- The older MVP foundation created this column as INT; account identifiers in
 -- the current schema are UUID strings.
-ALTER TABLE `audit_log` MODIFY COLUMN `actor_id` varchar(36) NOT NULL;
+ALTER TABLE `audit_log` MODIFY COLUMN `actor_id` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;

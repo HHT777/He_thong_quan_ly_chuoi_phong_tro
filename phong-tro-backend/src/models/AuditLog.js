@@ -15,7 +15,7 @@ const AuditLog = sequelize.define(
     correlation_id: { type: DataTypes.STRING(100), allowNull: true },
     created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   },
-  { tableName: "audit_log", timestamps: false },
+  { tableName: "audit_log", timestamps: false, charset: "utf8mb4", collate: "utf8mb4_unicode_ci" },
 );
 
 module.exports = AuditLog;
