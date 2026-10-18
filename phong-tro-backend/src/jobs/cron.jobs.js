@@ -1,7 +1,8 @@
 const cron = require("node-cron");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
-const { HopDong, KhachThue, TaiKhoan, ThongBao } = require("../models");
+const { HopDong, KhachThue } = require("../models");
+const { getLandlordAccountForRoom } = require("../services/ownership.service");
 const { getPersistedSystemConfig } = require("../services/systemConfig.service");
 const { withNamedLock } = require("../services/dbNamedLock.service");
 const reservationService = require("../services/reservation.service");
@@ -18,14 +19,15 @@ async function updateContractStates() {
     where: { trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] }, ngay_ket_thuc: { [Op.lte]: warningDate } },
     include: [{ model: KhachThue, as: "khachThue" }],
   });
-  const landlord = await TaiKhoan.findOne({ where: { vai_tro: "CHU_TRO", trang_thai: "HOAT_DONG" } });
   for (const contract of expiring) {
     await sequelize.transaction(async (transaction) => {
       const locked = await HopDong.findByPk(contract.ma_hop_dong, { transaction, lock: transaction.LOCK.UPDATE });
       const expired = new Date(locked.ngay_ket_thuc) < now;
       const nextState = expired ? "HET_HAN" : "SAP_HET_HAN";
       if (locked.trang_thai !== nextState) await locked.update({ trang_thai: nextState }, { transaction });
-      const recipients = [contract.khachThue?.ma_tai_khoan, landlord?.ma_tai_khoan].filter(Boolean);
+      const landlordAccountId = await getLandlordAccountForRoom(locked.ma_phong, transaction);
+      if (!landlordAccountId) throw new Error(`Missing landlord for contract ${locked.ma_hop_dong}`);
+      const recipients = [...new Set([contract.khachThue?.ma_tai_khoan, landlordAccountId].filter(Boolean))];
       for (const accountId of recipients) {
         const content = `Hợp đồng ${locked.ma_hop_dong} ${expired ? "đã hết hạn" : "sắp hết hạn"} ngày ${locked.ngay_ket_thuc}`;
         await require("../services/notification.service").createIdempotent({ ma_tai_khoan: accountId, loai_thong_bao: "HOP_DONG", noi_dung: content, khoa_su_kien: `HOP_DONG:${contract.ma_hop_dong}:${localDate(now, config.timezone)}`, thoi_diem_tao: now, da_doc: false }, { transaction });

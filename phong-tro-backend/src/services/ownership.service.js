@@ -53,6 +53,15 @@ async function getOwnedBuildingIds(user, transaction) {
   return rows.map((r) => r.ma_can);
 }
 
+async function getLandlordAccountForRoom(roomId, transaction) {
+  const room = await PhongTro.findByPk(roomId, { attributes: ["ma_can"], transaction });
+  if (!room) return null;
+  const building = await CanTro.findByPk(room.ma_can, { attributes: ["ma_chu_tro"], transaction });
+  if (!building) return null;
+  const landlord = await ChuTro.findByPk(building.ma_chu_tro, { attributes: ["ma_tai_khoan"], transaction });
+  return landlord?.ma_tai_khoan || null;
+}
+
 async function resolveBuildingId(resourceType, id, transaction) {
   if (!id) return null;
   switch (resourceType) {
@@ -345,5 +354,6 @@ module.exports = {
   notFoundError,
   getLandlordProfile,
   getOwnedBuildingIds,
+  getLandlordAccountForRoom,
   assertOwned,
 };
