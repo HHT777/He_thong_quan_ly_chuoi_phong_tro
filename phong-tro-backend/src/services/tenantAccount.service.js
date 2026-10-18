@@ -2,6 +2,8 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { TaiKhoan, KhachThue, HopDong, TienCoc } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
+const { assertOwned } = require("./ownership.service");
+const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 const ACTIVE_CONTRACT_STATES = Object.freeze(["DANG_HIEU_LUC", "SAP_HET_HAN"]);
 const fail = (status, code, message) => Object.assign(new Error(message), { status, code });
@@ -52,6 +54,7 @@ async function requireRentalEligibility(tenantId, transaction) {
 }
 
 async function createWithinTransaction(tenantId, transaction, actorId) {
+  await assertOwned(ownerUser(actorId), "tenant", tenantId, { transaction });
   const tenant = await KhachThue.findByPk(tenantId, {
     transaction,
     lock: transaction.LOCK.UPDATE,
@@ -107,6 +110,7 @@ async function updateStatus(accountId, status, actorId) {
     throw fail(422, "INVALID_ACCOUNT_STATUS", "Trạng thái tài khoản không hợp lệ");
   }
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(ownerUser(actorId), "account", accountId, { transaction });
     const { account, tenant } = await requireTenantAccount(accountId, transaction);
     if (account.trang_thai === status) {
       throw fail(409, "ACCOUNT_STATUS_UNCHANGED", `Tài khoản đã ở trạng thái ${status}`);
@@ -120,6 +124,7 @@ async function updateStatus(accountId, status, actorId) {
 
 async function resetPassword(tenantId, actorId) {
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(ownerUser(actorId), "tenant", tenantId, { transaction });
     const tenant = await KhachThue.findByPk(tenantId, {
       transaction,
       lock: transaction.LOCK.UPDATE,

@@ -2,7 +2,7 @@ const {
   ChuTro, CanTro, PhongTro, HopDong, ThanhToan, GiaoDichThanhToan,
   TienCoc, DatGiuPhong, SuCo, TaiSan, YeuCau, YeuCauGiaHan, YeuCauTraPhong,
   DeXuatBanCungPhong, ThanhVienPhong, ChiSoDien, BienBanTraPhong, KhoanChi,
-  KhoanDieuChinh, ViPhamHopDong, KhachThue, ThongBao,
+  KhoanDieuChinh, ViPhamHopDong, KhachThue, TaiKhoan, ThongBao,
 } = require("../models");
 
 const knownResources = new Set([

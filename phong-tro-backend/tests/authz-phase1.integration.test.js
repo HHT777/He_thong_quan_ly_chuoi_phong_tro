@@ -282,7 +282,8 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     : groupFilter === "deposit" ? routes.filter((r) => r.name.includes("/api/dat-coc"))
       : groupFilter === "bill" ? routes.filter((r) => r.name.startsWith("POST /api/khoan-phai-thu (") || /\/api\/v1\/bills\/(preview|generate)/.test(r.name))
         : groupFilter === "payment" ? routes.filter((r) => /payment\/create|payment\/:id\/confirm|mark-paid|mark-all-paid|payments\/:id\/cancel/.test(r.name))
-          : groupFilter === "adjustment" ? routes.filter((r) => /\/discounts|\/adjustments|\/billing-adjustments/.test(r.name)) : routes;
+          : groupFilter === "adjustment" ? routes.filter((r) => /\/discounts|\/adjustments|\/billing-adjustments/.test(r.name))
+            : groupFilter === "account" ? routes.filter((r) => r.name.includes("/api/v1/accounts")) : routes;
   console.log(`\n=== RUNNING TABLE-DRIVEN AUTHZ CHECKS FOR ${selectedRoutes.length + (groupFilter ? 0 : 1)} ROUTES ===`);
   const snapshotModels = [TaiKhoan, PhongTro, HopDong, TienCoc, ThanhToan, GiaoDichThanhToan,
     KhoanDieuChinh, KhoanThu, AuditLog, ThongBao, BienBanTraPhong, GiaoDichHoanCoc, ChiTietThanhToan];
@@ -395,6 +396,11 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
     if (foreign.response.status !== 404 || JSON.stringify(visible(foreign)) !== JSON.stringify(visible(absent))) {
       failures.push({ route: "GET /api/v1/billing-adjustments?contractId=", target: "cross-landlord-filter", actual: visible(foreign), expected: visible(absent) });
     }
+  }
+  if (groupFilter === "account") {
+    const ownReset = await request("/api/v1/accounts/reset-password", { method: "POST", headers: headers(landlordA),
+      body: JSON.stringify({ tenantId: rentalA.tenant.ma_khach_thue }) });
+    if (ownReset.response.status !== 200) failures.push({ route: "POST /api/v1/accounts/reset-password", target: "own-account", actual: visible(ownReset) });
   }
   for (const item of [
     { route: `GET /api/hop-dong/${rentalB.contract.ma_hop_dong}`, missing: `GET /api/hop-dong/${dummyId}` },
