@@ -432,7 +432,7 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
   });
   if (tenantWrite.response.status !== 403) failures.push({ route: "POST /api/v1/bills/generate", target: "tenant-role", actual: visible(tenantWrite) }); }
 
-  console.log(`Phase 1 Unpatched/Failing checks count: ${failures.length} (total routes: ${routes.length})`);
+  console.log(`Phase 1 Unpatched/Failing checks count: ${failures.length} (total routes: ${routes.length + (groupFilter ? 0 : 1)})`);
   if (failures.length > 0) {
     console.log(`AUTHZ_RED_ROUTES ${new Set(failures.map((item) => item.route)).size}`);
     for (const failure of failures) {
