@@ -27,9 +27,11 @@ set names utf8mb4;
 set session time_zone = '+07:00';
 set session sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,NO_BACKSLASH_ESCAPES';
 create database `quan_ly_phong_tro_demo` character set utf8mb4 collate utf8mb4_unicode_ci;
+-- Mọi bảng, kể cả bảng thêm qua migration 004–015, khai báo tường minh
+-- DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci để FK chuỗi tương thích DB cũ.
 use `quan_ly_phong_tro_demo`;
 
--- 1. TẠO 36 BẢNG
+-- 1. TẠO 37 BẢNG
 
 create table `TaiKhoan` (
 `maTaiKhoan` varchar(36) not null,

@@ -10,7 +10,8 @@ const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const moveOutService = require("../src/services/moveOut.service");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
-const today = () => new Date().toISOString().slice(0, 10);
+// Business dates use Vietnam time; UTC's previous day would miss receipts near midnight.
+const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 async function prepareMoveOut(landlord, fresh) {
   const created = await request("/api/v1/requests", {

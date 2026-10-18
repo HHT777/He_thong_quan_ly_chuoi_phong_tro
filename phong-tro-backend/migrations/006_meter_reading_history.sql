@@ -3,11 +3,11 @@
 SET @schema_name = DATABASE();
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='daXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `daXoa` boolean NOT NULL DEFAULT false');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='lyDoXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `lyDoXoa` varchar(1000) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='lyDoXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `lyDoXoa` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='ngayXoa'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `ngayXoa` timestamp NULL DEFAULT NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='nguoiXoaId'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `nguoiXoaId` varchar(36) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='ChiSoDien' AND column_name='nguoiXoaId'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD COLUMN `nguoiXoaId` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='ChiSoDien' AND constraint_name='fk_ChiSoDien_nguoiXoaId'), 'SELECT 1', 'ALTER TABLE `ChiSoDien` ADD CONSTRAINT `fk_ChiSoDien_nguoiXoaId` FOREIGN KEY (`nguoiXoaId`) REFERENCES `TaiKhoan` (`maTaiKhoan`)');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

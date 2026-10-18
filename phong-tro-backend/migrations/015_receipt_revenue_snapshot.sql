@@ -6,7 +6,7 @@ SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schem
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='KhoanThu' AND column_name='giamTruPhanBo'), 'SELECT 1', 'ALTER TABLE `KhoanThu` ADD COLUMN `giamTruPhanBo` decimal(18,2) NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='KhoanThu' AND column_name='nguonSnapshot'), 'SELECT 1', 'ALTER TABLE `KhoanThu` ADD COLUMN `nguonSnapshot` varchar(20) NULL');
+SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=@schema_name AND table_name='KhoanThu' AND column_name='nguonSnapshot'), 'SELECT 1', 'ALTER TABLE `KhoanThu` ADD COLUMN `nguonSnapshot` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @sql = IF(EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_schema=@schema_name AND table_name='KhoanThu' AND constraint_name='ck_KhoanThu_015_nguon'), 'SELECT 1', 'ALTER TABLE `KhoanThu` ADD CONSTRAINT `ck_KhoanThu_015_nguon` CHECK (`nguonSnapshot` IS NULL OR `nguonSnapshot` IN (''GHI_NHAN'',''SUY_DIEN''))');

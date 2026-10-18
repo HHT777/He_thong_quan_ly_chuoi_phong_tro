@@ -5,7 +5,7 @@ const sequelize = require("../config/database");
 const id = (field) => ({ type: DataTypes.STRING(36), field, primaryKey: true, defaultValue: () => crypto.randomUUID() });
 const ref = (field, allowNull = false) => ({ type: DataTypes.STRING(36), field, allowNull });
 const money = (field, allowNull = false, defaultValue) => ({ type: DataTypes.DECIMAL(18, 2), field, allowNull, ...(defaultValue === undefined ? {} : { defaultValue }) });
-const opts = (tableName) => ({ tableName, timestamps: false, freezeTableName: true });
+const opts = (tableName) => ({ tableName, timestamps: false, freezeTableName: true, charset: "utf8mb4", collate: "utf8mb4_unicode_ci" });
 
 const TaiKhoan = sequelize.define("TaiKhoan", {
   ma_tai_khoan: id("maTaiKhoan"),
