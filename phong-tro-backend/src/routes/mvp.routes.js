@@ -271,15 +271,20 @@ router.post("/requests/:id/revoke", landlord, async (req, res, next) => {
 
 router.get("/move-outs", landlord, async (req, res, next) => {
   try {
+    const buildingIds = await getOwnedBuildingIds(req.user);
+    const contracts = await HopDong.findAll({
+      attributes: ["ma_hop_dong"],
+      include: [{ model: PhongTro, as: "phongTro", attributes: [], required: true, where: { ma_can: { [Op.in]: buildingIds } } }],
+      raw: true,
+    });
+    const details = await YeuCauTraPhong.findAll({
+      where: { ma_hop_dong: { [Op.in]: contracts.map((row) => row.ma_hop_dong) } }, raw: true,
+    });
     const requests = await YeuCau.findAll({
-      where: { loai_yeu_cau: "TRA_PHONG" },
+      where: { loai_yeu_cau: "TRA_PHONG", ma_yeu_cau: { [Op.in]: details.map((row) => row.ma_yeu_cau) } },
       order: [["ngay_gui", "DESC"]],
       raw: true,
     });
-    const details = requests.length ? await YeuCauTraPhong.findAll({
-      where: { ma_yeu_cau: { [Op.in]: requests.map((row) => row.ma_yeu_cau) } },
-      raw: true,
-    }) : [];
     const contractByRequest = new Map(details.map((row) => [row.ma_yeu_cau, row.ma_hop_dong]));
     return data(res, requests.map((row) => ({ ...row, ma_hop_dong: contractByRequest.get(row.ma_yeu_cau) || null })));
   } catch (e) { next(e); }

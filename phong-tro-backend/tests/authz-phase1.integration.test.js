@@ -309,6 +309,14 @@ test("PHASE 1 AUTHZ: Landlord A cannot read or modify Landlord B finance/contrac
       failures.push({ route: "GET /api/khoan-phai-thu/payment/stats", target: "cross-landlord-aggregate", actual: visible(stats), changedTables: [] });
     }
   }
+  if (!groupFilter || groupFilter === "settlement") {
+    const ownMoveOuts = await request("/api/v1/move-outs", { headers: headers(landlordA) });
+    const foreignMoveOuts = await request("/api/v1/move-outs", { headers: headers(landlordB) });
+    if (ownMoveOuts.response.status !== 200 || ownMoveOuts.body.data?.some((row) => row.ma_hop_dong === exitB.contract.ma_hop_dong)
+      || foreignMoveOuts.response.status !== 200 || !foreignMoveOuts.body.data?.some((row) => row.ma_hop_dong === exitB.contract.ma_hop_dong)) {
+      failures.push({ route: "GET /api/v1/move-outs", target: "cross-landlord-list", actual: visible(ownMoveOuts) });
+    }
+  }
   for (const r of selectedRoutes) {
     const before = await fingerprint();
     // 1. Cross-landlord call (A accessing B's resource)
