@@ -159,10 +159,16 @@ async function runIntegration() {
   let server;
   try {
     await resetAndSeed(databaseName);
+    if (process.env.TEST_CHECK_SEED_INVARIANTS === "true") {
+      console.log(`[INVARIANTS seed] name=${databaseName} host=${env.DB_HOST} port=${env.DB_PORT}`);
+      const seedInvariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
+      if (seedInvariant.status !== 0) return seedInvariant.status ?? 1;
+    }
     server = spawn(process.execPath, ["src/index.js"], { cwd: root, env, stdio: "inherit" });
     await waitUntilReady(baseUrl, server);
     const testStatus = runNodeTests(selectedTests, env);
     if (testStatus !== 0) return testStatus;
+    console.log(`[INVARIANTS post-integration] name=${databaseName} host=${env.DB_HOST} port=${env.DB_PORT}`);
     const invariant = spawnSync(process.execPath, ["scripts/check-invariants.js"], { cwd: root, env, stdio: "inherit" });
     return invariant.status ?? 1;
   } finally {
