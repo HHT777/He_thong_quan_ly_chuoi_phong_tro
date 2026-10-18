@@ -654,3 +654,17 @@ Clone sạch kiểm chứng tại HEAD `00ecf38ee85a1798c851fd3206dd8c53d8439f21
 Contract hiện hành tiếp tục theo `0f65ddb`: `totalRevenue`/`totalCollected` là thực nhận, `grossRevenue` là trước giảm trừ, `discounts` là giảm trừ đã phân bổ, và `profit = totalRevenue - totalExpenses`. Các consumer mới không được suy diễn `totalRevenue` là số gộp.
 
 Số vi phạm snapshot: `recordedReceiptSnapshots=0`, `receiptSnapshotArithmetic=0`, `allocatedDiscounts=0`, `snapshotReportTotals=0`. Không phát hiện lệch báo cáo sau backfill. Không làm F.5, in hợp đồng, Excel, liên kết sự cố, npm audit, dữ liệu hoàn cọc legacy hoặc thu hồi token.
+
+### Cập nhật authz Giai đoạn 1 sau nghiệm thu (18/10/2026)
+
+Phần này thay thế mọi ghi chú authz cũ trong mục 9. `docs/AUTHZ_MATRIX.md` liệt kê **117 khai báo route cụ thể**: 38 G1, 56 hoãn P2 Giai đoạn 2, 21 hoãn P2 Giai đoạn 3, 2 không áp dụng (có lý do). Trước khi bật nhiều Chủ trọ phải mở lại P2; đặc biệt `GET /reports/cashflow` hiện chưa tách phạm vi theo chủ.
+
+| FR | File/commit | Tình trạng sau kiểm chứng | Test bằng chứng |
+| --- | --- | --- | --- |
+| FR-035/041, FR-043/044, FR-144, FR-073/079, FR-164/175, FR-002/007, FR-096/187, FR-188 | Các service nghiệp vụ trong `docs/AUTHZ_MATRIX.md`; commit G1 `60c7962`, `3745649`, `3bf4ae6`, `2223786`, `71ee3fe`, `5041074`, `481a9e9`, `354b895` | Đã chặn truy cập chéo Chủ trọ ở 26 route cốt lõi; ID ngoại chủ và ID không tồn tại cùng 404 `RESOURCE_NOT_FOUND` | `tests/authz-phase1.integration.test.js`: 26/26 phép thử phủ định riêng đỏ khi tắt guard cho request được chọn, khôi phục xanh; `tests/authz-owner-regression.integration.test.js` và các test nghiệp vụ cũ giữ luồng 2xx của chính chủ |
+| FR-159 | `reservation.service.js`, `cron.jobs.js`, `mvp.routes.js` (`1bb2fc7`) | Thông báo giữ phòng quá hạn/hợp đồng sắp hết hạn chỉ tới Chủ trọ sở hữu; broadcast chỉ tới khách thuộc căn của chủ gửi | `tests/notification-ownership.integration.test.js`: hai chủ, cùng số phòng, chạy cron hai lần không trùng, ba phép thử phủ định đỏ |
+| FR-165 | `debtLifecycle.service.js` (`aa0acf6`) | `GET /debt` chỉ trả phiếu của căn thuộc Chủ trọ | `tests/authz-phase1.integration.test.js`: A không thấy nợ B, B thấy nợ B; bỏ lọc làm test đỏ |
+| FR-096 | `mvp.routes.js` (`282d06b`) | `GET /move-outs` chỉ trả hợp đồng của Chủ trọ | `tests/authz-phase1.integration.test.js`: A không thấy biên bản B; bỏ lọc làm test đỏ |
+| FR-035/043/144/073/164/002/096/188 | Hai API client frontend (`282f5f3`) | Chỉ 404 `RESOURCE_NOT_FOUND` hiển thị “Không tìm thấy hoặc bạn không có quyền với đối tượng này”; 404 khác giữ nguyên | `tests/frontend-authz-errors.test.js` kiểm cả hai client |
+
+Test toàn bộ trên MySQL 8.0.46 qua TCP `127.0.0.1:3307`, DB được duyệt `qlpt_authz_test`: unit **118/118**, integration **62/62**, 26 nhóm `check-invariants.js` **0 vi phạm**. Manifest `tests/authz-route-manifest.test.js` đối chiếu 117 dòng ma trận với mã nguồn; route mới hoặc sửa route mà không khai báo sẽ làm test đỏ. Không có migration mới. Frontend build **chưa chạy trong sandbox**; người dùng cần build và xác nhận trước Giai đoạn G.
