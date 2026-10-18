@@ -12,8 +12,9 @@ const cashflowReportService = require("../src/services/cashflowReport.service");
 const { businessDate } = require("../src/utils/businessDate.util");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
-// Business dates use Vietnam time; UTC's previous day would miss receipts near midnight.
-const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+// Keep the entire fixture on one Vietnam business day, independent of the machine clock.
+const FIXED_NOW = new Date("2026-10-31T19:00:00.000Z");
+const today = () => businessDate(FIXED_NOW);
 
 async function prepareMoveOut(landlord, fresh) {
   const created = await request("/api/v1/requests", {
@@ -30,7 +31,7 @@ async function prepareMoveOut(landlord, fresh) {
     }),
   });
   assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
-  await moveOutRequestService.processDueMoveOuts({ now: new Date() });
+  await moveOutRequestService.processDueMoveOuts({ now: FIXED_NOW });
   assert.equal((await PhongTro.findByPk((await HopDong.findByPk(fresh.contract.ma_hop_dong)).ma_phong)).trang_thai, "DANG_XU_LY_TRA_PHONG");
   return created.body.data.ma_yeu_cau;
 }
@@ -47,7 +48,7 @@ function baseSettlement(overrides = {}) {
 }
 
 test("FR-187/188 Vietnam business day controls settlement, meter month and refund at UTC month boundary", async () => {
-  const instant = new Date("2026-10-31T19:00:00.000Z"); // 2026-11-01 02:00 in Vietnam.
+  const instant = FIXED_NOW; // 2026-11-01 02:00 in Vietnam.
   const landlord = await login(integration.landlord);
   const fresh = await createFreshRental(landlord, "settlement-vietnam-boundary");
   const requestId = await prepareMoveOut(landlord, fresh);
@@ -182,8 +183,8 @@ test("FR-189 zero/negative settlement is idempotent and post-liquidation debt re
   assert.equal(debt.response.status, 200);
   assert.ok(debt.body.data.some((row) => row.ma_thanh_toan === postBills[0].ma_thanh_toan));
   const paid = await request("/api/khoan-phai-thu/payment/create", {
-    method: "POST", headers: headers(landlord, { "Idempotency-Key": `post-debt-${Date.now()}` }),
-    body: JSON.stringify({ ma_khoan_phai_thu: postBills[0].ma_thanh_toan, so_tien: 400000, ngay_thanh_toan: new Date().toISOString(), phuong_thuc: "CHUYEN_KHOAN" }),
+    method: "POST", headers: headers(landlord, { "Idempotency-Key": `post-debt-${postBills[0].ma_thanh_toan}` }),
+    body: JSON.stringify({ ma_khoan_phai_thu: postBills[0].ma_thanh_toan, so_tien: 400000, ngay_thanh_toan: FIXED_NOW.toISOString(), phuong_thuc: "CHUYEN_KHOAN" }),
   });
   assert.equal(paid.response.status, 201, JSON.stringify(paid.body));
   assert.equal(Number((await ThanhToan.findByPk(postBills[0].ma_thanh_toan)).so_tien_con_no), 0);
