@@ -8,6 +8,9 @@ test("authz runner rejects a zero-match filter before resetting any database", (
   assert.throws(() => testFiles(true, "__no_such_authz_test__"), /No integration test files match filter/);
   assert.throws(() => testFiles(false, "__no_such_authz_test__"), /No unit test files match filter/);
   assert.ok(testFiles(true, "co-tenant-detail").length > 0);
+  const baseline = testFiles(true, "!authz-phase1");
+  assert.ok(baseline.length > 0);
+  assert.ok(baseline.every((file) => !file.includes("authz-phase1")));
   const source = fs.readFileSync(path.resolve(__dirname, "../scripts/run-test-suite.js"), "utf8");
   assert.ok(source.indexOf("const selectedTests = testFiles(true)") < source.indexOf("await resetAndSeed(databaseName)"));
 });

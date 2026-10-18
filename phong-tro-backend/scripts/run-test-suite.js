@@ -13,8 +13,10 @@ const testsDir = path.join(root, "tests");
 const mode = process.argv[2];
 
 function testFiles(integration, filter = process.argv[3]) {
+  const excluded = filter?.startsWith("!") ? filter.slice(1) : null;
   const files = fs.readdirSync(testsDir)
-    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration && (!filter || name.includes(filter)))
+    .filter((name) => name.endsWith(".test.js") && name.includes(".integration.") === integration
+      && (!filter || (excluded ? !name.includes(excluded) : name.includes(filter))))
     .sort()
     .map((name) => path.join("tests", name));
   if (files.length === 0) throw new Error(`No ${integration ? "integration" : "unit"} test files match filter: ${filter || "(none)"}`);
