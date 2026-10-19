@@ -4,6 +4,20 @@ export default listTab({ id: "incidents", route: "/operations/incidents", title:
   title: "Sự cố",
   description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố.",
   endpoint: "/v1/incidents",
+  create: {
+    label: "Tạo sự cố",
+    fields: [
+      { name: "roomId", label: "Mã phòng", required: true },
+      { name: "type", label: "Loại sự cố", required: true },
+      { name: "priority", label: "Mức độ ưu tiên", required: true, options: [
+        { value: "TRUNG_BINH", label: "Trung bình" }, { value: "THAP", label: "Thấp" },
+        { value: "CAO", label: "Cao" }, { value: "KHAN_CAP", label: "Khẩn cấp" },
+      ] },
+      { name: "description", label: "Mô tả", type: "textarea", required: true },
+      { name: "previousIncidentId", label: "Sự cố trước (mã, nếu có)" },
+    ],
+    map: (raw) => ({ ...raw, previousIncidentId: raw.previousIncidentId || undefined }),
+  },
   columns: [{ label: "Phòng", format: (row) => row.phongTro?.so_phong || row.ma_phong }, { label: "Nội dung", key: "mo_ta" }, { label: "Ưu tiên", key: "muc_do_uu_tien" }, { label: "Trạng thái", key: "trang_thai" }, { label: "Chi phí", format: (row) => money(row.chi_phi_sua_chua) }, { label: "Ngày gửi", format: (row) => date(row.ngay_gui) }],
   rowActions: [
     {

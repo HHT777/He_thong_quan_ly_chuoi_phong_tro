@@ -10,9 +10,84 @@ const {
 } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const { businessDate } = require("../utils/businessDate.util");
+const { assertOwned, notFoundError } = require("./ownership.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const dateOnly = businessDate;
+
+async function validatePreviousIncident(previousId, roomId, newId, user, transaction) {
+  if (!roomId) throw fail(422, "Không thể liên kết sự cố khu vực chung", "INCIDENT_COMMON_AREA_LINK_UNSUPPORTED");
+  const seen = new Set([newId]);
+  let currentId = previousId;
+  let first = true;
+  let depth = 0;
+  while (currentId) {
+    if (++depth > 64) throw fail(409, "Chuỗi sự cố quá dài hoặc có vòng", "INCIDENT_CHAIN_TOO_DEEP");
+    if (seen.has(currentId)) throw fail(409, "Liên kết sự cố tạo thành vòng", "INCIDENT_LINK_CYCLE");
+    seen.add(currentId);
+    const current = await SuCo.findByPk(currentId, { transaction });
+    if (!current || current.da_xoa) throw notFoundError();
+    if (first) {
+      await assertOwned(user, "incident", currentId, { transaction });
+      if (!current.ma_phong || current.ma_phong !== roomId) {
+        throw fail(422, "Sự cố trước phải cùng phòng", "INCIDENT_PREVIOUS_ROOM_MISMATCH");
+      }
+      if (current.trang_thai !== "DA_XU_LY") {
+        throw fail(409, "Sự cố trước chưa xử lý xong", "INCIDENT_PREVIOUS_NOT_COMPLETED");
+      }
+    }
+    currentId = current.ma_su_co_truoc;
+    first = false;
+  }
+}
+
+async function create(payload, user) {
+  const roomId = payload.roomId;
+  const previousId = payload.previousIncidentId || null;
+  if (previousId && !roomId) throw fail(422, "Không thể liên kết sự cố khu vực chung", "INCIDENT_COMMON_AREA_LINK_UNSUPPORTED");
+  if (!roomId || !String(payload.description || "").trim()) {
+    throw fail(422, "Thiếu thông tin sự cố", "INCIDENT_REQUIRED_FIELDS");
+  }
+  if (previousId && user.vai_tro !== "CHU_TRO") {
+    throw fail(403, "Chỉ Chủ trọ được liên kết sự cố", "FORBIDDEN");
+  }
+  return sequelize.transaction(async (transaction) => {
+    if (user.vai_tro === "CHU_TRO") await assertOwned(user, "room", roomId, { transaction });
+    const incident = SuCo.build({
+      ma_nguoi_gui: user.ma_tai_khoan,
+      ma_phong: roomId,
+      loai_su_co: payload.type || payload.title || "KHAC",
+      muc_do_uu_tien: payload.priority || "TRUNG_BINH",
+      mo_ta: payload.description,
+      hinh_anh_url: payload.imageUrl || null,
+      trang_thai: user.vai_tro === "CHU_TRO" ? "DANG_XU_LY" : "CHO_TIEP_NHAN",
+      ...(user.vai_tro === "CHU_TRO" ? { nguoi_tiep_nhan_id: user.ma_tai_khoan, ngay_tiep_nhan: new Date() } : {}),
+    });
+    if (previousId) {
+      await validatePreviousIncident(previousId, roomId, incident.ma_su_co, user, transaction);
+      incident.ma_su_co_truoc = previousId;
+    }
+    await incident.save({ transaction });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_CREATED", entityType: "SuCo", entityId: incident.ma_su_co, after: { roomId, hasPrevious: Boolean(previousId) } });
+    return incident;
+  });
+}
+
+async function unlinkPrevious(incidentId, user) {
+  return sequelize.transaction(async (transaction) => {
+    await assertOwned(user, "incident", incidentId, { transaction });
+    const incident = await SuCo.findByPk(incidentId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!incident || incident.da_xoa) throw notFoundError();
+    if (!incident.ma_su_co_truoc) throw fail(409, "Sự cố không có liên kết", "INCIDENT_PREVIOUS_NOT_SET");
+    const links = await financialLinks(incidentId, transaction);
+    if (incident.trang_thai === "DA_XU_LY" || links.expense || links.pendingTenantCharge) {
+      throw fail(409, "Chi phí sự cố đã chốt", "INCIDENT_FINANCE_FINALIZED");
+    }
+    await incident.update({ ma_su_co_truoc: null, ngay_chinh_sua: new Date() }, { transaction });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_PREVIOUS_UNLINKED", entityType: "SuCo", entityId: incidentId, after: { hasPrevious: false } });
+    return incident;
+  });
+}
 
 async function financialLinks(incidentId, transaction) {
   const [expense, pendingTenantCharge] = await Promise.all([
@@ -81,8 +156,12 @@ async function createFinancialBranch(incident, payload, transaction) {
   }, { transaction });
 }
 
-async function update(incidentId, payload, actorId) {
+async function update(incidentId, payload, user) {
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(user, "incident", incidentId, { transaction });
+    if (Object.hasOwn(payload, "previousIncidentId") || Object.hasOwn(payload, "ma_su_co_truoc") || Object.hasOwn(payload, "maSuCoTruoc")) {
+      throw fail(409, "Chỉ được liên kết khi tạo sự cố mới", "INCIDENT_LINK_CREATE_ONLY");
+    }
     const incident = await SuCo.findByPk(incidentId, { transaction, lock: transaction.LOCK.UPDATE });
     if (!incident || incident.da_xoa) throw fail(404, "Sự cố không tồn tại", "INCIDENT_NOT_FOUND");
     if (incident.trang_thai === "DA_XU_LY") throw fail(409, "Sự cố đã xử lý không thể mở lại", "INCIDENT_ALREADY_COMPLETED");
@@ -97,7 +176,7 @@ async function update(incidentId, payload, actorId) {
     if (nextStatus === "DANG_XU_LY" && incident.trang_thai === "CHO_TIEP_NHAN") {
       Object.assign(patch, {
         trang_thai: "DANG_XU_LY",
-        nguoi_tiep_nhan_id: actorId,
+        nguoi_tiep_nhan_id: user.ma_tai_khoan,
         ngay_tiep_nhan: new Date(),
       });
     }
@@ -122,18 +201,19 @@ async function update(incidentId, payload, actorId) {
     }
     await incident.update(patch, { transaction });
     await writeAuditLog({
-      transaction, actorId, action: "INCIDENT_UPDATED", entityType: "SuCo", entityId: incident.ma_su_co,
+      transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_UPDATED", entityType: "SuCo", entityId: incident.ma_su_co,
       after: { status: incident.trang_thai, cost: incident.chi_phi_sua_chua, responsible: incident.doi_tuong_chiu_phi },
     });
     return incident;
   });
 }
 
-async function softDelete(incidentId, reason, actorId) {
+async function softDelete(incidentId, reason, user) {
   const normalizedReason = String(reason || "").trim();
-  if (!normalizedReason) throw fail(422, "Lý do xóa sự cố là bắt buộc", "DELETE_REASON_REQUIRED");
 
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(user, "incident", incidentId, { transaction });
+    if (!normalizedReason) throw fail(422, "Lý do xóa sự cố là bắt buộc", "DELETE_REASON_REQUIRED");
     const incident = await SuCo.findByPk(incidentId, { transaction, lock: transaction.LOCK.UPDATE });
     if (!incident || incident.da_xoa) throw fail(404, "Sự cố không tồn tại", "INCIDENT_NOT_FOUND");
     const links = await financialLinks(incident.ma_su_co, transaction);
@@ -149,11 +229,11 @@ async function softDelete(incidentId, reason, actorId) {
       da_xoa: true,
       ly_do_xoa: normalizedReason,
       ngay_xoa: new Date(),
-      nguoi_xoa_id: actorId,
+      nguoi_xoa_id: user.ma_tai_khoan,
     }, { transaction });
-    await writeAuditLog({ transaction, actorId, action: "INCIDENT_SOFT_DELETED", entityType: "SuCo", entityId: incident.ma_su_co, reason: normalizedReason });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_SOFT_DELETED", entityType: "SuCo", entityId: incident.ma_su_co, reason: normalizedReason });
     return incident;
   });
 }
 
-module.exports = { update, softDelete };
+module.exports = { create, unlinkPrevious, validatePreviousIncident, update, softDelete };

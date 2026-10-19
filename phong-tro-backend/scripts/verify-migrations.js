@@ -7,6 +7,11 @@ const mysql = require("mysql2/promise");
 const database = String(process.env.MIGRATION_TEST_DB_NAME || "").trim();
 if (!/^[A-Za-z0-9_]+_(?:test|ci)$/i.test(database)) throw new Error("MIGRATION_TEST_DB_NAME must end in _test or _ci");
 if (database === process.env.DB_NAME) throw new Error("Migration copy must differ from DB_NAME");
+if (process.env.MIGRATION_TEST_DB_ALLOWED_NAME && (
+  database !== process.env.MIGRATION_TEST_DB_ALLOWED_NAME
+  || process.env.TEST_DB_HOST !== "127.0.0.1"
+  || Number(process.env.TEST_DB_PORT) !== 3307
+)) throw new Error("Migration test DB target is outside explicitly approved scope");
 
 const options = (withDatabase = false) => ({
   host: process.env.TEST_DB_HOST || process.env.DB_HOST,
@@ -51,8 +56,12 @@ async function actualSchema(connection) {
 
 async function run() {
   const admin = await mysql.createConnection(options(false));
+  const [[{ version }]] = await admin.query("SELECT VERSION() version");
+  const engine = String(version).includes("MariaDB") ? "MariaDB" : "MySQL8";
   const quoted = `\`${database}\``;
+  console.log(`[MIGRATION DB DROP] ENGINE=${engine} host=${options().host} port=${options().port} name=${database}`);
   await admin.query(`DROP DATABASE IF EXISTS ${quoted}`);
+  console.log(`[MIGRATION DB CREATE] ENGINE=${engine} host=${options().host} port=${options().port} name=${database}`);
   await admin.query(`CREATE DATABASE ${quoted} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
   await admin.end();
   const connection = await mysql.createConnection(options(true));
@@ -63,6 +72,7 @@ async function run() {
     const [beforeRevenue] = await connection.query("SELECT COUNT(*) receipts, COALESCE(SUM(soTien),0) netRevenue FROM KhoanThu WHERE trangThaiGhiNhan='HIEU_LUC'");
     await connection.query(`
       SET FOREIGN_KEY_CHECKS=0;
+      ALTER TABLE SuCo DROP FOREIGN KEY fk_SuCo_maSuCoTruoc, DROP INDEX ix_SuCo_maSuCoTruoc, DROP COLUMN maSuCoTruoc;
       DROP TABLE IF EXISTS GiaoDichHoanCoc, LichSuChuyenPhong, LichSuGiaHanHopDong, LichSuSuaHopDong;
       ALTER TABLE ChiTietThanhToan DROP FOREIGN KEY fk_ChiTietThanhToan_khoanDieuChinh, DROP FOREIGN KEY fk_ChiTietThanhToan_nguoiThucHien, DROP INDEX uq_ChiTietThanhToan_dieu_chinh, DROP CONSTRAINT ck_ChiTietThanhToan_013, DROP COLUMN thoiDiemTao, DROP COLUMN nguoiThucHienId, DROP COLUMN maKhoanDieuChinh;
       ALTER TABLE ChiTietThanhToan ADD CONSTRAINT ck_ChiTietThanhToan_1 CHECK (soTien >= 0);
@@ -80,7 +90,7 @@ async function run() {
       SET FOREIGN_KEY_CHECKS=1;
     `);
     const migrations = fs.readdirSync(path.resolve(__dirname, "../migrations"))
-      .filter((name) => /^(00[4-9]|01[0-5])_.*\.sql$/.test(name))
+      .filter((name) => /^(00[4-9]|01[0-6])_.*\.sql$/.test(name))
       .sort();
     for (let pass = 1; pass <= 2; pass += 1) {
       for (const name of migrations) {
@@ -109,6 +119,7 @@ async function run() {
   } finally {
     await connection.end();
     const cleanup = await mysql.createConnection(options(false));
+    console.log(`[MIGRATION DB DROP] ENGINE=${engine} host=${options().host} port=${options().port} name=${database}`);
     await cleanup.query(`DROP DATABASE IF EXISTS ${quoted}`);
     await cleanup.end();
   }

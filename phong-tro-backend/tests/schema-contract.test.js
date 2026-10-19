@@ -19,7 +19,7 @@ function ddlTables() {
 test("canonical DDL and Sequelize models pin utf8mb4_unicode_ci", () => {
   const documented = fs.readFileSync(path.resolve(__dirname, "../../data2.md"), "utf8");
   const migrationDir = path.resolve(__dirname, "../migrations");
-  const migrations = fs.readdirSync(migrationDir).filter((name) => /^0(?:0[4-9]|1[0-5])_.*\.sql$/.test(name));
+  const migrations = fs.readdirSync(migrationDir).filter((name) => /^0(?:0[4-9]|1[0-6])_.*\.sql$/.test(name));
   const definitions = [{ name: "data2.md", source: documented }, ...migrations.map((name) => ({ name, source: fs.readFileSync(path.join(migrationDir, name), "utf8") }))];
   for (const { name, source } of definitions) {
     const tables = [...source.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`([^`]+)`[\s\S]*?;/gi)];
@@ -57,6 +57,7 @@ test("Sequelize maps every documented table and physical column", () => {
   assert.equal(expected.size, 37, "Migration 014 must map 37 documented tables");
   assert.ok(expected.has("KhoanDieuChinh"), "Migration 013 adjustment table must be documented");
   assert.ok(expected.get("ThongBao")?.includes("khoaSuKien"), "Migration 014 notification event key must be documented");
+  assert.ok(expected.get("SuCo")?.includes("maSuCoTruoc"), "Migration 016 previous incident must be documented");
   assert.deepEqual(
     ["doanhThuGop", "giamTruPhanBo", "nguonSnapshot"].filter((column) => !expected.get("KhoanThu")?.includes(column)),
     [],

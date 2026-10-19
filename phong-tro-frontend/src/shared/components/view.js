@@ -681,8 +681,10 @@ export async function renderList(context, config) {
         <div class="empty-state__icon" style="color:var(--red-primary);">${icons.alertCircle(24)}</div>
         <h4 class="empty-state__title">Lỗi khi tải dữ liệu</h4>
         <p class="empty-state__desc">${escapeHtml(error.message)}</p>
+        <button class="btn btn--secondary" type="button" data-list-retry>Thử lại</button>
       </div>
     `;
+    content.querySelector("[data-list-retry]")?.addEventListener("click", () => renderList(context, config));
   }
 }
 
