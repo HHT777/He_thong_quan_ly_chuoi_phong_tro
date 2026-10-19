@@ -111,9 +111,9 @@ test("FR-143 report and finance query routes reject invalid filters", async () =
     assert.equal(response.response.status, 400, `${url}: ${JSON.stringify(response.body)}`);
     assert.equal(response.body.error?.code || response.body.code, code, url);
   }
-  const empty = await request("/api/v1/reports/cashflow?periodType=year&periodValue=2026&buildingId=00000000-0000-4000-8000-000000000001", { headers: { Authorization: `Bearer ${landlord}` } });
-  assert.equal(empty.response.status, 200, JSON.stringify(empty.body));
-  assert.equal(empty.body.data.receiptDetails.length, 0);
+  const missing = await request("/api/v1/reports/cashflow?periodType=year&periodValue=2026&buildingId=00000000-0000-4000-8000-000000000001", { headers: { Authorization: `Bearer ${landlord}` } });
+  assert.equal(missing.response.status, 404, JSON.stringify(missing.body));
+  assert.equal(missing.body.error.code, "RESOURCE_NOT_FOUND");
 });
 
 test("FR-143 partial payments use distinct keys, retry safely and serialize overpayment", async () => {

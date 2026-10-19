@@ -46,3 +46,17 @@ test("FR-133 dashboard reads server report fields and does not synthesize money 
 test("F.5 dates use the Ho Chi Minh timezone", () => {
   assert.match(read("shared/components/view.js"), /timeZone: "Asia\/Ho_Chi_Minh"/);
 });
+
+test("FR-194 report export sends the bearer token, uses a blob and offers retry", () => {
+  const report = read("modules/finance/reports.tab.js");
+  const api = read("core/api.js");
+  assert.match(report, /data-export-report/);
+  assert.match(report, /context\.api\.getBlob\(`\/v1\/reports\/cashflow\.xlsx\?\$\{query\.toString\(\)\}`\)/);
+  assert.match(report, /URL\.createObjectURL\(blob\)/);
+  assert.match(report, /URL\.revokeObjectURL\(url\)/);
+  assert.match(report, /URL\.revokeObjectURL\(url\); \}\s*await load\(\)/);
+  assert.match(report, /data-export-retry>Thử lại/);
+  assert.match(report, /addEventListener\("click", exportReport\)/);
+  assert.match(api, /async function getBlob[\s\S]*?headers\.Authorization = `Bearer \$\{token\(\)\}`/);
+  assert.match(api, /return \{ blob: await response\.blob\(\), disposition:/);
+});

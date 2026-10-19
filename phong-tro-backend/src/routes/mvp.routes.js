@@ -9,6 +9,7 @@ const moveOutService = require("../services/moveOut.service");
 const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
+const cashflowExportService = require("../services/cashflowExport.service");
 const { validateQuery } = require("../utils/queryValidation");
 const { businessDate } = require("../utils/businessDate.util");
 const billAdjustmentService = require("../services/billAdjustment.service");
@@ -410,16 +411,26 @@ router.post("/notifications/broadcast", landlord, async (req, res, next) => {
     return data(res, { maBroadcast, recipients: recipients.length, sent, skipped }, 201);
   } catch (e) { next(e); }
 });
+const cashflowFilters = (query, ownedBuildingIds) => ({
+  from: query.from, to: query.to, buildingId: query.buildingId,
+  periodType: query.periodType, periodValue: query.periodValue, ownedBuildingIds,
+});
 router.get("/reports/cashflow", landlord, async (req, res, next) => {
   try {
     validateQuery(req.query, { allowed: ["from", "to", "buildingId", "periodType", "periodValue"] });
-    return data(res, await cashflowReportService.getCashflow({
-      from: req.query.from,
-      to: req.query.to,
-      buildingId: req.query.buildingId,
-      periodType: req.query.periodType,
-      periodValue: req.query.periodValue,
-    }));
+    const ownedBuildingIds = await getOwnedBuildingIds(req.user);
+    return data(res, await cashflowReportService.getCashflow(cashflowFilters(req.query, ownedBuildingIds)));
+  } catch (e) { next(e); }
+});
+router.get("/reports/cashflow.xlsx", landlord, async (req, res, next) => {
+  try {
+    validateQuery(req.query, { allowed: ["from", "to", "buildingId", "periodType", "periodValue"] });
+    const ownedBuildingIds = await getOwnedBuildingIds(req.user);
+    const { filename, buffer } = await cashflowExportService.exportCashflow(cashflowFilters(req.query, ownedBuildingIds));
+    res.set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.set("Content-Disposition", `attachment; filename="${filename}"`);
+    res.set("Cache-Control", "private, no-store");
+    return res.status(200).send(buffer);
   } catch (e) { next(e); }
 });
 
