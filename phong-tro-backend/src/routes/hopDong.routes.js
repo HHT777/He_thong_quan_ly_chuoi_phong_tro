@@ -29,6 +29,11 @@ router.get(
   authorize("hopDong.read"),
   hopDongController.getHistory.bind(hopDongController),
 );
+router.get(
+  "/:id/print",
+  authorize("CHU_TRO"),
+  hopDongController.printContract.bind(hopDongController),
+);
 router.post(
   "/:id/transfers",
   authorize("hopDong.write"),
