@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 const models = require("../src/models");
+const { requiredSchema } = require("../src/services/schemaReadiness.service");
 
 function ddlTables() {
   const source = fs.readFileSync(path.resolve(__dirname, "../../data2.md"), "utf8");
@@ -43,6 +44,10 @@ test("canonical DDL and Sequelize models pin utf8mb4_unicode_ci", () => {
 
 test("Sequelize maps every documented table and physical column", () => {
   const expected = ddlTables();
+  assert.deepEqual([...requiredSchema().keys()].sort(), [...expected.keys()].sort(), "startup schema inventory matches data2.md");
+  for (const [table, columns] of requiredSchema()) {
+    assert.deepEqual([...columns].sort(), expected.get(table).filter((column) => column !== "maPhongDangThue").sort(), `startup columns differ from data2.md: ${table}`);
+  }
   assert.ok(expected.size >= 25);
   assert.deepEqual(
     ["LichSuGiaHanHopDong", "LichSuSuaHopDong", "LichSuChuyenPhong", "GiaoDichHoanCoc"].filter((table) => !expected.has(table)),

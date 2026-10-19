@@ -3,29 +3,27 @@ require("./config/environment").assertRuntimeAuthConfig();
 const app = require("./app");
 const sequelize = require("./config/database");
 const { initCronJobs } = require("./jobs/cron.jobs");
+const { checkSchema } = require("./services/schemaReadiness.service");
 
 const PORT = process.env.PORT || 3001;
 
-// Sync database only when explicitly requested, then start server
-const databaseSync = sequelize
-  .authenticate()
-  .then(() => console.log("✓ Database connected successfully"))
-  .then(() =>
-    process.env.DB_SYNC === "true"
-      ? sequelize.sync({ alter: process.env.DB_SYNC_ALTER === "true" })
-      : undefined,
-  );
-
-databaseSync
-  .then(() => {
+// Inspect the existing schema before any optional test/development sync.
+sequelize.authenticate()
+  .then(async () => {
+    console.log("✓ Database connected successfully");
+    const schema = await checkSchema();
+    app.locals.schemaReady = schema.ready;
+    if (!schema.ready) console.error("DB_SCHEMA_OUTDATED missing schema objects:", schema.missing);
+    if (schema.ready && process.env.DB_SYNC === "true") {
+      await sequelize.sync({ alter: process.env.DB_SYNC_ALTER === "true" });
+    }
     console.log(
-      process.env.DB_SYNC === "true"
+      schema.ready && process.env.DB_SYNC === "true"
         ? "✓ Database schema synced"
-        : "✓ Database schema sync skipped (DB_SYNC is disabled)",
+        : "✓ Database schema sync skipped",
     );
-
-    // Initialize cron jobs
-    initCronJobs();
+    // Do not run jobs against an incomplete schema.
+    if (schema.ready) initCronJobs();
 
     app.listen(PORT, () => {
       console.log(`\n✓ Server is running on port ${PORT}`);
