@@ -2,7 +2,7 @@
 
 ## Cập nhật hiện hành G3 (19/10/2026; ưu tiên hơn các mốc lịch sử bên dưới)
 
-- Nhánh làm việc: `giai-doan-g3-xuat-excel`, HEAD mã đã kiểm chứng `5acc9f5` (sau mốc `163525c`); không merge nhánh này vào `main` trong lượt này. Khi bắt đầu lượt, `main` đã có merge `c0b4d7f` từ bên ngoài; commit docs bàn giao đứng sau HEAD mã này.
+- Nhánh làm việc: `giai-doan-g3-xuat-excel`, HEAD mã/test đã kiểm chứng `d26bb9a` (sau `5acc9f5` và mốc `163525c`); không merge nhánh này vào `main` trong lượt này. Khi bắt đầu lượt, `main` đã có merge `c0b4d7f` từ bên ngoài; commit docs bàn giao đứng sau HEAD mã/test này.
 - G1 in hợp đồng FR-184 đã merge (`cb10ff3`); G2 liên kết sự cố FR-192, migration 016 đã merge (`b7b69fd`); G3 cashflow Excel FR-194 đang hoàn thiện.
 - Mốc trước bổ sung: unit 136/136, integration 71/71, 26 nhóm bất biến 0. Mốc sau bổ sung trên MySQL 8 TCP `qlpt_authz_test`: unit 137/137, integration 72/72, 28 nhóm bất biến 0 ở seed và sau integration. Test Python độc lập kiểm tra OPC/SpreadsheetML mẫu đã chạy xanh; frontend build và mở Excel/LibreOffice chưa chạy.
 - Quyết định chi phí `KhoanChi.maCan IS NULL`: đúng một `ChuTro` thì tính vào `totalExpenses`/`profit` toàn chuỗi như trước G3; từ hai `ChuTro` trở lên không phân cho ai, trả `unassignedExpenses: {count,total}` riêng trong JSON/Excel/màn hình. Đây là quyết định P2 cần chốt lại trước khi bật nhiều Chủ trọ. Báo cáo lọc một căn không phân khoản NULL vào căn đó.
