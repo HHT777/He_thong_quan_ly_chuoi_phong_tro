@@ -46,7 +46,7 @@ async function render(context) {
   <section class="panel"><h3>Các lần thu</h3><div data-payments></div></section>`;
   const message = content.querySelector("[data-main-message]"); const workspace = content.querySelector("[data-bill-workspace]");
   let bills = []; let definitions = []; let payments = [];
-  const [contractsResponse, buildingsResponse] = await Promise.all([context.api.get("/hop-dong?limit=100"), context.api.get("/management/can-tro?limit=100")]);
+  try { const [contractsResponse, buildingsResponse] = await Promise.all([context.api.get("/hop-dong?limit=100"), context.api.get("/management/can-tro?limit=100")]);
   const contracts = contractsResponse.data || []; const buildings = buildingsResponse.data || [];
   content.querySelector("[data-building]").innerHTML += buildings.map((x) => `<option value="${escapeHtml(x.ma_can)}">${escapeHtml(x.ten_can || x.dia_chi || x.ma_can)}</option>`).join("");
   content.querySelector("[data-contracts]").innerHTML = `<strong>Hợp đồng/phòng</strong><div class="checkbox-grid">${contracts.filter((x) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(x.trang_thai)).map((x) => `<label><input data-contract-id type="checkbox" value="${escapeHtml(x.ma_hop_dong)}"> ${escapeHtml(x.phongTro?.so_phong)} · ${escapeHtml(x.khachThue?.ho_ten)}</label>`).join("")}</div>`;
@@ -78,6 +78,10 @@ async function render(context) {
   function bindDefinition(initial = {}) { const target = content.querySelector("[data-definition-workspace]"); target.innerHTML = definitionForm(initial); const form = target.querySelector("form"); form.addEventListener("submit", async (event) => { event.preventDefault(); const submit = form.querySelector("button"); submit.disabled = true; try { const raw = Object.fromEntries(new FormData(form)); const body = { contractId: requiredText(raw.contractId, "Hợp đồng"), type: raw.type, name: requiredText(raw.name, "Tên/lý do"), amount: integerVnd(raw.amount, "Số tiền", { positive: true }), mode: raw.mode, period: raw.period || undefined, startDate: raw.startDate || undefined }; if (form.dataset.id) await context.api.patch(`/v1/billing-adjustments/${form.dataset.id}`, body); else await context.api.post("/v1/billing-adjustments", body); target.textContent = ""; showToast("Đã lưu khoản điều chỉnh.", "success"); await refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; } finally { submit.disabled = false; } }); }
   content.querySelector("[data-new-definition]").addEventListener("click", () => bindDefinition());
   await refresh();
+  } catch (error) {
+    content.innerHTML = `<div class="empty-state empty-state--error"><h3>Không tải được phiếu thu</h3><p>${escapeHtml(error.message)}</p><button class="btn btn--primary" data-retry-load>Thử lại</button></div>`;
+    content.querySelector("[data-retry-load]").addEventListener("click", () => render(context));
+  }
 }
 
 function showRequestError(target, error, scope) {

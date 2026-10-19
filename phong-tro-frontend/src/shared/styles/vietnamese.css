@@ -1,0 +1,8 @@
+/* app.css contains legacy Georgia headings; prefer a Vietnamese-complete face. */
+.module-page h1,
+.navbar h2,
+.brand,
+.login-intro h1,
+.login-form-panel h2 {
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
+}
