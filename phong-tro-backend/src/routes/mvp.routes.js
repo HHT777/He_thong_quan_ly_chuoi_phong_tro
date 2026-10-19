@@ -10,6 +10,7 @@ const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const { validateQuery } = require("../utils/queryValidation");
+const { businessDate } = require("../utils/businessDate.util");
 const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
 const billingAdjustmentDefinitionService = require("../services/billingAdjustmentDefinition.service");
@@ -70,7 +71,7 @@ router.post("/accounts/reset-password", landlord, async (req, res, next) => {
 
 router.get("/reservations", landlord, async (req, res, next) => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessDate();
     const rows = await DatGiuPhong.findAll({ include: [{ model: PhongTro, as: "phongTro" }], order: [["han_giu", "ASC"]] });
     return data(res, rows.map((row) => ({ ...row.toJSON(), quaHan: row.trang_thai === "DANG_GIU" && String(row.han_giu) < today })));
   } catch (e) { next(e); }

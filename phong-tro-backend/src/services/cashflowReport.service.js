@@ -1,4 +1,5 @@
 const { Op } = require("sequelize");
+const { businessMonth } = require("../utils/businessDate.util");
 const {
   KhoanThu,
   KhoanChi,
@@ -34,7 +35,7 @@ function buildDateCondition(from, to) {
 }
 
 function vietnamMonth(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(now);
+  return businessMonth(now);
 }
 
 function normalizeFilters(filters = {}, now = new Date()) {

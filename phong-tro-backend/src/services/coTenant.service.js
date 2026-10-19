@@ -11,7 +11,6 @@ const { writeAuditLog } = require("./auditLog.service");
 const { assertLandlordOwnsRoom } = require("./propertyAccess.service");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
-const today = () => new Date().toISOString().slice(0, 10);
 
 function validateProposal(payload) {
   const name = String(payload.name || "").trim();

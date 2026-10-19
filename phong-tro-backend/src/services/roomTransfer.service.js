@@ -3,9 +3,10 @@ const { HopDong, PhongTro, ChiSoDien, ThanhVienPhong, KhachThue, ThongBao, LichS
 const { writeAuditLog } = require("./auditLog.service");
 const lifecycle = require("./contractLifecycle.service");
 const { assertOwned } = require("./ownership.service");
+const { businessDate } = require("../utils/businessDate.util");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
-const dateOnly = (value) => String(value || new Date().toISOString().slice(0, 10)).slice(0, 10);
+const dateOnly = (value) => businessDate(value || new Date());
 
 function positiveReading(value, field) {
   const number = Number(value);

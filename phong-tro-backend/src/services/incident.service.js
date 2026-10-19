@@ -9,9 +9,10 @@ const {
   ThongBao,
 } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
+const { businessDate } = require("../utils/businessDate.util");
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
-const dateOnly = (value = new Date()) => new Date(value).toISOString().slice(0, 10);
+const dateOnly = businessDate;
 
 async function financialLinks(incidentId, transaction) {
   const [expense, pendingTenantCharge] = await Promise.all([

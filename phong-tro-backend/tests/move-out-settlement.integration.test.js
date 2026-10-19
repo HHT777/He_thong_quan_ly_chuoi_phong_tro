@@ -4,14 +4,17 @@ const {
   TaiKhoan, HopDong, PhongTro, TaiSan, TienCoc, ChiSoDien, ThanhToan,
   ChiTietThanhToan, GiaoDichThanhToan, KhoanThu, KhoanKhauTru,
   BienBanTraPhong, GiaoDichHoanCoc, ViPhamHopDong, SuCo,
-  ChiPhiSuCoKhachThue,
+  ChiPhiSuCoKhachThue, YeuCauTraPhong,
 } = require("../src/models");
 const moveOutRequestService = require("../src/services/moveOutRequest.service");
 const moveOutService = require("../src/services/moveOut.service");
+const cashflowReportService = require("../src/services/cashflowReport.service");
+const { businessDate } = require("../src/utils/businessDate.util");
 const { integration, request, headers, login, createBaseRental, createFreshRental } = require("./helpers/integration-api");
 
-// Business dates use Vietnam time; UTC's previous day would miss receipts near midnight.
-const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+// Keep the entire fixture on one Vietnam business day, independent of the machine clock.
+const FIXED_NOW = new Date("2026-10-31T19:00:00.000Z");
+const today = () => businessDate(FIXED_NOW);
 
 async function prepareMoveOut(landlord, fresh) {
   const created = await request("/api/v1/requests", {
@@ -28,7 +31,7 @@ async function prepareMoveOut(landlord, fresh) {
     }),
   });
   assert.equal(approved.response.status, 200, JSON.stringify(approved.body));
-  await moveOutRequestService.processDueMoveOuts({ now: new Date() });
+  await moveOutRequestService.processDueMoveOuts({ now: FIXED_NOW });
   assert.equal((await PhongTro.findByPk((await HopDong.findByPk(fresh.contract.ma_hop_dong)).ma_phong)).trang_thai, "DANG_XU_LY_TRA_PHONG");
   return created.body.data.ma_yeu_cau;
 }
@@ -43,6 +46,30 @@ function baseSettlement(overrides = {}) {
     ...overrides,
   };
 }
+
+test("FR-187/188 Vietnam business day controls settlement, meter month and refund at UTC month boundary", async () => {
+  const instant = FIXED_NOW; // 2026-11-01 02:00 in Vietnam.
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "settlement-vietnam-boundary");
+  const requestId = await prepareMoveOut(landlord, fresh);
+  // Legacy approved requests may lack a stored date; exercise the settlement fallback clock.
+  await YeuCauTraPhong.update({ ngay_tra_da_duyet: null }, { where: { ma_yeu_cau: requestId } });
+  const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
+  const settled = await moveOutService.settle(fresh.contract.ma_hop_dong, baseSettlement({ deduction: 1 }), actor.ma_tai_khoan, { now: instant });
+  assert.equal(settled.report.ngay_quyet_toan, "2026-11-01");
+  assert.equal(settled.report.ngay_kiem_tra, "2026-11-01");
+  const finalReading = await ChiSoDien.findOne({ where: { ma_phong: fresh.room.ma_phong, loai_chi_so: "CHOT_TRA_PHONG", khoa_nghiep_vu: fresh.contract.ma_hop_dong } });
+  assert.equal(Number(finalReading.nam), 2026);
+  assert.equal(Number(finalReading.thang), 11);
+  assert.equal(businessDate(finalReading.ngay_ghi_nhan), "2026-11-01");
+  const november = await cashflowReportService.getCashflow({ periodType: "month", periodValue: "2026-11", buildingId: fresh.building.ma_can });
+  const october = await cashflowReportService.getCashflow({ periodType: "month", periodValue: "2026-10", buildingId: fresh.building.ma_can });
+  assert.equal(november.depositDeductions, Math.min(Number(settled.report.tien_coc_ban_dau), Number(settled.report.tong_khoan_khau_tru)));
+  assert.equal(november.totalRevenue, november.depositDeductions);
+  assert.equal(october.depositDeductions, 0);
+  const refund = await moveOutService.recordDepositRefund(settled.report.ma_bien_ban, { soTien: 1, khoaChongTrung: `vn-boundary-${fresh.contract.ma_hop_dong}` }, actor.ma_tai_khoan, { now: instant });
+  assert.equal(refund.ngay_hoan, "2026-11-01");
+});
 
 test("FR-096/187/188 settlement context, detailed deductions, debt offset and partial refund", async () => {
   const landlord = await login(integration.landlord);
@@ -156,8 +183,8 @@ test("FR-189 zero/negative settlement is idempotent and post-liquidation debt re
   assert.equal(debt.response.status, 200);
   assert.ok(debt.body.data.some((row) => row.ma_thanh_toan === postBills[0].ma_thanh_toan));
   const paid = await request("/api/khoan-phai-thu/payment/create", {
-    method: "POST", headers: headers(landlord, { "Idempotency-Key": `post-debt-${Date.now()}` }),
-    body: JSON.stringify({ ma_khoan_phai_thu: postBills[0].ma_thanh_toan, so_tien: 400000, ngay_thanh_toan: new Date().toISOString(), phuong_thuc: "CHUYEN_KHOAN" }),
+    method: "POST", headers: headers(landlord, { "Idempotency-Key": `post-debt-${postBills[0].ma_thanh_toan}` }),
+    body: JSON.stringify({ ma_khoan_phai_thu: postBills[0].ma_thanh_toan, so_tien: 400000, ngay_thanh_toan: FIXED_NOW.toISOString(), phuong_thuc: "CHUYEN_KHOAN" }),
   });
   assert.equal(paid.response.status, 201, JSON.stringify(paid.body));
   assert.equal(Number((await ThanhToan.findByPk(postBills[0].ma_thanh_toan)).so_tien_con_no), 0);

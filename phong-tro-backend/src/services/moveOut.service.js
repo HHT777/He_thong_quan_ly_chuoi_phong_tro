@@ -9,10 +9,10 @@ const { countBillableOccupants, calculateWaterCharge } = require("./occupancy.se
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { elapsedMonthRatio } = require("../utils/billingPeriod.util");
 const { assertOwned } = require("./ownership.service");
+const { businessDate } = require("../utils/businessDate.util");
 const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
-const today = () => new Date().toISOString().slice(0, 10);
 const money = (value) => Math.round(Number(value) * 100) / 100;
 function amount(value, label) { const n = Number(value || 0); if (!Number.isFinite(n) || n < 0) throw fail(422, `${label} không hợp lệ`, "INVALID_SETTLEMENT_AMOUNT"); return money(n); }
 function validateChecklist(payload) {
@@ -43,7 +43,7 @@ async function getContext(contractId, actorId) {
   ]);
   return { tenant: contract.khachThue, room: contract.phongTro, contract, deposit, latestElectricityReading: reading, assets, outstandingBills: debts, outstandingDebt: debts.reduce((s, r) => s + Number(r.so_tien_con_no), 0), pendingIncidentCharges: incidents, violations, approvedMoveOutDate: request?.ngay_tra_da_duyet || null, occupantCount: occupants };
 }
-async function settle(contractId, payload, actorId) {
+async function settle(contractId, payload, actorId, { now = new Date() } = {}) {
   const other = validateChecklist(payload);
   return sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findByPk(contractId, { transaction, lock: transaction.LOCK.UPDATE });
@@ -54,13 +54,13 @@ async function settle(contractId, payload, actorId) {
     if (!room || room.trang_thai !== "DANG_XU_LY_TRA_PHONG") throw fail(409, "Phòng chưa sẵn sàng trả", "ROOM_NOT_READY_FOR_MOVE_OUT");
     const request = await approvedRequest(contractId, transaction);
     if (!request) throw fail(422, "Yêu cầu trả phòng chưa duyệt", "INVALID_MOVE_OUT_REQUEST");
-    const settlementDate = String(payload.inspectionDate || request.ngay_tra_da_duyet || today()).slice(0, 10);
+    const settlementDate = businessDate(payload.inspectionDate || request.ngay_tra_da_duyet || now);
     const period = dayRatio(settlementDate);
     const previous = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, da_xoa: false, trang_thai_xac_nhan: "DA_XAC_NHAN" }, order: [["ngay_ghi_nhan", "DESC"], ["ma_chi_so", "DESC"]], transaction, lock: transaction.LOCK.UPDATE });
     const finalValue = Number(payload.finalElectricityReading);
     if (!previous || !Number.isFinite(finalValue) || finalValue < Number(previous.chi_so_moi)) throw fail(422, "Chỉ số điện cuối không hợp lệ", "INVALID_FINAL_METER_READING");
     const electricity = money((finalValue - Number(previous.chi_so_moi)) * Number(contract.don_gia_dien));
-    await ChiSoDien.create({ ma_phong: contract.ma_phong, nam: period.year, thang: period.month, loai_chi_so: "CHOT_TRA_PHONG", khoa_nghiep_vu: contractId, chi_so_moi: finalValue, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", ngay_ghi_nhan: new Date(`${settlementDate}T23:59:00Z`), nguoi_ghi_nhan_id: actorId, nguoi_xac_nhan_id: actorId, ngay_xac_nhan: new Date(), da_xoa: false }, { transaction });
+    await ChiSoDien.create({ ma_phong: contract.ma_phong, nam: period.year, thang: period.month, loai_chi_so: "CHOT_TRA_PHONG", khoa_nghiep_vu: contractId, chi_so_moi: finalValue, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", ngay_ghi_nhan: new Date(`${settlementDate}T16:59:00Z`), nguoi_ghi_nhan_id: actorId, nguoi_xac_nhan_id: actorId, ngay_xac_nhan: new Date(), da_xoa: false }, { transaction });
     const deposit = await TienCoc.findOne({ where: { ma_hop_dong: contractId }, transaction, lock: transaction.LOCK.UPDATE });
     if (!deposit || deposit.trang_thai === "CHUA_NHAN") throw fail(422, "Chưa nhận cọc", "DEPOSIT_NOT_RECEIVED");
     const occupants = await countBillableOccupants(contractId, { transaction });
@@ -107,7 +107,7 @@ async function settle(contractId, payload, actorId) {
     return { report, totalDeduction, refund, postDebt, snapshot };
   });
 }
-async function recordDepositRefund(reportId, payload, actorId) {
+async function recordDepositRefund(reportId, payload, actorId, { now = new Date() } = {}) {
   const key = String(payload.khoaChongTrung || "").trim(); const refundAmount = amount(payload.soTien, "Số tiền hoàn");
   if (!key || refundAmount <= 0) throw fail(422, "Thiếu thông tin hoàn cọc", "INVALID_DEPOSIT_REFUND");
   return sequelize.transaction(async (transaction) => {
@@ -118,7 +118,7 @@ async function recordDepositRefund(reportId, payload, actorId) {
     if (!report || report.la_du_lieu_legacy) throw fail(409, "Biên bản không hỗ trợ hoàn cọc", "REFUND_REPORT_NOT_ELIGIBLE");
     const deposit = await TienCoc.findOne({ where: { ma_hop_dong: report.ma_hop_dong }, transaction, lock: transaction.LOCK.UPDATE });
     if (Number(deposit.so_tien_da_hoan) + refundAmount > Number(report.so_tien_coc_duoc_hoan)) throw fail(422, "Hoàn vượt số được hoàn", "DEPOSIT_REFUND_EXCEEDED");
-    const row = await GiaoDichHoanCoc.create({ ma_bien_ban_tra_phong: reportId, ma_tien_coc: deposit.ma_tien_coc, ngay_hoan: payload.ngayHoan || today(), so_tien: refundAmount, nguoi_ghi_nhan_id: actorId, khoa_chong_trung: key }, { transaction });
+    const row = await GiaoDichHoanCoc.create({ ma_bien_ban_tra_phong: reportId, ma_tien_coc: deposit.ma_tien_coc, ngay_hoan: businessDate(payload.ngayHoan || now), so_tien: refundAmount, nguoi_ghi_nhan_id: actorId, khoa_chong_trung: key }, { transaction });
     const total = Number(deposit.so_tien_da_hoan) + refundAmount; await deposit.update({ so_tien_da_hoan: total, trang_thai: total === Number(report.so_tien_coc_duoc_hoan) ? "DA_HOAN" : deposit.trang_thai }, { transaction });
     await writeAuditLog({ transaction, actorId, action: "DEPOSIT_REFUND_RECORDED", entityType: "GiaoDichHoanCoc", entityId: row.ma_giao_dich_hoan_coc, after: { reportId, refundAmount, total } }); return row;
   });

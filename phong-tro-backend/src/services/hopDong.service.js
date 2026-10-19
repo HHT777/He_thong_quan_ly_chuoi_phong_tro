@@ -12,6 +12,7 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const lifecycle = require("./contractLifecycle.service");
 const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
+const { businessDate, addBusinessDays } = require("../utils/businessDate.util");
 const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 
 class HopDongService {
@@ -59,7 +60,7 @@ class HopDongService {
       reservation = await DatGiuPhong.findByPk(data.ma_dat_giu, { transaction, lock: transaction.LOCK.UPDATE });
       if (!reservation || reservation.trang_thai !== "DANG_GIU" || reservation.ma_phong !== data.ma_phong) throw { status: 409, code: "RESERVATION_NOT_CONVERTIBLE", message: "Giữ phòng không còn hiệu lực hoặc không khớp phòng" };
       if (String(reservation.so_dien_thoai) !== String(khachThue.so_dien_thoai)) throw { status: 409, code: "RESERVATION_HOLDER_MISMATCH", message: "Người ký hợp đồng không đúng người giữ phòng" };
-      if (new Date(data.ngay_bat_dau).toISOString().slice(0, 10) > String(reservation.han_giu)) throw { status: 409, code: "RESERVATION_EXPIRED", message: "Giữ phòng đã quá hạn" };
+      if (businessDate(data.ngay_bat_dau) > String(reservation.han_giu)) throw { status: 409, code: "RESERVATION_EXPIRED", message: "Giữ phòng đã quá hạn" };
     }
 
     // Create contract
@@ -222,20 +223,19 @@ class HopDongService {
     return hopDong;
   }
 
-  async getExpiringContracts(daysBeforeExpiry = 30, requester) {
+  async getExpiringContracts(daysBeforeExpiry = 30, requester, { now = new Date() } = {}) {
     /**
      * BR-02: Cảnh báo ít nhất 1 tháng trước khi hết hạn
      */
-    const now = new Date();
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + daysBeforeExpiry);
+    const today = businessDate(now);
+    const expiryDate = addBusinessDays(today, daysBeforeExpiry);
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
 
     return await HopDong.findAll({
       where: {
         trang_thai: "DANG_HIEU_LUC",
         ngay_ket_thuc: {
-          [Op.between]: [now, expiryDate],
+          [Op.between]: [today, expiryDate],
         },
       },
       include: [
