@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { TaiKhoan, ChuTro, KhoanThu, KhoanChi } = require("../src/models");
 const { integration, request, headers, login, createBaseRental } = require("./helpers/integration-api");
-const { readXlsxEntries } = require("./helpers/read-xlsx");
+const { readXlsxWorkbook } = require("./helpers/read-xlsx");
 
 test("FR-194 cashflow and XLSX contain only owned buildings and identical server amounts", async () => {
   const ownerA = await login(integration.landlord);
@@ -50,18 +50,32 @@ test("FR-194 cashflow and XLSX contain only owned buildings and identical server
     assert.equal(excelA.headers.get("content-type"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     assert.equal(excelA.headers.get("content-disposition"), 'attachment; filename="bao-cao-thu-chi_month_2026-10.xlsx"');
     assert.equal(excelA.headers.get("cache-control"), "private, no-store");
-    const entries = readXlsxEntries(Buffer.from(await excelA.arrayBuffer()));
-    const overview = entries.get("xl/worksheets/sheet1.xml");
-    assert.ok(overview.includes(`<c r="B6"><v>${jsonA.body.data.totalRevenue}</v></c>`));
-    assert.ok(overview.includes(`<c r="B7"><v>${jsonA.body.data.grossRevenue}</v></c>`));
-    assert.ok(overview.includes(`<c r="B10"><v>${jsonA.body.data.totalExpenses}</v></c>`));
-    assert.ok(overview.includes(`<c r="B11"><v>${jsonA.body.data.profit}</v></c>`));
-    const receipts = entries.get("xl/worksheets/sheet2.xml");
-    const expenses = entries.get("xl/worksheets/sheet3.xml");
-    assert.ok(receipts.includes(a.building.ma_can));
-    assert.ok(expenses.includes(a.building.ma_can));
-    assert.ok(!receipts.includes(b.building.ma_can));
-    assert.ok(!expenses.includes(b.building.ma_can));
+    const workbook = readXlsxWorkbook(Buffer.from(await excelA.arrayBuffer()));
+    const report = jsonA.body.data;
+    const sortedRows = (rows) => rows.map((row) => JSON.stringify(row)).sort();
+    assert.deepEqual(Object.keys(workbook), ["Tong quan", "Theo loai", "Theo can", "Thu", "Chi"]);
+    assert.deepEqual(workbook["Tong quan"].slice(5).map((row) => row[1]), [
+      report.totalRevenue, report.grossRevenue, report.discounts, report.depositDeductions,
+      report.totalExpenses, report.profit, report.unassignedExpenses.count, report.unassignedExpenses.total,
+    ]);
+    assert.deepEqual(sortedRows(workbook["Theo loai"].slice(1)), sortedRows(report.revenueByType.map((row) => [row.type, row.amount])));
+    assert.deepEqual(sortedRows(workbook["Theo can"].slice(1)), sortedRows(report.byBuilding.map((row) => [
+      row.buildingId || "", String(row.inComparison), row.revenue, row.grossRevenue,
+      row.discounts, row.depositDeductions, row.expenses, row.profit,
+    ])));
+    assert.deepEqual(sortedRows(workbook.Thu.slice(1)), sortedRows(report.receiptDetails.filter((row) => row.source !== "CHI_PHI").map((row) => [
+      row.buildingId || "", row.roomId || "", row.source, row.amount, row.date || "",
+      row.grossAmount, row.discountAllocated, row.snapshotSource || "",
+    ])));
+    assert.deepEqual(sortedRows(workbook.Chi.slice(1)), sortedRows(report.receiptDetails.filter((row) => row.source === "CHI_PHI").map((row) => [
+      row.buildingId || "", row.roomId || "", row.type || row.source, row.amount, row.date || "",
+    ])));
+    assert.equal(workbook["Theo loai"].slice(1).reduce((sum, row) => sum + row[1], 0), report.totalRevenue);
+    assert.equal(workbook["Theo can"].slice(1).reduce((sum, row) => sum + row[2], 0), report.totalRevenue);
+    assert.ok(workbook.Thu.some((row) => row[0] === a.building.ma_can));
+    assert.ok(workbook.Chi.some((row) => row[0] === a.building.ma_can));
+    assert.ok(!workbook.Thu.some((row) => row[0] === b.building.ma_can));
+    assert.ok(!workbook.Chi.some((row) => row[0] === b.building.ma_can));
     const forbidden = await fetch(`${integration.baseUrl}${endpoint}`, { headers: headers(tenant) });
     assert.equal(forbidden.status, 403);
     const foreignExport = await fetch(`${integration.baseUrl}${endpoint}&buildingId=${b.building.ma_can}`, { headers: headers(ownerA) });

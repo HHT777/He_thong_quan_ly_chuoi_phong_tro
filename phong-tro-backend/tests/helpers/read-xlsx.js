@@ -18,4 +18,27 @@ function readXlsxEntries(bytes) {
   return entries;
 }
 
-module.exports = { readXlsxEntries };
+function decodeXml(value) {
+  return value.replace(/&(?:amp|lt|gt|quot|apos);/g, (entity) => ({
+    "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&apos;": "'",
+  })[entity]);
+}
+
+function readXlsxWorkbook(bytes) {
+  const entries = readXlsxEntries(bytes);
+  const workbook = entries.get("xl/workbook.xml") || "";
+  const sheets = [...workbook.matchAll(/<sheet name="([^"]+)"[^>]*\/>/g)];
+  const result = {};
+  sheets.forEach((sheet, index) => {
+    const xml = entries.get(`xl/worksheets/sheet${index + 1}.xml`) || "";
+    result[decodeXml(sheet[1])] = [...xml.matchAll(/<row r="\d+">([\s\S]*?)<\/row>/g)].map((row) =>
+      [...row[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map((cell) => {
+        const value = cell[2].match(/<(?:v|t)(?:\s[^>]*)?>([\s\S]*?)<\/(?:v|t)>/);
+        const decoded = decodeXml(value?.[1] || "");
+        return /\bt="inlineStr"/.test(cell[1]) ? decoded : Number(decoded);
+      }));
+  });
+  return result;
+}
+
+module.exports = { readXlsxEntries, readXlsxWorkbook };

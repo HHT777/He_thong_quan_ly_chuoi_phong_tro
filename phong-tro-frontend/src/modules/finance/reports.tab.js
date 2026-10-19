@@ -42,9 +42,11 @@ function reportMarkup(data, buildingNames) {
   const compared = rows.filter((row) => row.buildingId && row.inComparison === true);
   const inactive = rows.filter((row) => row.buildingId && row.inComparison === false);
   const chainWide = rows.filter((row) => !row.buildingId);
+  const unassigned = data.unassignedExpenses || { count: 0, total: 0 };
   return `<section class="module-stack">
     <aside class="panel"><strong>Chú giải:</strong> Doanh thu thực nhận = đã trừ giảm trừ. Các tổng tiền dưới đây do server trả về; trình duyệt không tự cộng/trừ.</aside>
     ${summaryMarkup(data)}
+    <aside class="panel" data-unassigned-expenses><strong>Chi phí chưa phân căn:</strong> ${escapeHtml(unassigned.count)} khoản, ${money(unassigned.total)}. Nếu có nhiều Chủ trọ, khoản này chưa tính vào chi phí/lợi nhuận của từng Chủ trọ; cần phân căn trước khi đối chiếu toàn hệ thống.</aside>
     <section class="panel"><h3>Doanh thu theo loại</h3>${typeTable(data.revenueByType)}</section>
     <section class="panel"><h3>So sánh các căn đang hoạt động</h3>${buildingTable(compared, buildingNames, "Không có căn hoạt động phát sinh trong kỳ.")}</section>
     <section class="panel"><h3>Căn không tham gia so sánh</h3><p>Ngừng hoạt động, không tham gia so sánh.</p>${buildingTable(inactive, buildingNames, "Không có căn ngừng hoạt động phát sinh trong kỳ.")}</section>
