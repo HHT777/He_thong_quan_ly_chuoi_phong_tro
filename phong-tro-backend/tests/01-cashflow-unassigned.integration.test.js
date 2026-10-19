@@ -24,7 +24,7 @@ test("FR-194 legacy chain expense remains in single-owner cashflow and is separa
   assert.ok(unassignedRows.length > 0, "legacy seed must contain unassigned chain expenses");
   const g3BeforeFixExpenses = legacy.totalExpenses - unassignedTotal;
   const g3BeforeFixProfit = legacy.profit + unassignedTotal;
-  console.log(`[G3 legacy seed 2026-10] null=${unassignedRows.length} sum=${unassignedTotal} preG3Expenses=${legacy.totalExpenses} g3Expenses=${g3BeforeFixExpenses} preG3Profit=${legacy.profit} g3Profit=${g3BeforeFixProfit}`);
+  console.log(`[G3 legacy seed 2026-10] expenses=${legacy.expenses.length} null=${unassignedRows.length} sum=${unassignedTotal} preG3Expenses=${legacy.totalExpenses} g3Expenses=${g3BeforeFixExpenses} preG3Profit=${legacy.profit} g3Profit=${g3BeforeFixProfit}`);
   const singleton = await request(url, { headers: headers(tokenA) });
   assert.equal(singleton.response.status, 200, JSON.stringify(singleton.body));
   assert.equal(singleton.body.data.totalExpenses, legacy.totalExpenses, "one landlord must retain legacy expense amount");
@@ -48,5 +48,5 @@ test("FR-194 legacy chain expense remains in single-owner cashflow and is separa
   assert.equal(b.body.data.profit, b.body.data.totalRevenue - b.body.data.totalExpenses);
   assert.equal(a.body.data.totalExpenses + a.body.data.unassignedExpenses.total, legacy.totalExpenses);
   assert.equal(b.body.data.totalExpenses + b.body.data.unassignedExpenses.total, 91000 + unassignedTotal);
-  console.log(`[G3 two-owner fixture 2026-10] A_expenses=${a.body.data.totalExpenses} A_profit=${a.body.data.profit} B_expenses=${b.body.data.totalExpenses} B_profit=${b.body.data.profit} unassigned=${unassignedTotal}`);
+  console.log(`[G3 two-owner fixture 2026-10] A_expenseCount=${a.body.data.expenses.length} A_expenses=${a.body.data.totalExpenses} A_profit=${a.body.data.profit} B_expenseCount=${b.body.data.expenses.length} B_expenses=${b.body.data.totalExpenses} B_profit=${b.body.data.profit} unassignedCount=${unassignedRows.length} unassigned=${unassignedTotal}`);
 });
