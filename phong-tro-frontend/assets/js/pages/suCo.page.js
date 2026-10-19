@@ -1,5 +1,6 @@
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
   if (!window.ApiClient) return;
+  const load = async () => {
   try {
     const result = await window.ApiClient.get("/v1/incidents");
     const rows = [...document.querySelectorAll("tbody tr")];
@@ -11,5 +12,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (cells[3]) cells[3].textContent = item.trang_thai;
       if (cells[4]) cells[4].textContent = new Date(item.ngay_gui).toLocaleDateString("vi-VN");
     });
-  } catch (error) { console.error(error); }
+    document.querySelector("[data-api-load-error]")?.remove();
+  } catch (error) {
+    document.querySelector("[data-api-load-error]")?.remove();
+    const state = document.createElement("div");
+    state.dataset.apiLoadError = "";
+    state.textContent = `Không tải được sự cố: ${error.message} `;
+    const retry = document.createElement("button"); retry.textContent = "Thử lại";
+    retry.addEventListener("click", load); state.append(retry); document.body.prepend(state);
+  }
+  };
+  load();
 });

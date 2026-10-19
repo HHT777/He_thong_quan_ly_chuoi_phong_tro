@@ -56,12 +56,12 @@ export default {
     try {
       // 2. Fetch real data from all existing relevant APIs
       const [roomsRes, billsRes, debtRes, incidentsRes, contractsRes, cashflowRes] = await Promise.all([
-        context.api.get("/phong?limit=100").catch(() => ({ data: [] })),
-        context.api.get("/khoan-phai-thu?limit=100").catch(() => ({ data: [] })),
-        context.api.get("/v1/debt").catch(() => ({ data: [] })),
-        context.api.get("/v1/incidents").catch(() => ({ data: [] })),
-        context.api.get("/hop-dong?limit=100").catch(() => ({ data: [] })),
-        context.api.get("/v1/reports/cashflow").catch(() => ({ data: {} })),
+        context.api.get("/phong?limit=100"),
+        context.api.get("/khoan-phai-thu?limit=100"),
+        context.api.get("/v1/debt"),
+        context.api.get("/v1/incidents"),
+        context.api.get("/hop-dong?limit=100"),
+        context.api.get("/v1/reports/cashflow"),
       ]);
 
       const roomRows = Array.isArray(roomsRes.data) ? roomsRes.data : [];

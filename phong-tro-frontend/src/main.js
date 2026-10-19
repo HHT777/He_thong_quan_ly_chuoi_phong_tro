@@ -3,6 +3,7 @@ import "./shared/styles/layout.css";
 import "./shared/styles/dashboard.css";
 import "./shared/styles/management.css";
 import "./shared/styles/app.css";
+import "./shared/styles/vietnamese.css";
 import "./shared/styles/tabs.css";
 import { api } from "./core/api.js";
 import { isAuthenticated, isTenant, login, user } from "./core/session.js";

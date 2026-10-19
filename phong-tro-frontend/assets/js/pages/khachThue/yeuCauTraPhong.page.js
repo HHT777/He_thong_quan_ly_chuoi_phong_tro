@@ -15,10 +15,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.alert("Đã gửi yêu cầu trả phòng.");
     } catch (error) { window.alert(error.message); }
   });
-  try {
+  const load = async () => { try {
     const result = await ApiClient.get("/v1/requests");
     const latest = (result.data || []).find((item) => item.loai_yeu_cau === "TRA_PHONG");
     const status = document.querySelector(".status-badge");
     if (latest && status) status.textContent = latest.trang_thai;
-  } catch (error) { console.error(error); }
+    document.querySelector("[data-api-load-error]")?.remove();
+  } catch (error) {
+    document.querySelector("[data-api-load-error]")?.remove();
+    const state = document.createElement("div"); state.dataset.apiLoadError = "";
+    state.textContent = `Không tải được yêu cầu trả phòng: ${error.message} `;
+    const retry = document.createElement("button"); retry.textContent = "Thử lại";
+    retry.addEventListener("click", load); document.body.prepend(state); state.append(retry);
+  } };
+  load();
 });

@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.alert("Đã gửi yêu cầu gia hạn.");
     } catch (error) { window.alert(error.message); }
   });
-  try {
+  const load = async () => { try {
     const [result, contractResult] = await Promise.all([
       window.ApiClient.get("/v1/requests"),
       window.ApiClient.get("/hop-dong?limit=20"),
@@ -35,5 +35,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     const status = document.querySelector(".status-badge");
     const latest = (result.data || []).find((item) => item.loai_yeu_cau === "GIA_HAN");
     if (status && latest) status.textContent = latest.trang_thai;
-  } catch (error) { console.error(error); }
+    document.querySelector("[data-api-load-error]")?.remove();
+  } catch (error) {
+    document.querySelector("[data-api-load-error]")?.remove();
+    const state = document.createElement("div"); state.dataset.apiLoadError = "";
+    state.textContent = `Không tải được yêu cầu gia hạn: ${error.message} `;
+    const retry = document.createElement("button"); retry.textContent = "Thử lại";
+    retry.addEventListener("click", load); document.body.prepend(state); state.append(retry);
+  } };
+  load();
 });

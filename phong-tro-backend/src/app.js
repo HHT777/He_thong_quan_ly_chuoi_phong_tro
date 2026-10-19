@@ -18,6 +18,7 @@ const meterReadingRoutes = require("./routes/meterReading.routes");
 const mvpRoutes = require("./routes/mvp.routes");
 const { installApiResponse } = require("./utils/apiResponse");
 const app = express();
+app.locals.schemaReady = false;
 
 // Middleware
 app.use(cors());
@@ -37,6 +38,14 @@ app.get("/ready", async (req, res) => {
   } catch (error) {
     res.status(503).json({ success: false, checks: { database: "down" } });
   }
+});
+
+app.use("/api", (req, res, next) => {
+  if (app.locals.schemaReady) return next();
+  if (req.path.startsWith("/v1/")) {
+    return res.apiError(503, "DB_SCHEMA_OUTDATED", "Cơ sở dữ liệu chưa được nâng cấp");
+  }
+  return res.status(503).json({ success: false, code: "DB_SCHEMA_OUTDATED", message: "Cơ sở dữ liệu chưa được nâng cấp" });
 });
 
 // Routes
