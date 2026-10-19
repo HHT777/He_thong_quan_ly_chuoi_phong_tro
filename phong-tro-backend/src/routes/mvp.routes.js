@@ -310,29 +310,30 @@ router.post("/move-outs/:id/deposit-refunds", landlord, async (req, res, next) =
 
 router.post("/incidents", async (req, res, next) => {
   try {
-    const roomId = req.body.roomId;
-    if (!roomId || !req.body.description) throw fail(422, "Thiếu thông tin sự cố");
-    const priority = incidentPriority(req.body.priority);
-    const landlordCreated = req.user.vai_tro === "CHU_TRO";
-    return data(res, await SuCo.create({
-      ma_nguoi_gui: req.user.ma_tai_khoan,
-      ma_phong: roomId,
-      loai_su_co: req.body.type || req.body.title || "KHAC",
-      muc_do_uu_tien: priority,
-      mo_ta: req.body.description,
-      hinh_anh_url: req.body.imageUrl || null,
-      trang_thai: landlordCreated ? "DANG_XU_LY" : "CHO_TIEP_NHAN",
-      ...(landlordCreated ? { nguoi_tiep_nhan_id: req.user.ma_tai_khoan, ngay_tiep_nhan: new Date() } : {}),
-    }), 201);
+    return data(res, await incidentService.create({ ...req.body, priority: incidentPriority(req.body.priority) }, req.user), 201);
   } catch (e) { next(e); }
 });
-router.get("/incidents", async (req, res, next) => { try { return data(res, await SuCo.findAll({ where: req.user.vai_tro === "KHACH_THUE" ? { ma_nguoi_gui: req.user.ma_tai_khoan, da_xoa: false } : { da_xoa: false }, order: [["ngay_gui", "DESC"]] })); } catch (e) { next(e); } });
+router.delete("/incidents/:id/previous", landlord, async (req, res, next) => {
+  try { return data(res, await incidentService.unlinkPrevious(req.params.id, req.user)); } catch (e) { next(e); }
+});
+router.get("/incidents", async (req, res, next) => {
+  try {
+    const where = { da_xoa: false };
+    if (req.user.vai_tro === "KHACH_THUE") where.ma_nguoi_gui = req.user.ma_tai_khoan;
+    else {
+      const buildingIds = await getOwnedBuildingIds(req.user);
+      const rooms = await PhongTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } }, attributes: ["ma_phong"], raw: true });
+      where.ma_phong = { [Op.in]: rooms.map((room) => room.ma_phong) };
+    }
+    return data(res, await SuCo.findAll({ where, order: [["ngay_gui", "DESC"]] }));
+  } catch (e) { next(e); }
+});
 router.patch("/incidents/:id", landlord, async (req, res, next) => {
   try {
     return data(res, await incidentService.update(
       req.params.id,
       req.body,
-      req.user.ma_tai_khoan,
+      req.user,
     ));
   } catch (e) { next(e); }
 });
@@ -341,7 +342,7 @@ router.delete("/incidents/:id", landlord, async (req, res, next) => {
     return data(res, await incidentService.softDelete(
       req.params.id,
       req.body.reason,
-      req.user.ma_tai_khoan,
+      req.user,
     ));
   } catch (e) { next(e); }
 });

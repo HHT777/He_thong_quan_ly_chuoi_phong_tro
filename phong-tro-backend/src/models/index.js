@@ -86,6 +86,7 @@ KhoanDieuChinh.hasMany(ChiTietThanhToan, { foreignKey: "ma_khoan_dieu_chinh", as
 ChiTietThanhToan.belongsTo(KhoanDieuChinh, { foreignKey: "ma_khoan_dieu_chinh", as: "khoanDieuChinh" });
 PhongTro.hasMany(SuCo, { foreignKey: "ma_phong", as: "suCos" });
 SuCo.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+SuCo.belongsTo(SuCo, { foreignKey: "ma_su_co_truoc", as: "suCoTruoc" });
 CanTro.hasMany(KhoanChi, { foreignKey: "ma_can", as: "khoanChis" });
 KhoanChi.belongsTo(CanTro, { foreignKey: "ma_can", as: "canTro" });
 TaiKhoan.hasMany(ThongBao, { foreignKey: "ma_tai_khoan", as: "thongBaos" });

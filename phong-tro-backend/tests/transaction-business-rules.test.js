@@ -67,7 +67,8 @@ test("CT-005 soft delete requires a reason and rejects processed or financed inc
   assert.match(service, /DELETE_REASON_REQUIRED/);
   assert.match(service, /INCIDENT_CANNOT_BE_DELETED/);
   assert.match(service, /da_xoa: true/);
-  assert.match(service, /nguoi_xoa_id: actorId/);
+  assert.match(service, /nguoi_xoa_id: user\.ma_tai_khoan/);
+  assert.match(service, /async function softDelete[\s\S]*?assertOwned\(user, "incident", incidentId, \{ transaction \}\)/);
   assert.match(route, /router\.delete\("\/incidents\/:id"/);
 });
 

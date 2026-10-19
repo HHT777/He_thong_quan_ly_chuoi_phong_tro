@@ -136,6 +136,7 @@ const SuCo = sequelize.define("SuCo", {
   ngay_hoan_tat: { type: DataTypes.DATE, field: "ngayHoanTat", allowNull: true }, da_xoa: { type: DataTypes.BOOLEAN, field: "daXoa", allowNull: false, defaultValue: false },
   ly_do_xoa: { type: DataTypes.STRING(1000), field: "lyDoXoa", allowNull: true }, ngay_xoa: { type: DataTypes.DATE, field: "ngayXoa", allowNull: true },
   nguoi_tiep_nhan_id: ref("nguoiTiepNhanId", true), nguoi_xoa_id: ref("nguoiXoaId", true), ma_nguoi_gui: ref("maNguoiGui"), ma_phong: ref("maPhong"),
+  ma_su_co_truoc: ref("maSuCoTruoc", true),
 }, opts("SuCo"));
 const YeuCauGiaHan = sequelize.define("YeuCauGiaHan", { ma_yeu_cau: id("maYeuCau"), ngay_ket_thuc_de_xuat: { type: DataTypes.DATEONLY, field: "ngayKetThucDeXuat", allowNull: false }, ma_hop_dong: ref("maHopDong") }, opts("YeuCauGiaHan"));
 const YeuCauTraPhong = sequelize.define("YeuCauTraPhong", {
