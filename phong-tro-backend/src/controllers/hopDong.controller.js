@@ -1,8 +1,21 @@
 const hopDongService = require("../services/hopDong.service");
 const hopDongValidation = require("../validations/hopDong.validation");
 const paginationService = require("../utils/pagination.util");
+const contractPrintService = require("../services/contractPrint.service");
 
 class HopDongController {
+  async printContract(req, res, next) {
+    try {
+      const html = await contractPrintService.getPrintableContract(req.params.id, req.user);
+      res.set("Cache-Control", "private, no-store")
+        .set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'")
+        .set("X-Content-Type-Options", "nosniff")
+        .type("html").send(html);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createHopDong(req, res, next) {
     try {
       const { error, value } = hopDongValidation.createHopDong.validate(

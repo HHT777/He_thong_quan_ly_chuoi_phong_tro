@@ -1,6 +1,6 @@
 # Ma trận quyền sở hữu API — mốc Giai đoạn 1
 
-Nguồn route: `src/app.js`, `src/routes/*.routes.js` (117 khai báo trong 9 tệp; `management.routes.js` được mount thêm bí danh `/api`). `tests/authz-route-manifest.test.js` chốt cả số lượng và chữ ký toàn bộ khai báo: thêm/sửa/xóa route phải rà lại tài liệu và chủ sở hữu. Đây là khóa kiểm kê, **không** chứng minh 117 route đã an toàn.
+Nguồn route: `src/app.js`, `src/routes/*.routes.js` (118 khai báo trong 9 tệp; `management.routes.js` được mount thêm bí danh `/api`). `tests/authz-route-manifest.test.js` chốt cả số lượng và chữ ký toàn bộ khai báo: thêm/sửa/xóa route phải rà lại tài liệu và chủ sở hữu. Đây là khóa kiểm kê, **không** chứng minh 118 route đã an toàn.
 
 Mô hình: nhiều Chủ trọ độc lập; `CanTro.maChuTro` là gốc sở hữu. Phòng → căn; hợp đồng → phòng → căn; phiếu/cọc/thu/điều chỉnh/biên bản → hợp đồng → phòng → căn. ID người khác và ID không tồn tại cùng trả `404 RESOURCE_NOT_FOUND`; sai vai trò trả 403. Tài nguyên chưa ánh xạ bị chặn theo mặc định bằng `OWNERSHIP_RESOURCE_UNMAPPED`. Kiểm tra phân quyền nằm ở `ownership.service.js`/`propertyAccess.service.js` và được gọi trong service/controller tương ứng.
 
@@ -48,7 +48,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 
 Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn chỉ vì có RBAC vai trò. Lý do hoãn: SRS giai đoạn đầu vận hành một Chủ trọ; phải mở lại toàn bộ phần P2 **trước khi bật nhiều Chủ trọ**. Khi triển khai, bổ sung từng route vào test manifest theo chủ sở hữu thực tế và phép thử phủ định. Các bảng nhóm phía trên là ghi chú lịch sử; bảng kiểm kê dưới đây là trạng thái mới nhất và có ưu tiên khi hai chỗ khác nhau.
 
-## Kiểm kê route-theo-route (117 khai báo, không nhân đôi bí danh mount)
+## Kiểm kê route-theo-route (118 khai báo, không nhân đôi bí danh mount)
 
 `G1` = đã vá/kiểm chứng ở lượt authz; `P2-2`/`P2-3` = tồn đọng Giai đoạn 2/3, cần test A/B trước nhiều Chủ trọ; `N/A` = không áp dụng kiểm tra sở hữu đối tượng (nêu lý do). Đường dẫn tương đối với mount trong `app.js`: `management.routes.js` có hai mount `/api/management` và `/api`. Mỗi dòng là một khai báo `router.METHOD(path)`; bảng được đối chiếu bằng `authz-route-manifest.test.js`. `G1` không có nghĩa mọi tổ hợp dữ liệu đã có phép thử phủ định *riêng*; trạng thái bằng chứng chi tiết ở bảng kế tiếp.
 
@@ -67,6 +67,7 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | hopDong.routes.js | GET | / | G1 `60c7962` |
 | hopDong.routes.js | GET | /expiring | P2-3: danh sách sắp hạn chưa có test riêng |
 | hopDong.routes.js | GET | /:id/history | P2-3: lịch sử đã có guard, thiếu test A/B riêng |
+| hopDong.routes.js | GET | /:id/print | G1 FR-184: Chủ trọ sở hữu căn; Khách 403; A/B 404; `contract-print.integration.test.js` |
 | hopDong.routes.js | POST | /:id/transfers | G1 `60c7962` |
 | hopDong.routes.js | GET | /:id | G1 `60c7962` |
 | hopDong.routes.js | PUT | /:id | G1 `60c7962` |

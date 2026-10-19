@@ -29,8 +29,27 @@ async function request(path, options = {}) {
   return payload;
 }
 
+async function getHtml(path) {
+  const headers = {};
+  if (token()) headers.Authorization = `Bearer ${token()}`;
+  const response = await fetch(`${API_ROOT}${path.startsWith("/") ? path : `/${path}`}`, { headers });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const code = payload.error?.code || payload.code;
+    const message = response.status === 404 && code === "RESOURCE_NOT_FOUND"
+      ? "Không tìm thấy hoặc bạn không có quyền với đối tượng này"
+      : payload.error?.message || payload.message || `Yêu cầu thất bại (${response.status})`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.code = code;
+    throw error;
+  }
+  return response.text();
+}
+
 export const api = {
   request,
+  getHtml,
   get: (path) => request(path),
   post: (path, body, headers) => request(path, { method: "POST", body: JSON.stringify(body), headers }),
   put: (path, body) => request(path, { method: "PUT", body: JSON.stringify(body) }),

@@ -26,6 +26,50 @@ const numericContractValues = (raw) => ({
   ngay_nhan_coc: raw.ngay_nhan_coc || null,
 });
 
+async function openContractDetail(context, row) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Chi tiết hợp đồng</h3><div data-detail>Đang tải...</div><div data-print-state></div><button type="button" data-print>In hợp đồng</button> <button type="button" data-close>Đóng</button></div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove());
+  const detail = overlay.querySelector("[data-detail]");
+  const state = overlay.querySelector("[data-print-state]");
+  const printButton = overlay.querySelector("[data-print]");
+  const loadDetail = async () => {
+    try {
+      const response = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}`);
+      const contract = response.data || {};
+      detail.innerHTML = `<p>Khách: ${escapeHtml(contract.khachThue?.ho_ten)}</p><p>Phòng: ${escapeHtml(contract.phongTro?.so_phong)}</p><p>Giá thuê hợp đồng: ${money(contract.gia_thue)}</p><p>Thời hạn: ${escapeHtml(date(contract.ngay_bat_dau))} – ${escapeHtml(date(contract.ngay_ket_thuc))}</p>`;
+    } catch (error) {
+      detail.textContent = `Không tải được chi tiết: ${error.message} `;
+      const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
+      retry.addEventListener("click", loadDetail); detail.append(retry);
+    }
+  };
+  const loadPrint = async () => {
+    printButton.disabled = true;
+    state.textContent = "Đang tải bản in...";
+    try {
+      const html = await context.api.getHtml(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/print`);
+      state.textContent = "";
+      const frame = document.createElement("iframe");
+      frame.title = "Bản in hợp đồng";
+      frame.setAttribute("sandbox", "allow-same-origin allow-modals");
+      frame.style.cssText = "width:100%;height:55vh;border:1px solid #ddd";
+      frame.srcdoc = html;
+      const button = document.createElement("button"); button.type = "button"; button.textContent = "Mở hộp thoại in";
+      button.addEventListener("click", () => frame.contentWindow?.print());
+      state.append(frame, button);
+    } catch (error) {
+      state.textContent = `Không tải được bản in: ${error.message} `;
+      const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
+      retry.addEventListener("click", loadPrint); state.append(retry);
+    } finally { printButton.disabled = false; }
+  };
+  printButton.addEventListener("click", loadPrint);
+  await loadDetail();
+}
+
 export default listTab({ id: "contracts", route: "/residents-contracts/contracts", title: "Hợp đồng", tabLabel: "Hợp đồng", group: "residents-contracts", order: 31, roles: ["CHU_TRO"] }, {
   title: "Hợp đồng",
   description: "Tạo hợp đồng kèm hồ sơ cọc và gia hạn hợp đồng hiện có.",
@@ -54,6 +98,8 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
     map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; return result; },
   },
   rowActions: [{
+    id: "detail", label: "Chi tiết", run: openContractDetail,
+  }, {
     id: "history", label: "Lịch sử", run: async (context, row) => {
       const result = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/history`);
       const entries = (result.data || []).map(safeHistory);
