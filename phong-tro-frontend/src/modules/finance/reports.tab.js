@@ -95,11 +95,12 @@ async function render(context) {
       <label data-filter-mode="year">Năm<input name="year" type="number" min="2000" max="2100" step="1" value="${year}"></label>
       <label data-filter-mode="range">Từ ngày<input name="from" type="date"></label><label data-filter-mode="range">Đến ngày<input name="to" type="date"></label>
       <label>Căn<select name="buildingId"><option value="">Toàn chuỗi</option>${buildings.map((row) => `<option value="${escapeHtml(row.ma_can)}">${escapeHtml(row.ten_can)}</option>`).join("")}</select></label>
-      <button class="btn btn--primary">Xem báo cáo</button><span data-filter-message></span>
+      <button class="btn btn--primary">Xem báo cáo</button><button class="btn btn--secondary" type="button" data-export-report>Xuất Excel</button><span data-filter-message></span>
     </form><div data-report-result><div class="panel">Đang tải báo cáo...</div></div>`;
     const form = content.querySelector("[data-report-filter]");
     const result = content.querySelector("[data-report-result]");
     const message = form.querySelector("[data-filter-message]");
+    const exportButton = form.querySelector("[data-export-report]");
 
     const syncFields = () => {
       const mode = form.elements.mode.value;
@@ -128,6 +129,31 @@ async function render(context) {
     };
     form.elements.mode.addEventListener("change", syncFields);
     form.addEventListener("submit", (event) => { event.preventDefault(); load(); });
+    const exportReport = async () => {
+      exportButton.disabled = true;
+      message.textContent = "";
+      try {
+        const query = filterQuery(form);
+        const { blob, disposition } = await context.api.getBlob(`/v1/reports/cashflow.xlsx?${query.toString()}`);
+        const filename = /filename="(bao-cao-thu-chi_[A-Za-z0-9_-]+\.xlsx)"/.exec(disposition)?.[1] || "bao-cao-thu-chi.xlsx";
+        const url = URL.createObjectURL(blob);
+        try {
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        } finally { URL.revokeObjectURL(url); }
+        await load();
+      } catch (error) {
+        const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
+        message.textContent = friendly;
+        result.innerHTML = `<div class="empty-state empty-state--error"><h4 class="empty-state__title">Không xuất được Excel</h4><p class="empty-state__desc">${escapeHtml(friendly)}</p><button class="btn btn--secondary" type="button" data-export-retry>Thử lại</button></div>`;
+        result.querySelector("[data-export-retry]").addEventListener("click", exportReport);
+      } finally { exportButton.disabled = false; }
+    };
+    exportButton.addEventListener("click", exportReport);
     syncFields();
     await load();
   } catch (error) {

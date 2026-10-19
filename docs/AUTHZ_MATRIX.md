@@ -1,6 +1,6 @@
 # Ma trận quyền sở hữu API — mốc Giai đoạn 1
 
-Nguồn route: `src/app.js`, `src/routes/*.routes.js` (119 khai báo trong 9 tệp; `management.routes.js` được mount thêm bí danh `/api`). `tests/authz-route-manifest.test.js` chốt cả số lượng và chữ ký toàn bộ khai báo: thêm/sửa/xóa route phải rà lại tài liệu và chủ sở hữu. Đây là khóa kiểm kê, **không** chứng minh 119 route đã an toàn.
+Nguồn route: `src/app.js`, `src/routes/*.routes.js` (120 khai báo trong 9 tệp; `management.routes.js` được mount thêm bí danh `/api`). `tests/authz-route-manifest.test.js` chốt cả số lượng và chữ ký toàn bộ khai báo: thêm/sửa/xóa route phải rà lại tài liệu và chủ sở hữu. Đây là khóa kiểm kê, **không** chứng minh 120 route đã an toàn.
 
 Mô hình: nhiều Chủ trọ độc lập; `CanTro.maChuTro` là gốc sở hữu. Phòng → căn; hợp đồng → phòng → căn; phiếu/cọc/thu/điều chỉnh/biên bản → hợp đồng → phòng → căn. ID người khác và ID không tồn tại cùng trả `404 RESOURCE_NOT_FOUND`; sai vai trò trả 403. Tài nguyên chưa ánh xạ bị chặn theo mặc định bằng `OWNERSHIP_RESOURCE_UNMAPPED`. Kiểm tra phân quyền nằm ở `ownership.service.js`/`propertyAccess.service.js` và được gọi trong service/controller tương ứng.
 
@@ -31,7 +31,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 | `management.routes.js` | `GET/POST /can-tro`, `GET/PUT/DELETE /can-tro/:id`; `GET/POST /khach-thue`, `GET/PUT/DELETE /khach-thue/:id`; `GET/POST /thu-chi`, `PUT/DELETE /thu-chi/:id` | Căn, khách, thu chi của B; alias mount kép |
 | `mvp.routes.js` | `GET/POST /reservations`, `GET /reservations/:id/extension-history`, `GET /reservations/:id/cancellation-quote`, `PATCH /reservations/:id/extend`, `POST /reservations/:id/cancel`; `GET/POST /assets`, `PUT/DELETE /assets/:id` | Giữ phòng, tài sản của B; producer cron thông báo quá hạn đã vá riêng ở FR-159 |
 | `mvp.routes.js` | `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/revoke`; `POST /incidents` từ khách; `GET /co-tenant-proposals/:id`, `POST/GET /co-tenants`, `PATCH /co-tenants/:id` | Yêu cầu và người ở cùng chéo chủ/khách; sự cố Chủ trọ đã được khoanh phạm vi ở G2, báo sự cố từ khách còn P2-2; `GET /move-outs` đã vá G1 |
-| `mvp.routes.js` | `GET /reports/cashflow`, `GET/POST /contracts/:id/violations`; `GET /notifications`, `PATCH /notifications/:id/read` | Báo cáo toàn hệ thống/vi phạm; `GET /debt` và broadcast đã vá G1 |
+| `mvp.routes.js` | `GET/POST /contracts/:id/violations`; `GET /notifications`, `PATCH /notifications/:id/read` | Vi phạm/thông báo; cashflow, `GET /debt` và broadcast đã vá phạm vi chủ sở hữu |
 | `meterReading.routes.js` | `GET /meter-readings`, `GET/PATCH/DELETE /meter-readings/:readingId`, `POST /meter-readings/:readingId/confirmations|correction-requests`, `POST /meter-readings/manual`, `POST /meter-readings/ocr-previews|ocr-submit`, `GET /private-files/:id` | Chỉ số/ảnh/file của B; đường dẫn file riêng tư |
 
 ## Giai đoạn 3 — route nền tảng/khách, chưa có ma trận A/B toàn diện
@@ -48,7 +48,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 
 Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn chỉ vì có RBAC vai trò. Lý do hoãn: SRS giai đoạn đầu vận hành một Chủ trọ; phải mở lại toàn bộ phần P2 **trước khi bật nhiều Chủ trọ**. Khi triển khai, bổ sung từng route vào test manifest theo chủ sở hữu thực tế và phép thử phủ định. Các bảng nhóm phía trên là ghi chú lịch sử; bảng kiểm kê dưới đây là trạng thái mới nhất và có ưu tiên khi hai chỗ khác nhau.
 
-## Kiểm kê route-theo-route (119 khai báo, không nhân đôi bí danh mount)
+## Kiểm kê route-theo-route (120 khai báo, không nhân đôi bí danh mount)
 
 `G1` = đã vá/kiểm chứng ở lượt authz; `P2-2`/`P2-3` = tồn đọng Giai đoạn 2/3, cần test A/B trước nhiều Chủ trọ; `N/A` = không áp dụng kiểm tra sở hữu đối tượng (nêu lý do). Đường dẫn tương đối với mount trong `app.js`: `management.routes.js` có hai mount `/api/management` và `/api`. Mỗi dòng là một khai báo `router.METHOD(path)`; bảng được đối chiếu bằng `authz-route-manifest.test.js`. `G1` không có nghĩa mọi tổ hợp dữ liệu đã có phép thử phủ định *riêng*; trạng thái bằng chứng chi tiết ở bảng kế tiếp.
 
@@ -165,7 +165,8 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | GET | /notifications | P2-2: danh sách thông báo |
 | mvp.routes.js | PATCH | /notifications/:id/read | P2-2: đánh dấu đã đọc |
 | mvp.routes.js | POST | /notifications/broadcast | G1 `1bb2fc7`: chỉ khách trong căn của chủ |
-| mvp.routes.js | GET | /reports/cashflow | P2-2: báo cáo toàn hệ thống cần tách chủ |
+| mvp.routes.js | GET | /reports/cashflow | G3 FR-194: tổng hợp chỉ căn sở hữu; buildingId lạ/khác chủ 404 |
+| mvp.routes.js | GET | /reports/cashflow.xlsx | G3 FR-194: xuất cùng dữ liệu cashflow của căn sở hữu; chỉ Chủ trọ |
 | phong.routes.js | POST | / | P2-2: tạo phòng |
 | phong.routes.js | GET | / | P2-2: danh sách phòng |
 | phong.routes.js | GET | /:id | P2-2: chi tiết phòng |
@@ -231,4 +232,6 @@ Chạy `AUTHZ_ROUTE=<tên route>` cùng `AUTHZ_MUTATION_ROUTE=<tên route>` và 
 | `POST /api/v1/move-outs/:contractId/settle` | `moveOut.service.js:50` | 200, thanh lý B; đỏ | 404 |
 | `POST /api/v1/move-outs/:id/deposit-refunds` | `moveOut.service.js:114` | 201, hoàn cọc B; đỏ | 404 |
 
-**Kết quả:** 26/26 route đỏ khi tắt guard riêng; 0 route thiếu phép thử riêng. Bản không đột biến cần trở lại xanh ở toàn bộ integration. Các route đọc/list mở rộng được kiểm bằng `authz-phase1.integration.test.js` và các test tích hợp nghiệp vụ; `GET /debt` và `GET /move-outs` có test riêng sau vá. Riêng `GET /reports/cashflow` còn tổng hợp toàn hệ thống, phân loại P2-2, **không an toàn để bật nhiều Chủ trọ** trước khi xử lý.
+**Kết quả:** 26/26 route đỏ khi tắt guard riêng; 0 route thiếu phép thử riêng. Bản không đột biến cần trở lại xanh ở toàn bộ integration. Các route đọc/list mở rộng được kiểm bằng `authz-phase1.integration.test.js` và các test tích hợp nghiệp vụ; `GET /debt`, `GET /move-outs`, `GET /reports/cashflow` và bản xuất có test riêng sau vá. Các route P2-2/P2-3 khác vẫn cần rà trước khi bật nhiều Chủ trọ.
+
+**G3 chưa làm:** xuất Excel công nợ UC-23 và các báo cáo RPT-01…06 ngoài màn cashflow UC-19; chỉ bản xuất cashflow UC-19 được triển khai theo quyết định phạm vi G3.

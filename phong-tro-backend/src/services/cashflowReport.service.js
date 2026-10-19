@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const { businessMonth } = require("../utils/businessDate.util");
+const { notFoundError } = require("./ownership.service");
 const {
   KhoanThu,
   KhoanChi,
@@ -82,14 +83,21 @@ function buildWhere(filters = {}, now = new Date()) {
     receiptWhere.ma_can = String(filters.buildingId).trim();
     expenseWhere.ma_can = String(filters.buildingId).trim();
   }
+  if (Array.isArray(filters.ownedBuildingIds)) {
+    if (filters.buildingId && !filters.ownedBuildingIds.includes(filters.buildingId)) throw notFoundError();
+    const scope = filters.buildingId || { [Op.in]: filters.ownedBuildingIds };
+    receiptWhere.ma_can = scope;
+    expenseWhere.ma_can = scope;
+  }
   return { receiptWhere, expenseWhere, reportDate: date, buildingId: filters.buildingId };
 }
 
 async function getCashflow(filters) {
   const { receiptWhere, expenseWhere, reportDate, buildingId } = buildWhere(filters);
-  const roomWhere = buildingId !== undefined && String(buildingId).trim()
-    ? { ma_can: String(buildingId).trim() }
-    : undefined;
+  const rowLimit = filters.maxDetailRows ? filters.maxDetailRows + 1 : undefined;
+  const roomWhere = Array.isArray(filters.ownedBuildingIds)
+    ? { ma_can: buildingId || { [Op.in]: filters.ownedBuildingIds } }
+    : buildingId !== undefined && String(buildingId).trim() ? { ma_can: String(buildingId).trim() } : undefined;
   const [receipts, expenses, reports] = await Promise.all([
     KhoanThu.findAll({
       where: receiptWhere,
@@ -113,8 +121,9 @@ async function getCashflow(filters) {
         }],
       }],
       order: [["ngay_ghi_nhan", "DESC"]],
+      ...(rowLimit ? { limit: rowLimit } : {}),
     }),
-    KhoanChi.findAll({ where: expenseWhere, order: [["ngay_phat_sinh", "DESC"]] }),
+    KhoanChi.findAll({ where: expenseWhere, order: [["ngay_phat_sinh", "DESC"]], ...(rowLimit ? { limit: rowLimit } : {}) }),
     BienBanTraPhong.findAll({
       where: {
         la_du_lieu_legacy: false,
@@ -127,8 +136,12 @@ async function getCashflow(filters) {
         include: [{ model: PhongTro, as: "phongTro", required: Boolean(roomWhere), where: roomWhere }],
       }],
       order: [["ngay_quyet_toan", "DESC"]],
+      ...(rowLimit ? { limit: rowLimit } : {}),
     }),
   ]);
+  if (rowLimit && receipts.length + expenses.length + reports.length > filters.maxDetailRows) {
+    throw Object.assign(new Error("Báo cáo vượt giới hạn dòng"), { status: 413, code: "REPORT_EXPORT_TOO_LARGE" });
+  }
   const buildingIds = [...new Set([
     ...receipts.map((row) => row.ma_can),
     ...expenses.map((row) => row.ma_can),
@@ -162,7 +175,7 @@ function summarizeCashflow({ receipts, expenses, reports, buildings = [] }) {
   }, {}));
   if (depositDeductions > 0) revenueByType.push({ type: "KHAU_TRU_COC", amount: depositDeductions });
   const expensesByType = Object.values(expenses.reduce((all, row) => { const key = row.loai_khoan_chi; all[key] = all[key] || { type: key, amount: 0 }; all[key].amount += Number(row.so_tien); return all; }, {}));
-  const expenseDetails = expenses.map((row) => ({ source: "CHI_PHI", amount: Number(row.so_tien), date: row.ngay_phat_sinh, expenseId: row.ma_khoan_chi, buildingId: row.ma_can || null, roomId: null, incidentId: row.ma_su_co || null }));
+  const expenseDetails = expenses.map((row) => ({ source: "CHI_PHI", type: row.loai_khoan_chi, amount: Number(row.so_tien), date: row.ngay_phat_sinh, expenseId: row.ma_khoan_chi, buildingId: row.ma_can || null, roomId: null, incidentId: row.ma_su_co || null }));
   const statusByBuilding = new Map(buildings.map((row) => [row.ma_can, row.trang_thai]));
   const comparison = {};
   const buildingRow = (buildingId) => {
@@ -290,4 +303,4 @@ function allocateReceipts(receipts) {
   return result;
 }
 
-module.exports = { parseDate, buildDateCondition, buildWhere, vietnamMonth, getCashflow, allocateReceipts, summarizeCashflow };
+module.exports = { parseDate, buildDateCondition, buildWhere, vietnamMonth, normalizeFilters, getCashflow, allocateReceipts, summarizeCashflow };
