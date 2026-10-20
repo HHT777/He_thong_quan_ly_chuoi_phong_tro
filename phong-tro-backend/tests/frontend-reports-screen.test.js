@@ -60,3 +60,13 @@ test("FR-194 report export sends the bearer token, uses a blob and offers retry"
   assert.match(api, /async function getBlob[\s\S]*?headers\.Authorization = `Bearer \$\{token\(\)\}`/);
   assert.match(api, /return \{ blob: await response\.blob\(\), disposition:/);
 });
+
+test("FR-194 report screen exposes unassigned expenses without client money arithmetic", () => {
+  const source = read("modules/finance/reports.tab.js");
+  assert.match(source, /data\.unassignedExpenses/);
+  assert.match(source, /data-unassigned-expenses/);
+  assert.match(source, /unassigned\.count/);
+  assert.match(source, /money\(unassigned\.total\)/);
+  assert.match(source, /chưa tính vào chi phí\/lợi nhuận/);
+  assert.doesNotMatch(source, /unassigned\.total\s*[+-]/);
+});

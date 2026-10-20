@@ -1,5 +1,7 @@
 # Đối chiếu chức năng Chủ trọ hiện có trong backend với `SRS.md` và `phantich.md`
 
+> Cập nhật G3 19/10/2026 (ưu tiên hơn các ghi chú lịch sử bên dưới): xuất Excel cashflow FR-194 trên nhánh `giai-doan-g3-xuat-excel` gồm 5 sheet `Tong quan`, `Theo loai`, `Theo can`, `Thu`, `Chi`; JSON/Excel/màn hình có `unassignedExpenses`. Một Chủ trọ: khoản chi chưa phân căn vẫn tính vào chi phí/lợi nhuận toàn chuỗi; nhiều Chủ trọ: tách riêng, chưa gán cho ai. Có test `cashflow-export.test.js`, `cashflow-export.integration.test.js`, `01-cashflow-unassigned.integration.test.js` và công cụ Python độc lập `verify-xlsx.py`; kết quả nghiệm thu cuối ghi ở báo cáo lượt này. Chưa xuất UC-23/RPT-01…06, chưa build frontend hoặc mở bằng Excel/LibreOffice.
+
 Ngày rà soát: 14/10/2026<br>
 Phạm vi: mã nguồn hiện tại trong `phong-tro-backend/src`, route đã gắn vào `src/app.js`, các service/controller liên quan và test trong `phong-tro-backend/tests`.
 

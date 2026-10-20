@@ -1,5 +1,6 @@
 require("dotenv").config();
 const mysql = require("mysql2/promise");
+const { getCashflow } = require("../src/services/cashflowReport.service");
 
 const options = { host: process.env.DB_HOST, port: Number(process.env.DB_PORT || 3306), user: process.env.DB_USER, password: process.env.DB_PASSWORD || "", database: process.env.DB_NAME, charset: "utf8mb4" };
 const checks = {
@@ -34,6 +35,20 @@ const checks = {
 (async () => {
   const connection = await mysql.createConnection(options); const result = {};
   for (const [name, sql] of Object.entries(checks)) result[name] = Number((await connection.query(sql))[0][0].violations);
+  result.reportProfitArithmetic = 0;
+  result.reportExpenseAllocation = 0;
+  const [owners] = await connection.query("SELECT maChuTro FROM ChuTro");
+  for (const owner of owners) {
+    const [buildings] = await connection.query("SELECT maCan FROM CanTro WHERE maChuTro=?", [owner.maChuTro]);
+    const ownedBuildingIds = buildings.map((row) => row.maCan);
+    const report = await getCashflow({ from: "1900-01-01", to: "2100-12-31", ownedBuildingIds });
+    if (Math.abs(report.totalRevenue - report.totalExpenses - report.profit) > 0.001) result.reportProfitArithmetic += 1;
+    const [scope] = await connection.query(
+      "SELECT COALESCE(SUM(k.soTien),0) expected FROM KhoanChi k LEFT JOIN CanTro c ON c.maCan=k.maCan WHERE k.trangThai='HIEU_LUC' AND k.ngayPhatSinh BETWEEN '1900-01-01' AND '2100-12-31' AND (k.maCan IS NULL OR c.maChuTro=?)",
+      [owner.maChuTro],
+    );
+    if (Math.abs(report.totalExpenses + report.unassignedExpenses.total - Number(scope[0].expected)) > 0.001) result.reportExpenseAllocation += 1;
+  }
   await connection.end(); console.log(JSON.stringify(result));
   if (Object.values(result).some((value) => value !== 0)) process.exitCode = 1;
 })().catch((error) => { console.error(error.message); process.exitCode = 1; });

@@ -11,6 +11,7 @@ const {
   HopDong,
   PhongTro,
   CanTro,
+  ChuTro,
 } = require("../models");
 
 function parseDate(value, field) {
@@ -95,6 +96,14 @@ function buildWhere(filters = {}, now = new Date()) {
 async function getCashflow(filters) {
   const { receiptWhere, expenseWhere, reportDate, buildingId } = buildWhere(filters);
   const rowLimit = filters.maxDetailRows ? filters.maxDetailRows + 1 : undefined;
+  const scoped = Array.isArray(filters.ownedBuildingIds);
+  const landlordCount = scoped ? await ChuTro.count() : 0;
+  // Before multi-landlord support, chain-wide costs belonged to the sole owner.
+  // With multiple owners they have no provable owner and must not affect profit.
+  if (scoped && landlordCount === 1 && !buildingId) {
+    expenseWhere.ma_can = { [Op.or]: [{ [Op.in]: filters.ownedBuildingIds }, { [Op.is]: null }] };
+  }
+  const unassignedWhere = { trang_thai: "HIEU_LUC", ma_can: null, ...(reportDate ? { ngay_phat_sinh: reportDate } : {}) };
   const roomWhere = Array.isArray(filters.ownedBuildingIds)
     ? { ma_can: buildingId || { [Op.in]: filters.ownedBuildingIds } }
     : buildingId !== undefined && String(buildingId).trim() ? { ma_can: String(buildingId).trim() } : undefined;
@@ -120,7 +129,7 @@ async function getCashflow(filters) {
           ],
         }],
       }],
-      order: [["ngay_ghi_nhan", "DESC"]],
+      order: [["ngay_ghi_nhan", "DESC"], ["ma_khoan_thu", "DESC"]],
       ...(rowLimit ? { limit: rowLimit } : {}),
     }),
     KhoanChi.findAll({ where: expenseWhere, order: [["ngay_phat_sinh", "DESC"]], ...(rowLimit ? { limit: rowLimit } : {}) }),
@@ -142,16 +151,19 @@ async function getCashflow(filters) {
   if (rowLimit && receipts.length + expenses.length + reports.length > filters.maxDetailRows) {
     throw Object.assign(new Error("Báo cáo vượt giới hạn dòng"), { status: 413, code: "REPORT_EXPORT_TOO_LARGE" });
   }
+  const unassignedExpenses = scoped && landlordCount > 1
+    ? { count: await KhoanChi.count({ where: unassignedWhere }), total: Number(await KhoanChi.sum("so_tien", { where: unassignedWhere }) || 0) }
+    : { count: 0, total: 0 };
   const buildingIds = [...new Set([
     ...receipts.map((row) => row.ma_can),
     ...expenses.map((row) => row.ma_can),
     ...reports.map((row) => row.hopDong?.phongTro?.ma_can),
   ].filter(Boolean))];
   const buildings = buildingIds.length ? await CanTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } } }) : [];
-  return summarizeCashflow({ receipts, expenses, reports, buildings });
+  return summarizeCashflow({ receipts, expenses, reports, buildings, unassignedExpenses });
 }
 
-function summarizeCashflow({ receipts, expenses, reports, buildings = [] }) {
+function summarizeCashflow({ receipts, expenses, reports, buildings = [], unassignedExpenses = { count: 0, total: 0 } }) {
   const allocations = allocateReceipts(receipts);
   const cashReceipts = receipts.reduce((sum, row) => sum + Number(row.so_tien), 0);
   const grossCashRevenue = allocations.reduce((sum, row) => sum + row.gross, 0);
@@ -240,6 +252,7 @@ function summarizeCashflow({ receipts, expenses, reports, buildings = [] }) {
     totalRevenue,
     totalCollected: totalRevenue,
     totalExpenses,
+    unassignedExpenses,
     grossRevenue,
     grossCashRevenue,
     profit: totalRevenue - totalExpenses,
@@ -260,9 +273,12 @@ function allocateReceipts(receipts) {
   }
   const result = [];
   for (const entries of groups.values()) {
-    entries.sort((a, b) => new Date(a.row.ngay_ghi_nhan) - new Date(b.row.ngay_ghi_nhan));
+    entries.sort((a, b) => String(a.row.ngay_ghi_nhan).localeCompare(String(b.row.ngay_ghi_nhan))
+      || String(a.row.ma_khoan_thu).localeCompare(String(b.row.ma_khoan_thu)));
     const lines = entries[0].bill?.chiTiets || [];
-    const grossLines = lines.filter((line) => line.loai_khoan !== "GIAM_TRU");
+    const grossLines = lines.filter((line) => line.loai_khoan !== "GIAM_TRU")
+      .sort((a, b) => String(a.loai_khoan).localeCompare(String(b.loai_khoan))
+        || String(a.ma_chi_tiet).localeCompare(String(b.ma_chi_tiet)));
     const grossTotal = grossLines.reduce((sum, line) => sum + Math.max(0, Number(line.so_tien)), 0) || entries.reduce((sum, item) => sum + Number(item.row.so_tien), 0);
     const discountTotal = lines.filter((line) => line.loai_khoan === "GIAM_TRU").reduce((sum, line) => sum + Math.abs(Number(line.so_tien)), 0);
     // Allocate against the bill's immutable net payable, not the set of

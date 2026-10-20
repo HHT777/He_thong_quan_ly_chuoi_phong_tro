@@ -1,5 +1,13 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Cập nhật hiện hành G3 (19/10/2026; ưu tiên hơn các mốc lịch sử bên dưới)
+
+- Nhánh làm việc: `giai-doan-g3-xuat-excel`, HEAD mã/test đã kiểm chứng `3e32798` (sau `d26bb9a`, `5acc9f5` và mốc `163525c`); không merge nhánh này vào `main` trong lượt này. Khi bắt đầu lượt, `main` đã có merge `c0b4d7f` từ bên ngoài; commit docs bàn giao đứng sau HEAD mã/test này.
+- G1 in hợp đồng FR-184 đã merge (`cb10ff3`); G2 liên kết sự cố FR-192, migration 016 đã merge (`b7b69fd`); G3 cashflow Excel FR-194 đang hoàn thiện.
+- Mốc trước bổ sung: unit 136/136, integration 71/71, 26 nhóm bất biến 0. Mốc sau bổ sung trên MySQL 8 TCP `qlpt_authz_test`: unit 137/137, integration 72/72, 28 nhóm bất biến 0 ở seed và sau integration. Test Python độc lập kiểm tra OPC/SpreadsheetML mẫu đã chạy xanh; frontend build và mở Excel/LibreOffice chưa chạy.
+- Quyết định chi phí `KhoanChi.maCan IS NULL`: đúng một `ChuTro` thì tính vào `totalExpenses`/`profit` toàn chuỗi như trước G3; từ hai `ChuTro` trở lên không phân cho ai, trả `unassignedExpenses: {count,total}` riêng trong JSON/Excel/màn hình. Đây là quyết định P2 cần chốt lại trước khi bật nhiều Chủ trọ. Báo cáo lọc một căn không phân khoản NULL vào căn đó.
+- Việc còn lại: xuất Excel công nợ UC-23 và RPT-01…06 (Could, chưa làm); Prompt 3 màn hình cấu hình FR-200; Prompt 4 dọn cuối; Prompt 5 nghiệm thu tổng. Người dùng tự build frontend và tự mở Excel/LibreOffice; sandbox không được báo đạt cho hai việc đó.
+
 Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng CHỦ TRỌ (backend `phong-tro-backend`, frontend `phong-tro-frontend`). Người dùng giao tiếp bằng TIẾNG VIỆT; báo cáo và commit message theo phong cách đã dùng (xem `git log`).
 
 ## 1. Nguồn chuẩn
