@@ -134,6 +134,7 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | POST | /bills/preview | G1 `3bf4ae6` |
 | mvp.routes.js | POST | /bills/generate | G1 `3bf4ae6` |
 | mvp.routes.js | GET | /debt | G1 `aa0acf6` |
+| mvp.routes.js | GET | /dashboard/summary | BE-1 FR-024/144: Chủ trọ; tổng hợp phòng và phiếu DINH_KY chỉ trong căn sở hữu |
 | mvp.routes.js | POST | /bills/:id/mark-paid | G1 `2223786` |
 | mvp.routes.js | POST | /bills/mark-all-paid | G1 `2223786` |
 | mvp.routes.js | POST | /payments/:id/cancel | G1 `2223786` |
@@ -237,3 +238,5 @@ Chạy `AUTHZ_ROUTE=<tên route>` cùng `AUTHZ_MUTATION_ROUTE=<tên route>` và 
 **G3 chưa làm:** xuất Excel công nợ UC-23 và các báo cáo RPT-01…06 ngoài màn cashflow UC-19; chỉ bản xuất cashflow UC-19 được triển khai theo quyết định phạm vi G3.
 
 **Chi phí chưa phân căn (quyết định G3/P2):** `GET /reports/cashflow` và bản `.xlsx` giữ `KhoanChi.maCan IS NULL` trong `totalExpenses`/`profit` khi hệ thống có đúng một `ChuTro` và không lọc riêng một căn. Khi có ít nhất hai `ChuTro`, không gán khoản này cho bất kỳ chủ nào; JSON, Excel và màn hình công khai `unassignedExpenses: {count,total}`. Trước khi bật nhiều Chủ trọ P2 phải quyết định phân bổ/xử lý các khoản chưa phân căn; không được âm thầm loại khỏi đối soát toàn hệ thống. Test: `01-cashflow-unassigned.integration.test.js`, `cashflow-export.integration.test.js`.
+
+**BE-1 tổng quan chỉ-đọc:** `GET /api/v1/dashboard/summary?period=YYYY-MM` chỉ cho `CHU_TRO`; không truyền kỳ thì lấy tháng theo `Asia/Ho_Chi_Minh`. `rooms.total` là mọi phòng thuộc căn sở hữu, `rooms.byStatus` gồm năm trạng thái chuẩn và `KHAC` cho trạng thái chưa biết. `bills` chỉ đếm phiếu `DINH_KY` trong kỳ, không trộn nợ `SAU_THANH_LY`: `daThu` khi dư nợ bằng 0; `conNo` khi dư nợ dương và cờ `quaHan` chưa bật; `quaHan` khi dư nợ dương và cờ đã bật. Các nhóm loại trừ nhau và cộng bằng `total`. Cờ `quaHan` do cron công nợ lưu khi tới `overdueDay` (mặc định ngày 06/T), không tính lại ngày trong API; cấu hình thay đổi hoặc cron chưa chạy có thể làm thời điểm cờ khác ngày mặc định. Test: `dashboard-summary.test.js`, `zz-dashboard-summary.integration.test.js`.
