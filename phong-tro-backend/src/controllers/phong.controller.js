@@ -27,14 +27,15 @@ class PhongController {
     try {
       require("../utils/queryValidation").validateQuery(req.query, { strings: ["ma_can", "trang_thai"], positiveIntegers: ["page", "limit"] });
       const pagination = paginationService.paginate(req);
-      const { count, data } = await phongService.getPhongList(
+      const { total, data } = await phongService.getPhongList(
         req.query,
         pagination,
+        req.user,
       );
 
       const response = paginationService.buildResponse(
         data,
-        count,
+        total,
         pagination.page,
         pagination.limit,
       );
@@ -52,7 +53,7 @@ class PhongController {
 
   async getPhongById(req, res, next) {
     try {
-      const phong = await phongService.getPhongById(req.params.id);
+      const phong = await phongService.getPhongById(req.params.id, req.user);
 
       res.json({
         success: true,

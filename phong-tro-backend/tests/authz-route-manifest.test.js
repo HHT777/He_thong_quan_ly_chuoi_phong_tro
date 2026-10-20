@@ -38,4 +38,6 @@ test("authz route manifest: inventory changes require explicit review", () => {
     .map((match) => `${match[1]} ${match[2]} ${match[3]}`);
   assert.equal(documented.length, 120, "Each route requires one explicit matrix row");
   assert.deepEqual(documented.sort(), signatures, "Route inventory and authorization matrix differ");
+  assert.match(matrix, /^\| phong\.routes\.js \| GET \| \/ \| BE-1 FR-024:/m);
+  assert.match(matrix, /^\| phong\.routes\.js \| GET \| \/:id \| BE-1 FR-026:/m);
 });

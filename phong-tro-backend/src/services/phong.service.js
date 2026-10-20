@@ -2,6 +2,7 @@ const { PhongTro, CanTro } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { writeAuditLog } = require("./auditLog.service");
+const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
 
 class PhongService {
   async createPhong(data, transaction = null) {
@@ -27,10 +28,12 @@ class PhongService {
     return phong;
   }
 
-  async getPhongList(filters, pagination) {
-    const where = {};
+  async getPhongList(filters, pagination, requester) {
+    const ownedBuildings = await getOwnedBuildingIds(requester);
+    const where = { ma_can: { [Op.in]: ownedBuildings } };
 
     if (filters.ma_can) {
+      await assertOwned(requester, "building", filters.ma_can);
       where.ma_can = filters.ma_can;
     }
 
@@ -55,7 +58,8 @@ class PhongService {
     return { total: count, data: rows };
   }
 
-  async getPhongById(maPhong) {
+  async getPhongById(maPhong, requester) {
+    if (requester) await assertOwned(requester, "room", maPhong);
     const phong = await PhongTro.findByPk(maPhong, {
       include: [
         {

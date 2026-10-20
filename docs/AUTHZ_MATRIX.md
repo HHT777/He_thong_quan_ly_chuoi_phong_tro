@@ -27,7 +27,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 
 | Tệp | Route còn chờ rà soát (path tương đối mount) | Rủi ro chính |
 | --- | --- | --- |
-| `phong.routes.js` | `POST/GET /`, `GET/PUT/DELETE /:id` | Phòng/căn của B |
+| `phong.routes.js` | `POST /`, `PUT/DELETE /:id` | Phòng/căn của B; `GET /` và `GET /:id` đã vá BE-1 FR-024/026 |
 | `management.routes.js` | `GET/POST /can-tro`, `GET/PUT/DELETE /can-tro/:id`; `GET/POST /khach-thue`, `GET/PUT/DELETE /khach-thue/:id`; `GET/POST /thu-chi`, `PUT/DELETE /thu-chi/:id` | Căn, khách, thu chi của B; alias mount kép |
 | `mvp.routes.js` | `GET/POST /reservations`, `GET /reservations/:id/extension-history`, `GET /reservations/:id/cancellation-quote`, `PATCH /reservations/:id/extend`, `POST /reservations/:id/cancel`; `GET/POST /assets`, `PUT/DELETE /assets/:id` | Giữ phòng, tài sản của B; producer cron thông báo quá hạn đã vá riêng ở FR-159 |
 | `mvp.routes.js` | `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/revoke`; `POST /incidents` từ khách; `GET /co-tenant-proposals/:id`, `POST/GET /co-tenants`, `PATCH /co-tenants/:id` | Yêu cầu và người ở cùng chéo chủ/khách; sự cố Chủ trọ đã được khoanh phạm vi ở G2, báo sự cố từ khách còn P2-2; `GET /move-outs` đã vá G1 |
@@ -168,8 +168,8 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | GET | /reports/cashflow | G3 FR-194: tổng hợp chỉ căn sở hữu; buildingId lạ/khác chủ 404 |
 | mvp.routes.js | GET | /reports/cashflow.xlsx | G3 FR-194: xuất cùng dữ liệu cashflow của căn sở hữu; chỉ Chủ trọ |
 | phong.routes.js | POST | / | P2-2: tạo phòng |
-| phong.routes.js | GET | / | P2-2: danh sách phòng |
-| phong.routes.js | GET | /:id | P2-2: chi tiết phòng |
+| phong.routes.js | GET | / | BE-1 FR-024: chỉ phòng thuộc căn của Chủ trọ; lọc căn khác/không tồn tại 404 |
+| phong.routes.js | GET | /:id | BE-1 FR-026: phòng khác chủ/không tồn tại 404 |
 | phong.routes.js | PUT | /:id | P2-2: sửa phòng |
 | phong.routes.js | DELETE | /:id | P2-2: xóa phòng |
 | tenant.routes.js | GET | /thong-bao | P2-3: thông báo khách |
