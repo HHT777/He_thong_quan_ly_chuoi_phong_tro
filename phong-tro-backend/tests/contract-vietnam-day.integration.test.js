@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 const { HopDong, TaiKhoan, ChuTro } = require("../src/models");
 const cronJobs = require("../src/jobs/cron.jobs");
 const hopDongService = require("../src/services/hopDong.service");
-const { DEFAULTS, getPersistedSystemConfig } = require("../src/services/systemConfig.service");
+const { DEFAULTS, getPersistedSystemConfig, invalidateSystemConfigCache } = require("../src/services/systemConfig.service");
 const { addBusinessDays, businessDate } = require("../src/utils/businessDate.util");
 const { integration, request, headers, login, createFreshRental } = require("./helpers/integration-api");
 
@@ -106,4 +106,46 @@ test("FR-040 cron-promoted SAP_HET_HAN contract remains visible through the endp
   assert.equal(a.body.data.some((row) => row.ma_hop_dong === rentalB.contract.ma_hop_dong), false);
   assert.equal(b.body.data.some((row) => row.ma_hop_dong === rentalB.contract.ma_hop_dong), true);
   assert.equal(b.body.data.some((row) => row.ma_hop_dong === rentalA.contract.ma_hop_dong), false);
+});
+
+test("FR-158 expiring endpoint follows runtime 45/15-day threshold and retains cron-promoted contracts", async () => {
+  const landlord = await login(integration.landlord);
+  const today = businessDate(new Date());
+  const ids = {};
+  for (const [label, days] of [["edge-45", 45], ["outside-45", 46], ["edge-15", 15], ["outside-15", 16]]) {
+    const rental = await createFreshRental(landlord, `configured-expiring-${label}`, { createAccount: false });
+    ids[label] = rental.contract.ma_hop_dong;
+    await HopDong.update({ ngay_ket_thuc: addBusinessDays(today, days) }, { where: { ma_hop_dong: ids[label] } });
+  }
+  const priorValue = (await getPersistedSystemConfig()).contractWarningDays;
+  try {
+    const setWarningDays = async (value) => {
+      const result = await request("/api/v1/system-config/contractWarningDays", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value }) });
+      assert.equal(result.response.status, 200);
+      invalidateSystemConfigCache();
+    };
+    await setWarningDays(45);
+    await cronJobs.updateContractStates();
+    assert.equal((await HopDong.findByPk(ids["edge-45"])).trang_thai, "SAP_HET_HAN");
+    let result = await request("/api/hop-dong/expiring", { headers: headers(landlord) });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.warningDays, 45);
+    let found = new Set(result.body.data.map((row) => row.ma_hop_dong));
+    assert.equal(found.has(ids["edge-45"]), true);
+    assert.equal(found.has(ids["outside-45"]), false);
+
+    await setWarningDays(15);
+    await HopDong.update({ trang_thai: "DANG_HIEU_LUC" }, { where: { ma_hop_dong: ids["outside-15"] } });
+    result = await request("/api/hop-dong/expiring", { headers: headers(landlord) });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.warningDays, 15);
+    found = new Set(result.body.data.map((row) => row.ma_hop_dong));
+    assert.equal(found.has(ids["edge-45"]), true, "Already promoted SAP_HET_HAN stays visible after threshold decreases");
+    assert.equal(found.has(ids["edge-15"]), true);
+    assert.equal(found.has(ids["outside-15"]), false);
+  } finally {
+    const restored = await request("/api/v1/system-config/contractWarningDays", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: priorValue }) });
+    assert.equal(restored.response.status, 200);
+    invalidateSystemConfigCache();
+  }
 });

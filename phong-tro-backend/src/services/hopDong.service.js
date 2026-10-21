@@ -233,10 +233,11 @@ class HopDongService {
 
     return await HopDong.findAll({
       where: {
-        trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] },
-        ngay_ket_thuc: {
-          [Op.between]: [today, expiryDate],
-        },
+        [Op.or]: [
+          { trang_thai: "DANG_HIEU_LUC", ngay_ket_thuc: { [Op.between]: [today, expiryDate] } },
+          // Cron may already have promoted this contract under a wider former threshold.
+          { trang_thai: "SAP_HET_HAN", ngay_ket_thuc: { [Op.gte]: today } },
+        ],
       },
       order: [["ngay_ket_thuc", "ASC"]],
       include: [
