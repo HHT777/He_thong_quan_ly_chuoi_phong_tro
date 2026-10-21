@@ -27,7 +27,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 
 | Tệp | Route còn chờ rà soát (path tương đối mount) | Rủi ro chính |
 | --- | --- | --- |
-| `phong.routes.js` | `POST/GET /`, `GET/PUT/DELETE /:id` | Phòng/căn của B |
+| `phong.routes.js` | `POST /`, `PUT/DELETE /:id` | Phòng/căn của B; `GET /` và `GET /:id` đã vá BE-1 FR-024/026 |
 | `management.routes.js` | `GET/POST /can-tro`, `GET/PUT/DELETE /can-tro/:id`; `GET/POST /khach-thue`, `GET/PUT/DELETE /khach-thue/:id`; `GET/POST /thu-chi`, `PUT/DELETE /thu-chi/:id` | Căn, khách, thu chi của B; alias mount kép |
 | `mvp.routes.js` | `GET/POST /reservations`, `GET /reservations/:id/extension-history`, `GET /reservations/:id/cancellation-quote`, `PATCH /reservations/:id/extend`, `POST /reservations/:id/cancel`; `GET/POST /assets`, `PUT/DELETE /assets/:id` | Giữ phòng, tài sản của B; producer cron thông báo quá hạn đã vá riêng ở FR-159 |
 | `mvp.routes.js` | `POST /requests`, `GET /requests`, `PATCH /requests/:id`, `POST /requests/:id/revoke`; `POST /incidents` từ khách; `GET /co-tenant-proposals/:id`, `POST/GET /co-tenants`, `PATCH /co-tenants/:id` | Yêu cầu và người ở cùng chéo chủ/khách; sự cố Chủ trọ đã được khoanh phạm vi ở G2, báo sự cố từ khách còn P2-2; `GET /move-outs` đã vá G1 |
@@ -134,6 +134,7 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | POST | /bills/preview | G1 `3bf4ae6` |
 | mvp.routes.js | POST | /bills/generate | G1 `3bf4ae6` |
 | mvp.routes.js | GET | /debt | G1 `aa0acf6` |
+| mvp.routes.js | GET | /dashboard/summary | BE-1 FR-024/144: Chủ trọ; tổng hợp phòng và phiếu DINH_KY chỉ trong căn sở hữu |
 | mvp.routes.js | POST | /bills/:id/mark-paid | G1 `2223786` |
 | mvp.routes.js | POST | /bills/mark-all-paid | G1 `2223786` |
 | mvp.routes.js | POST | /payments/:id/cancel | G1 `2223786` |
@@ -168,8 +169,8 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | GET | /reports/cashflow | G3 FR-194: tổng hợp chỉ căn sở hữu; buildingId lạ/khác chủ 404 |
 | mvp.routes.js | GET | /reports/cashflow.xlsx | G3 FR-194: xuất cùng dữ liệu cashflow của căn sở hữu; chỉ Chủ trọ |
 | phong.routes.js | POST | / | P2-2: tạo phòng |
-| phong.routes.js | GET | / | P2-2: danh sách phòng |
-| phong.routes.js | GET | /:id | P2-2: chi tiết phòng |
+| phong.routes.js | GET | / | BE-1 FR-024: chỉ phòng thuộc căn của Chủ trọ; lọc căn khác/không tồn tại 404 |
+| phong.routes.js | GET | /:id | BE-1 FR-026: phòng khác chủ/không tồn tại 404 |
 | phong.routes.js | PUT | /:id | P2-2: sửa phòng |
 | phong.routes.js | DELETE | /:id | P2-2: xóa phòng |
 | tenant.routes.js | GET | /thong-bao | P2-3: thông báo khách |
@@ -237,3 +238,5 @@ Chạy `AUTHZ_ROUTE=<tên route>` cùng `AUTHZ_MUTATION_ROUTE=<tên route>` và 
 **G3 chưa làm:** xuất Excel công nợ UC-23 và các báo cáo RPT-01…06 ngoài màn cashflow UC-19; chỉ bản xuất cashflow UC-19 được triển khai theo quyết định phạm vi G3.
 
 **Chi phí chưa phân căn (quyết định G3/P2):** `GET /reports/cashflow` và bản `.xlsx` giữ `KhoanChi.maCan IS NULL` trong `totalExpenses`/`profit` khi hệ thống có đúng một `ChuTro` và không lọc riêng một căn. Khi có ít nhất hai `ChuTro`, không gán khoản này cho bất kỳ chủ nào; JSON, Excel và màn hình công khai `unassignedExpenses: {count,total}`. Trước khi bật nhiều Chủ trọ P2 phải quyết định phân bổ/xử lý các khoản chưa phân căn; không được âm thầm loại khỏi đối soát toàn hệ thống. Test: `01-cashflow-unassigned.integration.test.js`, `cashflow-export.integration.test.js`.
+
+**BE-1 tổng quan chỉ-đọc:** `GET /api/v1/dashboard/summary?period=YYYY-MM` chỉ cho `CHU_TRO`; không truyền kỳ thì lấy tháng theo `Asia/Ho_Chi_Minh`. `rooms.total` là mọi phòng thuộc căn sở hữu, `rooms.byStatus` gồm năm trạng thái chuẩn và `KHAC` cho trạng thái chưa biết. `bills` chỉ đếm phiếu `DINH_KY` trong kỳ, không trộn nợ `SAU_THANH_LY`: `daThu` khi dư nợ bằng 0; `conNo` khi dư nợ dương và chưa đến hạn; `quaHan` khi dư nợ dương và đã đến hạn. Ngày hạn được suy ra bằng hàm thuần `actionDue` dùng chung với cron, từ ngày nghiệp vụ Việt Nam và `overdueDay` trong cấu hình DB (mặc định ngày 06/T), không đọc cờ lịch sử `ThanhToan.quaHan`. Các nhóm loại trừ nhau và cộng bằng `total`. Các endpoint công nợ khác còn đọc cờ lịch sử, cần quyết định đồng bộ riêng. Test: `dashboard-summary.test.js`, `zz-dashboard-summary.integration.test.js`.

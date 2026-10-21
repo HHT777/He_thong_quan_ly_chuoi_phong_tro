@@ -10,6 +10,7 @@ const incidentService = require("../services/incident.service");
 const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const cashflowExportService = require("../services/cashflowExport.service");
+const dashboardSummaryService = require("../services/dashboardSummary.service");
 const { validateQuery } = require("../utils/queryValidation");
 const { businessDate } = require("../utils/businessDate.util");
 const billAdjustmentService = require("../services/billAdjustment.service");
@@ -39,6 +40,12 @@ const landlord = authorize("CHU_TRO");
 const tenant = authorize("KHACH_THUE");
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 const data = (res, value, status = 200) => res.status(status).json({ success: true, data: value });
+router.get("/dashboard/summary", landlord, async (req, res, next) => {
+  try {
+    if (Object.keys(req.query).some((key) => key !== "period")) throw fail(400, "Tham số báo cáo không hợp lệ", "INVALID_PERIOD");
+    return data(res, await dashboardSummaryService.getDashboardSummary(req.user, req.query.period));
+  } catch (error) { return next(error); }
+});
 const INCIDENT_PRIORITIES = Object.freeze(["THAP", "TRUNG_BINH", "CAO", "KHAN_CAP"]);
 const incidentPriority = (value) => {
   const priority = value || "TRUNG_BINH";
