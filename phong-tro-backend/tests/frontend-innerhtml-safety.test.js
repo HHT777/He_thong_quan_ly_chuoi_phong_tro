@@ -9,6 +9,7 @@ const reviewedModules = [
   "operations/meter-readings.tab.js", "operations/move-outs.tab.js", "overview/dashboard.tab.js",
   "residents-contracts/contracts.tab.js", "residents-contracts/co-tenants.tab.js",
   "residents-contracts/requests.tab.js", "residents-contracts/reservations.tab.js",
+  "settings/system-config.tab.js",
 ];
 
 // Approved HTML-producing helpers. Their implementations escape untrusted text before returning markup.

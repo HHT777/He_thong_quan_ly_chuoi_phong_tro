@@ -4,6 +4,7 @@ const app = require("./app");
 const sequelize = require("./config/database");
 const { initCronJobs } = require("./jobs/cron.jobs");
 const { checkSchema } = require("./services/schemaReadiness.service");
+const { syncSchemaIfApproved } = require("./config/testDatabaseSafety");
 
 const PORT = process.env.PORT || 3001;
 
@@ -14,11 +15,9 @@ sequelize.authenticate()
     const schema = await checkSchema();
     app.locals.schemaReady = schema.ready;
     if (!schema.ready) console.error("DB_SCHEMA_OUTDATED missing schema objects:", schema.missing);
-    if (schema.ready && process.env.DB_SYNC === "true") {
-      await sequelize.sync({ alter: process.env.DB_SYNC_ALTER === "true" });
-    }
+    const synced = await syncSchemaIfApproved(sequelize, process.env, console, { schemaReady: schema.ready });
     console.log(
-      schema.ready && process.env.DB_SYNC === "true"
+      synced
         ? "✓ Database schema synced"
         : "✓ Database schema sync skipped",
     );

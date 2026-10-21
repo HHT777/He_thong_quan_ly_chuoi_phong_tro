@@ -150,7 +150,7 @@ test("FR-200 configuration changes apply without restart and named lock admits o
   const configuredHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T09:00:00+07:00" }) });
   assert.equal(configuredHour.body.data.due, true);
   const invalid = await request("/api/v1/system-config/billScheduleDay", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 29 }) });
-  assert.equal(invalid.response.status, 422);
+  assert.equal(invalid.response.status, 400);
   assert.equal(await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED", entity_id: changed.body.data.ma_cau_hinh } }), 1);
   let release;
   const held = new Promise((resolve) => { release = resolve; });

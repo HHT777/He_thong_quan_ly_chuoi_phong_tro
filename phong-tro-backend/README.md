@@ -44,7 +44,8 @@ hoặc production.
 
 Backend dùng schema 37 bảng trong `../data2.md` và từ điển dữ liệu
 `../data1.md`. Cấu hình `DB_NAME=phong_tro` trỏ tới database đã import schema
-này. Không bật Sequelize auto-sync để tránh tự ý đổi cấu trúc.
+này. Ngoài test, `DB_SYNC` và `DB_SYNC_ALTER` chỉ phát cảnh báo rồi bị bỏ qua;
+server không tự sửa schema. `scripts/seed.js` cũng không dùng được trên DB thật.
 
 ## Chạy Server
 
@@ -70,7 +71,7 @@ Unit test không cần database riêng:
 npm run test:unit
 ```
 
-Integration test tự tạo schema từ `../data2.md`, chạy server trên cổng test rồi xóa database test khi hoàn tất. Không dùng tên database thật. `TEST_DB_NAME` chỉ được chấp nhận khi kết thúc bằng `_test` hoặc `_ci` và phải khác `DB_NAME`.
+Integration test tự tạo schema từ `../data2.md`, chạy server trên cổng test rồi xóa database test khi hoàn tất. Không dùng tên database thật. `TEST_DB_NAME` phải kết thúc bằng `_test` hoặc `_ci`, khác `DB_NAME`, và khớp chính xác `TEST_DB_ALLOWED_NAME`. Host phải là `127.0.0.1`, cổng test MySQL là `3307`.
 
 Thiết lập các biến sau trong phiên terminal. Tên đăng nhập test phải khác nhau và dài tối đa 15 ký tự:
 
@@ -81,6 +82,11 @@ DB_USER=root
 DB_PASSWORD=
 DB_NAME=phong_tro
 TEST_DB_NAME=qlpt_integration_ci
+TEST_DB_ALLOWED_NAME=qlpt_integration_ci
+TEST_DB_HOST=127.0.0.1
+TEST_DB_PORT=3307
+TEST_DB_USER=root
+TEST_DB_PASSWORD=
 TEST_LANDLORD_USERNAME=owner_ci
 TEST_LANDLORD_PASSWORD=replace_with_test_password
 TEST_TENANT_USERNAME=tenant_ci
@@ -96,7 +102,7 @@ Khi runner tạo server với `NODE_ENV=test` và database có hậu tố `_test
 với tên database khác hoặc ở development/production. Có thể truyền rõ hai biến
 để kiểm tra một cấu hình JWT cụ thể.
 
-Nếu DB test chạy trên máy chủ khác, có thể đặt thêm `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`. Tài khoản DB test cần quyền tạo và xóa đúng database test.
+`TEST_DB_ALLOWED_NAME`, `TEST_DB_HOST`, `TEST_DB_PORT` và `TEST_DB_USER` là bắt buộc cho script có thể tạo/xóa DB. Các script không lấy host/cổng/user từ `DB_*` trong `.env`. Tài khoản DB test cần quyền tạo và xóa đúng database test. Chỉ dùng `scripts/seed.js` khi đã xác nhận riêng DB test: `NODE_ENV=test`, các biến test trên và `node scripts/seed.js --confirm-db=<TEST_DB_NAME>`. Lệnh này **xóa và dựng lại** schema DB test; không chạy nếu chưa được duyệt đích chính xác.
 
 Chạy integration hoặc toàn bộ test:
 
@@ -131,10 +137,12 @@ $env:TEST_DB_PORT='3307'
 $env:TEST_DB_USER='root'
 $env:TEST_DB_PASSWORD=''
 $env:MIGRATION_TEST_DB_NAME='qlpt_migration_ci'
+$env:TEST_DB_ALLOWED_NAME='qlpt_migration_ci'
 $env:TEST_DB_NAME='qlpt_test'
 ```
 
-Chạy migration 004–013 hai lượt, sau đó chạy unit và integration:
+Chạy migration trên DB tạm đã duyệt. Để chạy integration sau đó, đổi
+`TEST_DB_ALLOWED_NAME` thành `qlpt_test` để khớp `TEST_DB_NAME`:
 
 ```powershell
 npm run verify:mysql8

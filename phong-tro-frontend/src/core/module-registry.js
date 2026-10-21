@@ -14,7 +14,7 @@ export function findTab(route, currentUser) {
 }
 
 export function groupTabs(currentUser) {
-  return allowedTabs(currentUser).reduce((result, tab) => {
+  return allowedTabs(currentUser).filter((tab) => !tab.hiddenFromNav).reduce((result, tab) => {
     (result[tab.group] ||= []).push(tab);
     return result;
   }, {});

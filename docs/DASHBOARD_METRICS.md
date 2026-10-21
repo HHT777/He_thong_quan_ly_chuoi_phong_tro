@@ -11,12 +11,12 @@
 | Như trên | `data.rooms.byStatus.*`, gồm `DA_GIU`, `KHAC` | số nguyên/phòng | `readSummary` kiểm tổng sáu phần bằng `rooms.total`; chỉ tính tỷ lệ từ `DANG_THUE / total` vì server chưa trả tỷ lệ | Tình trạng phòng; tỷ lệ lấp đầy |
 | Như trên | `data.bills.total`, `daThu`, `conNo`, `quaHan` | số nguyên/phiếu `DINH_KY` của kỳ | `readSummary` kiểm ba nhóm loại trừ và tổng bằng `bills.total` | Phiếu thu kỳ này; công nợ quá hạn chỉ lấy `quaHan` |
 | `GET /api/v1/reports/cashflow?periodType=month&periodValue=YYYY-MM` | `data.totalRevenue` | số nguyên/VND thực nhận | `readCashflow` (không tính lại) | Doanh thu thực nhận |
-| `GET /api/hop-dong/expiring` | `data[]`, `ngay_ket_thuc`, `phongTro.so_phong` | danh sách; ngày `YYYY-MM-DD` | `readExpiring`; `length` vì API trả toàn bộ danh sách | Hợp đồng kết thúc trong 30 ngày |
+| `GET /api/hop-dong/expiring` | `data[]`, `warningDays`, `ngay_ket_thuc`, `phongTro.so_phong` | danh sách; ngưỡng ngày nguyên; ngày `YYYY-MM-DD` | `readExpiring`; `length` vì API trả toàn bộ danh sách | Hợp đồng thuộc diện cảnh báo; nhãn lấy từ `warningDays` |
 | `GET /api/v1/incidents` | `data[]`, `trang_thai`, `ngay_gui`, `mo_ta` | danh sách/sự cố | `readIncidents` nhóm trạng thái, sắp ngày giảm dần, lấy ba dòng | Sự cố theo trạng thái; sự cố gần nhất |
 
 `period` lấy theo tháng ở múi giờ `Asia/Ho_Chi_Minh`. Không truyền `buildingId` tự suy ra. Cashflow đã lọc theo căn sở hữu; trong hệ thống chỉ có một Chủ trọ, `totalExpenses` của báo cáo toàn chuỗi còn bao gồm khoản chi chưa phân căn theo quyết định G3. UI-1a chỉ hiển thị `totalRevenue`, không hiển thị tổng chi/lợi nhuận. Khi nhiều Chủ trọ, `unassignedExpenses` được API báo cáo tách riêng; UI-1a không che hoặc cộng nó vào doanh thu.
 
-**Định nghĩa khối hợp đồng (FR-040):** `GET /api/hop-dong/expiring` dùng ngày nghiệp vụ Việt Nam và ngưỡng 30 ngày: chỉ hợp đồng `DANG_HIEU_LUC` hoặc `SAP_HET_HAN` có ngày kết thúc từ hôm nay tới đúng ngày thứ 30 (bao gồm hai biên), sắp theo ngày kết thúc tăng dần. `HET_HAN`/`DA_THANH_LY` không thuộc danh sách. Cron có thể đã đổi trạng thái sang `SAP_HET_HAN` trước khi mở dashboard; bản sửa backend trong commit `fix(FR-040): include SAP_HET_HAN contracts in expiring list` giữ chúng trong danh sách. Phạm vi sở hữu vẫn lọc theo căn của Chủ trọ.
+**Định nghĩa khối hợp đồng (FR-040/158):** `GET /api/hop-dong/expiring` dùng ngày nghiệp vụ Việt Nam và `contractWarningDays` trong cấu hình runtime (mặc định 30). `DANG_HIEU_LUC` được liệt kê nếu kết thúc từ hôm nay đến đúng ngày thứ `warningDays`; `SAP_HET_HAN` chưa qua ngày kết thúc vẫn được liệt kê ngay cả khi ngưỡng vừa giảm, vì trạng thái đó đã được cron xác lập trước đó. `HET_HAN`/`DA_THANH_LY` không thuộc danh sách. Kết quả sắp theo ngày kết thúc tăng dần, lọc theo căn của Chủ trọ. Response giữ `data[]` và thêm `warningDays`; dashboard hiển thị chính ngưỡng từ response, không gắn cứng 30 ngày.
 
 ## Bằng chứng mẫu từ `qlpt_authz_test`
 

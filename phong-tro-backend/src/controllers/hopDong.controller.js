@@ -2,6 +2,7 @@ const hopDongService = require("../services/hopDong.service");
 const hopDongValidation = require("../validations/hopDong.validation");
 const paginationService = require("../utils/pagination.util");
 const contractPrintService = require("../services/contractPrint.service");
+const { getPersistedSystemConfig } = require("../services/systemConfig.service");
 
 class HopDongController {
   async printContract(req, res, next) {
@@ -147,11 +148,13 @@ class HopDongController {
 
   async getExpiringContracts(req, res, next) {
     try {
-      const expiring = await hopDongService.getExpiringContracts(30, req.user);
+      const { contractWarningDays } = await getPersistedSystemConfig();
+      const expiring = await hopDongService.getExpiringContracts(contractWarningDays, req.user);
 
       res.json({
         success: true,
         data: expiring,
+        warningDays: contractWarningDays,
         message: "Lấy danh sách hợp đồng sắp hết hạn thành công",
       });
     } catch (error) {

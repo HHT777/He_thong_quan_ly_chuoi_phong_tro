@@ -31,9 +31,12 @@ export function readCashflow(response) {
 
 export function readExpiring(response) {
   if (!Array.isArray(response?.data)) throw new TypeError("Invalid expiring contracts");
-  return response.data.map((row) => ({
+  const warningDays = response.warningDays;
+  if (!Number.isSafeInteger(warningDays) || warningDays < 1 || warningDays > 365) throw new TypeError("Invalid contract warning days");
+  const rows = response.data.map((row) => ({
     id: String(row.ma_hop_dong || ""), room: row.phongTro?.so_phong || "—", endDate: row.ngay_ket_thuc || "",
   }));
+  return { rows, warningDays };
 }
 
 export function readIncidents(response) {

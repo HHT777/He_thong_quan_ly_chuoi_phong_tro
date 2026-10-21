@@ -26,12 +26,12 @@ const contractViolationService = require("../services/contractViolation.service"
 const contractLifecycleService = require("../services/contractLifecycle.service");
 const moveOutRequestService = require("../services/moveOutRequest.service");
 const { writeAuditLog } = require("../services/auditLog.service");
-const { validateSystemConfigValue, invalidateSystemConfigCache } = require("../services/systemConfig.service");
+const { listSystemConfig, saveSystemConfig } = require("../services/systemConfig.service");
 const {
   TaiKhoan, KhachThue, HopDong, PhongTro, ChiSoDien, ThanhToan,
   GiaoDichThanhToan, ChiTietThanhToan, TienCoc, BienBanTraPhong,
   KhoanKhauTru, YeuCau, YeuCauGiaHan, YeuCauTraPhong,
-  DeXuatBanCungPhong, SuCo, ThanhVienPhong, ThongBao, KhoanThu, KhoanChi, TaiSan, SuCoTaiSan, DatGiuPhong, ViPhamHopDong, CauHinhHeThong, DanhMucSuCo,
+  DeXuatBanCungPhong, SuCo, ThanhVienPhong, ThongBao, KhoanThu, KhoanChi, TaiSan, SuCoTaiSan, DatGiuPhong, ViPhamHopDong, DanhMucSuCo,
 } = require("../models");
 
 const router = express.Router();
@@ -108,8 +108,19 @@ router.patch("/reservations/:id/extend", landlord, async (req, res, next) => {
 router.post("/reservations/:id/cancel", landlord, async (req, res, next) => {
   try { return data(res, await reservationService.cancel(req.params.id, req.body, req.user.ma_tai_khoan, req.user)); } catch (e) { next(e); }
 });
-router.get("/system-config", landlord, async (req, res, next) => { try { return data(res, await CauHinhHeThong.findAll({ order: [["khoa", "ASC"]] })); } catch (e) { next(e); } });
-router.put("/system-config/:key", landlord, async (req, res, next) => { try { const key = String(req.params.key || "").trim(); if (!key || req.body.value === undefined) throw fail(422, "Khóa và giá trị cấu hình là bắt buộc"); const value = validateSystemConfigValue(key, req.body.value); const row = await sequelize.transaction(async (transaction) => { const existing = await CauHinhHeThong.findOne({ where: { khoa: key }, transaction, lock: transaction.LOCK.UPDATE }); const before = existing?.get({ plain: true }) || null; const saved = existing ? await existing.update({ gia_tri: value, mo_ta: req.body.description ?? existing.mo_ta, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }) : await CauHinhHeThong.create({ khoa: key, gia_tri: value, mo_ta: req.body.description || null, nguoi_cap_nhat_id: req.user.ma_tai_khoan }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "SYSTEM_CONFIG_UPDATED", entityType: "CauHinhHeThong", entityId: saved.ma_cau_hinh, before, after: { key, value } }); return saved; }); invalidateSystemConfigCache(); return data(res, row); } catch (e) { next(e); } });
+router.get("/system-config", landlord, async (req, res, next) => {
+  try { return data(res, await listSystemConfig()); } catch (error) { return next(error); }
+});
+router.put("/system-config/:key", landlord, async (req, res, next) => {
+  try {
+    if (!req.body || req.body.value === undefined) throw fail(400, "Giá trị cấu hình là bắt buộc", "INVALID_SYSTEM_CONFIG");
+    return data(res, await saveSystemConfig(req.params.key, req.body.value, req.user.ma_tai_khoan));
+  } catch (error) { return next(error); }
+});
+router.post("/system-config/:key/reset", landlord, async (req, res, next) => {
+  try { return data(res, await saveSystemConfig(req.params.key, undefined, req.user.ma_tai_khoan, { restore: true })); }
+  catch (error) { return next(error); }
+});
 router.get("/incident-categories", async (req, res, next) => { try { return data(res, await DanhMucSuCo.findAll({ where: req.user.vai_tro === "CHU_TRO" ? {} : { dang_hoat_dong: true }, order: [["thu_tu", "ASC"], ["ten", "ASC"]] })); } catch (e) { next(e); } });
 router.post("/incident-categories", landlord, async (req, res, next) => { try { const code = String(req.body.code || "").trim(); const name = String(req.body.name || "").trim(); if (!code || !name) throw fail(422, "Mã và tên danh mục là bắt buộc"); return data(res, await DanhMucSuCo.create({ ma: code, ten: name, thu_tu: Number(req.body.order || 0) }), 201); } catch (e) { next(e); } });
 router.get("/contracts/:id/violations", async (req, res, next) => {

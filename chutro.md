@@ -307,6 +307,10 @@ Các endpoint dưới đây là API thực tế đã được mount trong `src/a
 
 ## 9. Cập nhật trạng thái sau đợt khắc phục (14/10/2026)
 
+### FR-200 — màn hình cấu hình hệ thống (21/10/2026)
+
+Đã có GET metadata, PUT và POST khôi phục mặc định cho 13 khóa số và timezone từ một danh mục (`systemConfig.service.js`), RBAC Chủ trọ, audit transaction, giao diện có kiểm miền, cảnh báo ảnh hưởng tiền/cron và nút Thử lại (`system-config.tab.js`). Test: `foundation-services.test.js` kiểm từng miền; `system-config-screen.integration.test.js` kiểm đọc/ghi/reset từng khóa, audit, RBAC và phiếu cũ không đổi; `frontend-system-config.test.js` kiểm hợp đồng frontend; `frontend-innerhtml-safety.test.js` quét giao diện mới. Baseline 144/79, sau 147/81, 28 nhóm bất biến 0. Build frontend: **chưa chạy, người dùng tự build**. Tồn đọng: hạn giữ chỉ gợi ý (cần duyệt khóa mới), ngày nhắc chỉ số (chưa có cửa sổ nộp), danh mục chi phí cần DDL; `contractStatusJobCron` không đưa lên giao diện vì chưa có consumer runtime.
+
 Phần này **thay thế trạng thái thực hiện** ở các mục ưu tiên phía trên. Đánh giá dựa trên mã hiện có, không chỉ dựa vào tài liệu/migration. `data2.md` là schema được test đồng bộ bằng Sequelize; các file `migrations/004` đến `011` là kế hoạch nâng cấp cho database triển khai và vẫn phải chạy theo thứ tự trên môi trường thật.
 
 | Nhóm chức năng theo SRS/Phân tích | Tình trạng hiện tại | Bằng chứng/ghi chú |

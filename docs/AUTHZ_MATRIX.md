@@ -119,8 +119,9 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | GET | /reservations/:id/cancellation-quote | P2-2: báo giá hủy |
 | mvp.routes.js | PATCH | /reservations/:id/extend | P2-2: gia hạn giữ phòng |
 | mvp.routes.js | POST | /reservations/:id/cancel | P2-2: hủy giữ phòng |
-| mvp.routes.js | GET | /system-config | P2-3: cấu hình toàn hệ thống |
-| mvp.routes.js | PUT | /system-config/:key | P2-3: cấu hình toàn hệ thống |
+| mvp.routes.js | GET | /system-config | FR-200: Chủ trọ xem danh mục 13 khóa số và múi giờ; P2-3: cấu hình toàn hệ thống cần quyết định phạm vi nhiều Chủ trọ |
+| mvp.routes.js | PUT | /system-config/:key | FR-200: Chủ trọ sửa khóa thuộc danh mục, kiểm miền và audit; P2-3: cần quyết định phạm vi nhiều Chủ trọ |
+| mvp.routes.js | POST | /system-config/:key/reset | FR-200: Chủ trọ khôi phục mặc định một khóa cấu hình toàn hệ thống; P2-3 vẫn cần quyết định khi có nhiều Chủ trọ |
 | mvp.routes.js | GET | /incident-categories | P2-3: danh mục chung |
 | mvp.routes.js | POST | /incident-categories | P2-3: danh mục chung |
 | mvp.routes.js | GET | /contracts/:id/violations | P2-2: vi phạm hợp đồng |
