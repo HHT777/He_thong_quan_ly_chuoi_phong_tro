@@ -8,6 +8,9 @@ const { integration, request, headers, login, createFreshRental, uniqueValues } 
 const { withNamedLock } = require("../src/services/dbNamedLock.service");
 const cronJobs = require("../src/jobs/cron.jobs");
 const reservationService = require("../src/services/reservation.service");
+const { actionDue } = require("../src/services/debtLifecycle.service");
+const { getPersistedSystemConfig } = require("../src/services/systemConfig.service");
+const { businessDate } = require("../src/utils/businessDate.util");
 
 async function confirmedReading(fresh, period, value) {
   const [year, month] = period.split("-").map(Number);
@@ -114,7 +117,11 @@ test("FR-074/075/079 mark paid and cancellation are idempotent, reversible and a
   await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 700000); assert.equal((await KhoanThu.findOne({ where: { ma_giao_dich_thanh_toan: paymentId } })).trang_thai_ghi_nhan, "DA_HUY");
   const revenueAfterCancel = await request(`/api/v1/reports/cashflow?buildingId=${fresh.building.ma_can}`, { headers: headers(landlord) });
   assert.equal(revenueAfterCancel.response.status, 200); assert.equal(revenueAfterCancel.body.data.cashReceipts, 0);
-  const debtAgain = await request("/api/v1/debt", { headers: headers(landlord) }); assert.equal(debtAgain.body.data.find((row) => row.ma_thanh_toan === bill.ma_thanh_toan).isOverdue, true);
+  const debtAgain = await request("/api/v1/debt", { headers: headers(landlord) });
+  const [year, month, day] = businessDate().split("-").map(Number);
+  const expectedOverdue = actionDue(bill, { year, month, day }, await getPersistedSystemConfig()).overdue;
+  assert.equal(bill.qua_han, true, "Historical cron flag remains unchanged after cancelling payment");
+  assert.equal(debtAgain.body.data.find((row) => row.ma_thanh_toan === bill.ma_thanh_toan).isOverdue, expectedOverdue);
   const deposit = await GiaoDichThanhToan.create({ ma_thanh_toan: bill.ma_thanh_toan, so_tien: 1, trang_thai_xac_nhan: "DA_XAC_NHAN", thoi_diem_xac_nhan: new Date(), nguon_thanh_toan: "KHAU_TRU_COC" });
   const rejectDeposit = await request(`/api/v1/payments/${deposit.ma_giao_dich}/cancel`, { method: "POST", headers: headers(landlord), body: JSON.stringify({ reason: "Không hợp lệ" }) }); assert.equal(rejectDeposit.response.status, 409);
   await deposit.destroy();
