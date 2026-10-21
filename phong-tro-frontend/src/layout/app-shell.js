@@ -231,7 +231,7 @@ export function mountShell(root, currentUser) {
   root.querySelector("#menuItemLogout")?.addEventListener("click", doLogout);
 
   // Settings & Support in sidebar
-  root.querySelector("#sidebarSettingsBtn")?.addEventListener("click", openSettingsModal);
+  root.querySelector("#sidebarSettingsBtn")?.addEventListener("click", () => currentUser?.vai_tro === "CHU_TRO" ? go("/settings/system-config") : openSettingsModal());
   root.querySelector("#sidebarSupportBtn")?.addEventListener("click", openSupportModal);
   root.querySelector("#sidebarUserCard")?.addEventListener("click", () => openProfileModal(currentUser));
 
@@ -276,7 +276,8 @@ export function mountShell(root, currentUser) {
   });
   root.querySelector("#menuItemSettings")?.addEventListener("click", () => {
     toggleDropdown(false);
-    openSettingsModal();
+    if (currentUser?.vai_tro === "CHU_TRO") go("/settings/system-config");
+    else openSettingsModal();
   });
   root.querySelector("#menuItemSupport")?.addEventListener("click", () => {
     toggleDropdown(false);

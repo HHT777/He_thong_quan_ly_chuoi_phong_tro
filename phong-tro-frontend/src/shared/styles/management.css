@@ -300,3 +300,12 @@
   font-size: 13.5px;
   color: var(--text-muted);
 }
+.system-config-group { margin-bottom: 1rem; padding: 1.25rem; }
+.system-config-group h2 { margin: 0 0 1rem; }
+.system-config-row { display: grid; grid-template-columns: minmax(16rem, 2fr) minmax(12rem, 1fr); gap: 1.25rem; padding: 1rem 0; border-top: 1px solid var(--border-color, #dce4ef); }
+.system-config-row h3 { margin: 0 0 .3rem; }
+.system-config-row p { margin: .2rem 0; }
+.system-config-row input, .system-config-row select { width: 100%; margin-bottom: .5rem; }
+.system-config-row button { margin: .2rem .4rem .2rem 0; }
+.system-config-warning { color: #9a5500; }
+@media (max-width: 680px) { .system-config-row { grid-template-columns: 1fr; } }
