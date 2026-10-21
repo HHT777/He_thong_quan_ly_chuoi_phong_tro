@@ -1,6 +1,19 @@
 const { isSafeTestDatabase } = require("./environment");
 
+// A matching TEST_DB_ALLOWED_NAME must never authorize a known development,
+// recovery or verification copy. The prefix intentionally covers future names.
+const PROTECTED_DATABASE_NAMES = new Set([
+  "phong_tro", "phong_tro_copy_ci", "phong_tro_khoiphuc",
+  "phong_tro_thu_nhap", "phong_tro_kiemtra_dump",
+]);
+function isProtectedDatabaseName(name) {
+  if (typeof name !== "string") return false;
+  const normalized = name.toLowerCase();
+  return PROTECTED_DATABASE_NAMES.has(normalized) || normalized.startsWith("phong_tro");
+}
+
 function approvedTestTarget(env, databaseName, { expectedPort = 3307 } = {}) {
+  if (isProtectedDatabaseName(databaseName)) throw new Error("Target is a protected database name");
   if (!isSafeTestDatabase(databaseName)) throw new Error("Target must be a _test or _ci test database");
   if (!env.TEST_DB_ALLOWED_NAME || databaseName !== env.TEST_DB_ALLOWED_NAME) {
     throw new Error("Target must exactly match TEST_DB_ALLOWED_NAME");
