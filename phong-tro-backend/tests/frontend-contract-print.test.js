@@ -5,11 +5,14 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "../../phong-tro-frontend/src");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("FR-184 contract detail offers print, loading error and retry", () => {
+test("FR-184 contract detail opens browser print from one button after preload", () => {
   const source = read("modules/residents-contracts/contracts.tab.js");
   assert.match(source, /openDetail: openContractDetail/);
   assert.match(source, /id: "detail", label: "Chi tiết", openDetail: true/);
-  assert.match(source, /data-print>In hợp đồng/);
+  assert.match(source, /data-print disabled>In hợp đồng/);
+  assert.match(source, /Promise\.all\(\[loadDetail\(\), loadHistory\(\), loadPrint\(\)\]\)/);
+  assert.match(source, /printButton\.addEventListener\("click", \(\) => printFrame\?\.contentWindow\?\.print\(\)\)/);
+  assert.doesNotMatch(source, /Mở hộp thoại in/);
   assert.match(source, /getHtml\(`\/hop-dong\/\$\{encodeURIComponent\(row\.ma_hop_dong\)\}\/print`\)/);
   assert.match(source, /Không tải được bản in/);
   assert.match(source, /retry\.addEventListener\("click", loadPrint\)/);

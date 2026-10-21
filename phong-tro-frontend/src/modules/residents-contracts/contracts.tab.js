@@ -40,7 +40,7 @@ async function openContractDetail(context, row) {
       <div class="contract-print-state" data-print-state></div>
     </div>
     <div class="modal-footer contract-detail-footer"><button type="button" class="btn btn--secondary" data-close>Đóng</button>
-      <button type="button" class="btn btn--primary" data-print>In hợp đồng</button></div>
+      <button type="button" class="btn btn--primary" data-print disabled>In hợp đồng</button></div>
   </div>`;
   const close = () => {
     document.removeEventListener("keydown", onKeydown);
@@ -56,6 +56,7 @@ async function openContractDetail(context, row) {
   const history = overlay.querySelector("[data-history]");
   const state = overlay.querySelector("[data-print-state]");
   const printButton = overlay.querySelector("[data-print]");
+  let printFrame = null;
   const loadDetail = async () => {
     try {
       const response = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}`);
@@ -89,26 +90,31 @@ async function openContractDetail(context, row) {
   };
   const loadPrint = async () => {
     printButton.disabled = true;
-    state.textContent = "Đang tải bản in...";
+    state.textContent = "Đang chuẩn bị bản in...";
     try {
       const html = await context.api.getHtml(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/print`);
-      state.textContent = "";
+      if (!overlay.isConnected) return;
       const frame = document.createElement("iframe");
       frame.title = "Bản in hợp đồng";
       frame.setAttribute("sandbox", "allow-same-origin allow-modals");
       frame.className = "contract-print-frame";
+      frame.addEventListener("load", () => {
+        if (!overlay.isConnected) return;
+        printFrame = frame;
+        printButton.disabled = false;
+      }, { once: true });
       frame.srcdoc = html;
-      const button = document.createElement("button"); button.type = "button"; button.className = "btn btn--secondary"; button.textContent = "Mở hộp thoại in";
-      button.addEventListener("click", () => frame.contentWindow?.print());
-      if (overlay.isConnected) state.append(frame, button);
+      state.textContent = "";
+      state.append(frame);
     } catch (error) {
+      if (!overlay.isConnected) return;
       state.textContent = `Không tải được bản in: ${error.message} `;
       const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
       retry.addEventListener("click", loadPrint); state.append(retry);
-    } finally { printButton.disabled = false; }
+    }
   };
-  printButton.addEventListener("click", loadPrint);
-  await Promise.all([loadDetail(), loadHistory()]);
+  printButton.addEventListener("click", () => printFrame?.contentWindow?.print());
+  await Promise.all([loadDetail(), loadHistory(), loadPrint()]);
 }
 
 export default listTab({ id: "contracts", route: "/residents-contracts/contracts", title: "Hợp đồng", tabLabel: "Hợp đồng", group: "residents-contracts", order: 31, roles: ["CHU_TRO"] }, {
