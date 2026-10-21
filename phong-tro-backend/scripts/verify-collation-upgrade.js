@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const mysql = require("mysql2/promise");
+const { approvedTestTarget } = require("../src/config/testDatabaseSafety");
 
 const MIGRATIONS_DIR = path.resolve(__dirname, "../migrations");
 const LEGACY_DUMP = "D:\\backup\\phong_tro_truoc_nang_cap.sql";
@@ -21,10 +22,12 @@ function assertTarget(config) {
 
 function connectionOptions(config, withDatabase = false) {
   assertTarget(config);
+  approvedTestTarget(process.env, config.database, { expectedPort: config.port });
+  if (!process.env.TEST_DB_USER) throw new Error("TEST_DB_USER is required");
   return {
     host: config.host, port: config.port,
-    user: process.env.TEST_DB_USER || "root",
-    password: config.label === "MySQL8" ? "" : (process.env.TEST_DB_PASSWORD || ""),
+    user: process.env.TEST_DB_USER,
+    password: process.env.TEST_DB_PASSWORD ?? "",
     ...(withDatabase ? { database: config.database } : {}),
     charset: "utf8mb4", multipleStatements: true,
   };

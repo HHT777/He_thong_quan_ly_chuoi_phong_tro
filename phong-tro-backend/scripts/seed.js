@@ -1,4 +1,17 @@
 require("dotenv").config();
+const { assertSeedTarget } = require("../src/config/testDatabaseSafety");
+try {
+  const target = assertSeedTarget(process.env, process.argv.slice(2));
+  // Override every runtime DB target before importing Sequelize or a model.
+  process.env.DB_NAME = target.database;
+  process.env.DB_HOST = target.host;
+  process.env.DB_PORT = String(target.port);
+  process.env.DB_USER = process.env.TEST_DB_USER;
+  process.env.DB_PASSWORD = process.env.TEST_DB_PASSWORD ?? "";
+} catch (error) {
+  console.error(`[DB SAFETY] seed refused: ${error.message}`);
+  process.exit(1);
+}
 const sequelize = require("../src/config/database");
 const {
   KhachThue,

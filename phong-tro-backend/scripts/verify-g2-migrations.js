@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const mysql = require("mysql2/promise");
+const { approvedTestTarget } = require("../src/config/testDatabaseSafety");
 
 const targets = Object.freeze({
   mysql8: { engine: "MySQL8", host: "127.0.0.1", port: 3307, db: "qlpt_g2_mysql_ci", collation: "utf8mb4_0900_ai_ci" },
@@ -15,10 +16,12 @@ const approved = targets[key];
 assert.equal(target.host, approved.host);
 assert.equal(target.port, approved.port);
 assert.equal(target.db, approved.db);
+const approvedTestDb = approvedTestTarget(process.env, target.db, { expectedPort: target.port });
+if (!process.env.TEST_DB_USER) throw new Error("TEST_DB_USER is required");
 
 const options = (withDb = false) => ({
-  host: target.host, port: target.port, user: process.env.TEST_DB_USER || "root",
-  password: key === "mysql8" ? "" : (process.env.TEST_DB_PASSWORD ?? process.env.DB_PASSWORD ?? ""),
+  host: approvedTestDb.host, port: approvedTestDb.port, user: process.env.TEST_DB_USER,
+  password: process.env.TEST_DB_PASSWORD ?? "",
   ...(withDb ? { database: target.db } : {}), charset: "utf8mb4", multipleStatements: true,
 });
 const label = () => `${target.engine} ${target.host}:${target.port} DB ${target.db}`;

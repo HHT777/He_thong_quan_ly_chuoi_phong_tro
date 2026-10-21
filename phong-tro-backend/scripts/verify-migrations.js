@@ -3,21 +3,19 @@ require("dotenv").config();
 const fs = require("node:fs");
 const path = require("node:path");
 const mysql = require("mysql2/promise");
+const { approvedTestTarget } = require("../src/config/testDatabaseSafety");
 
 const database = String(process.env.MIGRATION_TEST_DB_NAME || "").trim();
 if (!/^[A-Za-z0-9_]+_(?:test|ci)$/i.test(database)) throw new Error("MIGRATION_TEST_DB_NAME must end in _test or _ci");
 if (database === process.env.DB_NAME) throw new Error("Migration copy must differ from DB_NAME");
-if (process.env.MIGRATION_TEST_DB_ALLOWED_NAME && (
-  database !== process.env.MIGRATION_TEST_DB_ALLOWED_NAME
-  || process.env.TEST_DB_HOST !== "127.0.0.1"
-  || Number(process.env.TEST_DB_PORT) !== 3307
-)) throw new Error("Migration test DB target is outside explicitly approved scope");
+const target = approvedTestTarget(process.env, database);
+if (!process.env.TEST_DB_USER) throw new Error("TEST_DB_USER is required");
 
 const options = (withDatabase = false) => ({
-  host: process.env.TEST_DB_HOST || process.env.DB_HOST,
-  port: Number(process.env.TEST_DB_PORT || process.env.DB_PORT || 3306),
-  user: process.env.TEST_DB_USER || process.env.DB_USER,
-  password: process.env.TEST_DB_PASSWORD ?? process.env.DB_PASSWORD ?? "",
+  host: target.host,
+  port: target.port,
+  user: process.env.TEST_DB_USER,
+  password: process.env.TEST_DB_PASSWORD ?? "",
   ...(withDatabase ? { database } : {}),
   charset: "utf8mb4",
   multipleStatements: true,

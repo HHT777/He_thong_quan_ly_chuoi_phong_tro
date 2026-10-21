@@ -7,6 +7,7 @@ const { spawn, spawnSync } = require("node:child_process");
 const bcrypt = require("bcryptjs");
 const mysql = require("mysql2/promise");
 const { applyTestAuthDefaults } = require("../src/config/environment");
+const { approvedTestTarget } = require("../src/config/testDatabaseSafety");
 
 const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
@@ -46,25 +47,23 @@ function safeDatabaseName() {
     throw new Error("TEST_DB_NAME must contain only letters/numbers/underscores and end in _test or _ci");
   }
   if (name === process.env.DB_NAME) throw new Error("TEST_DB_NAME must differ from DB_NAME");
+  approvedTestTarget(process.env, name);
   return name;
 }
 
 function assertAuthorizedDatabaseTarget(name, operation) {
-  const expectedName = process.env.TEST_DB_ALLOWED_NAME;
-  const host = process.env.TEST_DB_HOST;
-  const port = Number(process.env.TEST_DB_PORT);
-  if (expectedName && (name !== expectedName || host !== "127.0.0.1" || port !== 3307)) {
-    throw new Error(`Refusing ${operation}: test DB target is outside approved scope`);
-  }
-  console.log(`[TEST DB ${operation}] name=${name} host=${host || process.env.DB_HOST} port=${port || process.env.DB_PORT}`);
+  let target;
+  try { target = approvedTestTarget(process.env, name); }
+  catch (error) { throw new Error(`Refusing ${operation}: test DB target is outside approved scope: ${error.message}`); }
+  console.log(`[TEST DB ${operation}] name=${target.database} host=${target.host} port=${target.port}`);
 }
 
 function connectionOptions(database) {
   return {
-    host: process.env.TEST_DB_HOST || required("DB_HOST"),
-    port: Number(process.env.TEST_DB_PORT || process.env.DB_PORT || 3306),
-    user: process.env.TEST_DB_USER || required("DB_USER"),
-    password: process.env.TEST_DB_PASSWORD ?? process.env.DB_PASSWORD ?? "",
+    host: "127.0.0.1",
+    port: Number(required("TEST_DB_PORT")),
+    user: required("TEST_DB_USER"),
+    password: process.env.TEST_DB_PASSWORD ?? "",
     ...(database ? { database } : {}),
     charset: "utf8mb4",
     multipleStatements: true,
@@ -147,10 +146,10 @@ async function runIntegration() {
   const env = applyTestAuthDefaults({
     ...process.env,
     NODE_ENV: "test",
-    DB_HOST: process.env.TEST_DB_HOST || process.env.DB_HOST,
-    DB_PORT: process.env.TEST_DB_PORT || process.env.DB_PORT,
-    DB_USER: process.env.TEST_DB_USER || process.env.DB_USER,
-    DB_PASSWORD: process.env.TEST_DB_PASSWORD ?? process.env.DB_PASSWORD ?? "",
+    DB_HOST: "127.0.0.1",
+    DB_PORT: process.env.TEST_DB_PORT,
+    DB_USER: process.env.TEST_DB_USER,
+    DB_PASSWORD: process.env.TEST_DB_PASSWORD ?? "",
     DB_NAME: databaseName,
     DB_SYNC: "true",
     DB_SYNC_ALTER: "false",
