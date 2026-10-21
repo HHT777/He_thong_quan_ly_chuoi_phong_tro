@@ -328,8 +328,8 @@
 .contract-detail-grid dt { color: var(--text-muted); font-size: 12px; margin-bottom: 5px; }
 .contract-detail-grid dd { margin: 0; color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
 .contract-detail-grid__wide { grid-column: 1 / -1; }
-.contract-detail-history { border-top: 1px solid var(--border-subtle); padding-top: 20px; }
-.contract-detail-history h4 { margin: 0 0 14px; color: var(--text-primary); }
+.contract-detail-deposit, .contract-detail-history { border-top: 1px solid var(--border-subtle); padding-top: 20px; }
+.contract-detail-deposit h4, .contract-detail-history h4 { margin: 0 0 14px; color: var(--text-primary); }
 .contract-history-item { padding: 12px 0; border-top: 1px solid var(--border-subtle); }
 .contract-history-item:first-child { border-top: 0; }
 .contract-history-item time { display: block; margin-top: 3px; color: var(--text-muted); font-size: 12px; }

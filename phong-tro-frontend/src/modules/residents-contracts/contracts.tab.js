@@ -36,6 +36,7 @@ async function openContractDetail(context, row) {
       <button type="button" class="modal-close-btn" data-close aria-label="Đóng chi tiết hợp đồng">×</button></div>
     <div class="modal-body contract-detail-body">
       <div data-detail>Đang tải chi tiết...</div>
+      <section class="contract-detail-deposit"><h4>Tiền cọc</h4><div data-deposit>Đang tải tiền cọc...</div></section>
       <section class="contract-detail-history"><h4>Lịch sử hợp đồng</h4><div data-history>Đang tải lịch sử...</div></section>
       <div class="contract-print-state" data-print-state></div>
     </div>
@@ -53,6 +54,7 @@ async function openContractDetail(context, row) {
   document.body.appendChild(overlay);
   overlay.querySelector("[data-close]").focus();
   const detail = overlay.querySelector("[data-detail]");
+  const deposit = overlay.querySelector("[data-deposit]");
   const history = overlay.querySelector("[data-history]");
   const state = overlay.querySelector("[data-print-state]");
   const printButton = overlay.querySelector("[data-print]");
@@ -88,6 +90,25 @@ async function openContractDetail(context, row) {
       if (overlay.isConnected) history.textContent = `Không tải được lịch sử: ${error.message}`;
     }
   };
+  const loadDeposit = async () => {
+    try {
+      const result = await context.api.get(`/dat-coc?ma_hop_dong=${encodeURIComponent(row.ma_hop_dong)}&limit=1`);
+      if (!overlay.isConnected) return;
+      const record = result.data?.[0];
+      deposit.innerHTML = record ? `<dl class="contract-detail-grid">
+        <div><dt>Số tiền cọc</dt><dd>${escapeHtml(money(record.so_tien_coc))}</dd></div>
+        <div><dt>Trạng thái</dt><dd>${escapeHtml(statusLabel(record.trang_thai))}</dd></div>
+        <div><dt>Ngày nhận cọc</dt><dd>${escapeHtml(date(record.ngay_nhan_coc))}</dd></div>
+        <div><dt>Đã hoàn</dt><dd>${escapeHtml(money(record.so_tien_da_hoan))}</dd></div>
+        <div><dt>Đã khấu trừ</dt><dd>${escapeHtml(money(record.so_tien_da_khau_tru))}</dd></div>
+      </dl>` : "Chưa có hồ sơ tiền cọc cho hợp đồng này.";
+    } catch (error) {
+      if (!overlay.isConnected) return;
+      deposit.textContent = `Không tải được tiền cọc: ${error.message} `;
+      const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
+      retry.addEventListener("click", loadDeposit); deposit.append(retry);
+    }
+  };
   const loadPrint = async () => {
     printButton.disabled = true;
     state.textContent = "Đang chuẩn bị bản in...";
@@ -114,7 +135,7 @@ async function openContractDetail(context, row) {
     }
   };
   printButton.addEventListener("click", () => printFrame?.contentWindow?.print());
-  await Promise.all([loadDetail(), loadHistory(), loadPrint()]);
+  await Promise.all([loadDetail(), loadDeposit(), loadHistory(), loadPrint()]);
 }
 
 export default listTab({ id: "contracts", route: "/residents-contracts/contracts", title: "Hợp đồng", tabLabel: "Hợp đồng", group: "residents-contracts", order: 31, roles: ["CHU_TRO"] }, {

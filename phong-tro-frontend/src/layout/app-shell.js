@@ -350,7 +350,7 @@ export function mountShell(root, currentUser) {
 
 export function setShellActive(root, tab) {
   const currentGroupLabel = GROUP_LABELS[tab.group] || "ISK19";
-  const tabsInGroup = allowedTabs(window.__ISK19_USER__).filter((item) => item.group === tab.group);
+  const tabsInGroup = allowedTabs(window.__ISK19_USER__).filter((item) => item.group === tab.group && !item.hiddenFromNav);
 
   // Update Header Title & Breadcrumb
   const titleEl = root.querySelector("[data-title]");
