@@ -33,6 +33,8 @@ test("UI-2a insights scopes two landlords, partitions bills, reconciles six cash
     assert.equal(b.body.data.occupancyByBuilding[0].buildingId, buildingB.ma_can);
     assert.equal(b.body.data.occupancyByBuilding[0].inComparison, false);
     assert.equal(b.body.data.occupancyByBuilding[0].total, 1);
+    assert.equal(b.body.data.revenueChangePct, null, "Zero previous-month revenue has no percentage trend");
+    assert.ok(b.body.data.cashflow6m.every((row) => row.totalRevenue === 0 && row.totalExpenses === 0 && row.profit === 0));
     assert.equal(a.body.data.occupancyByBuilding.some((row) => row.buildingId === buildingB.ma_can), false);
     assert.equal(b.body.data.occupancyByBuilding.reduce((sum, row) => sum + row.total, 0), 1);
     const tenantA = await KhachThue.findOne();
