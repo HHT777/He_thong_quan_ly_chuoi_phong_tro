@@ -5,6 +5,7 @@ import "./shared/styles/management.css";
 import "./shared/styles/app.css";
 import "./shared/styles/vietnamese.css";
 import "./shared/styles/tabs.css";
+import "./shared/styles/ui2-shell.css";
 import { api } from "./core/api.js";
 import { isAuthenticated, isTenant, login, user } from "./core/session.js";
 import { defaultRoute, go, renderRoute } from "./core/router.js";

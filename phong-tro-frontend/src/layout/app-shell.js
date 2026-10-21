@@ -3,6 +3,7 @@ import { go } from "../core/router.js";
 import { logout } from "../core/session.js";
 import { escapeHtml } from "../shared/components/view.js";
 import { icons } from "../shared/components/icons.js";
+import { api } from "../core/api.js";
 import { openProfileModal, openSettingsModal, openSupportModal } from "./modals.js";
 
 const GROUP_LABELS = {
@@ -33,14 +34,25 @@ const GROUP_ICONS = {
   "tenant-notifications": icons.bell,
 };
 
+const CREATE_SHORTCUTS = [
+  { id: "buildings", label: "Thêm căn trọ" },
+  { id: "rooms", label: "Thêm phòng" },
+  { id: "contracts", label: "Tạo hợp đồng" },
+  { id: "incidents", label: "Tạo sự cố" },
+];
+
 export function mountShell(root, currentUser) {
   const groups = groupTabs(currentUser);
   const userName = currentUser?.ho_ten || currentUser?.ten_dang_nhap || "Tài khoản";
-  const userEmail = currentUser?.email || `${currentUser?.ten_dang_nhap || "admin"}@isk19.vn`;
+  const userEmail = currentUser?.email || "";
   const roleName = currentUser?.vai_tro === "KHACH_THUE" ? "Khách thuê" : "Chủ trọ";
   const userInitial = userName.charAt(0).toUpperCase();
 
   const isCollapsed = localStorage.getItem("isk19_sidebar_collapsed") === "true";
+  const available = allowedTabs(currentUser);
+  const createShortcuts = currentUser?.vai_tro === "CHU_TRO"
+    ? CREATE_SHORTCUTS.map((item) => ({ ...item, tab: available.find((tab) => tab.id === item.id) })).filter((item) => item.tab)
+    : [];
 
   root.innerHTML = `
     <div class="app-shell ${isCollapsed ? "is-sidebar-collapsed" : ""}" id="appShell">
@@ -58,17 +70,6 @@ export function mountShell(root, currentUser) {
           <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="Thu gọn / Mở rộng menu" aria-label="Thu gọn sidebar">
             ${isCollapsed ? icons.panelLeftOpen(16) : icons.panelLeftClose(16)}
           </button>
-        </div>
-
-        <!-- Workspace / Account Management Box -->
-        <div class="sidebar__workspace-card">
-          <div class="sidebar__workspace-icon">
-            ${icons.building(16)}
-          </div>
-          <div class="sidebar__workspace-info">
-            <span class="sidebar__workspace-label">Không gian quản lý</span>
-            <span class="sidebar__workspace-name" title="${escapeHtml(userName)}">${escapeHtml(userName)}</span>
-          </div>
         </div>
 
         <!-- Navigation Links -->
@@ -134,14 +135,14 @@ export function mountShell(root, currentUser) {
               <div class="input-wrap">
                 <span class="input-icon">${icons.search(16)}</span>
                 <input type="text" class="input-search" placeholder="Tìm kiếm nhanh..." id="globalSearchInput" aria-label="Tìm kiếm">
-                <span class="input-shortcut">⌘K</span>
+                <span class="input-shortcut">Ctrl K</span>
               </div>
             </div>
 
             <!-- Notification Bell -->
             <button class="navbar-icon-btn" id="headerNotificationBtn" title="Thông báo hệ thống" aria-label="Thông báo">
               ${icons.bell(18)}
-              <span class="navbar-notification-dot"></span>
+              <span class="navbar-notification-dot" id="unreadNotificationDot" hidden></span>
             </button>
 
             <!-- User Avatar & Dropdown -->
@@ -162,7 +163,7 @@ export function mountShell(root, currentUser) {
                   </div>
                   <div class="user-dropdown-header__info">
                     <span class="user-dropdown-header__name">${escapeHtml(userName)}</span>
-                    <span class="user-dropdown-header__role">${escapeHtml(roleName)} · ${escapeHtml(userEmail)}</span>
+                    <span class="user-dropdown-header__role">${escapeHtml(roleName)}${userEmail ? ` · ${escapeHtml(userEmail)}` : ""}</span>
                   </div>
                 </div>
                 <div class="dropdown-divider"></div>
@@ -185,6 +186,12 @@ export function mountShell(root, currentUser) {
                 </button>
               </div>
             </div>
+            ${createShortcuts.length >= 2 ? `<div class="navbar-create-wrap">
+              <button class="navbar-create-btn" id="createMenuBtn" type="button" aria-expanded="false" aria-controls="createMenu">${icons.plus(17)}<span>Tạo mới</span></button>
+              <div class="navbar-create-menu" id="createMenu" hidden>
+                ${createShortcuts.map((item) => `<button type="button" class="navbar-create-item" data-create-route="${escapeHtml(item.tab.route)}">${escapeHtml(item.label)}</button>`).join("")}
+              </div>
+            </div>` : ""}
           </div>
         </header>
 
@@ -288,6 +295,45 @@ export function mountShell(root, currentUser) {
   root.querySelector("#headerNotificationBtn")?.addEventListener("click", () => {
     const notifRoute = currentUser?.vai_tro === "KHACH_THUE" ? "/tenant/notifications" : "/notifications/inbox";
     go(notifRoute);
+  });
+
+  const refreshNotificationDot = async () => {
+    try {
+      const result = await api.get("/v1/notifications");
+      const unread = Array.isArray(result.data) && result.data.some((item) => item.da_doc === false || item.da_doc === 0);
+      const dot = root.querySelector("#unreadNotificationDot");
+      if (dot) dot.hidden = !unread;
+    } catch (_) {
+      const dot = root.querySelector("#unreadNotificationDot");
+      if (dot) dot.hidden = true;
+    }
+  };
+  refreshNotificationDot();
+  window.addEventListener("focus", refreshNotificationDot);
+
+  const createButton = root.querySelector("#createMenuBtn");
+  const createMenu = root.querySelector("#createMenu");
+  createButton?.addEventListener("click", () => {
+    createMenu.hidden = !createMenu.hidden;
+    createButton.setAttribute("aria-expanded", String(!createMenu.hidden));
+  });
+  createMenu?.querySelectorAll("[data-create-route]").forEach((button) => button.addEventListener("click", () => {
+    createMenu.hidden = true;
+    createButton.setAttribute("aria-expanded", "false");
+    go(button.dataset.createRoute);
+  }));
+  document.addEventListener("click", (event) => {
+    if (createMenu && !event.target.closest(".navbar-create-wrap")) {
+      createMenu.hidden = true;
+      createButton.setAttribute("aria-expanded", "false");
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && createMenu && !createMenu.hidden) {
+      createMenu.hidden = true;
+      createButton.setAttribute("aria-expanded", "false");
+      createButton.focus();
+    }
   });
 
   return root.querySelector("#module-root");
