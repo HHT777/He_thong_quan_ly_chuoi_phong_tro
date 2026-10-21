@@ -4,6 +4,7 @@ const { getOwnedBuildingIds, notFoundError } = require("./ownership.service");
 const { getPersistedSystemConfig } = require("./systemConfig.service");
 const { getCashflow } = require("./cashflowReport.service");
 const { getDashboardSummary } = require("./dashboardSummary.service");
+const { actionDue } = require("./debtLifecycle.service");
 const { businessDate, businessMonth, addBusinessDays } = require("../utils/businessDate.util");
 
 const number = (value) => Number(value || 0);
@@ -57,7 +58,9 @@ async function getDashboardInsights(requester, query = {}, now = new Date()) {
     bills = { paid: summary.bills.daThu, outstanding: summary.bills.conNo, overdue: summary.bills.quaHan, total: summary.bills.total };
   } else {
     const [year, part] = period.split("-").map(Number);
-    const overdue = month < period ? 0 : month > period || (businessDate(now).slice(8) >= String(config.overdueDay).padStart(2, "0"));
+    const [currentYear, currentMonth, currentDay] = today.split("-").map(Number);
+    const overdue = actionDue({ nam: year, thang: part },
+      { year: currentYear, month: currentMonth, day: currentDay }, config).overdue;
     const [row] = await select(`SELECT COUNT(*) AS total, COALESCE(SUM(t.soTienConNo = 0),0) AS paid,
       COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 0),0) AS outstanding,
       COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 1),0) AS overdue
@@ -81,9 +84,14 @@ async function getDashboardInsights(requester, query = {}, now = new Date()) {
       WHERE ${inScope("p.maCan")} AND d.trangThai='DANG_GIU' AND d.hanGiu < :today`).then(([row]) => row),
     select(`SELECT COUNT(*) AS incidents FROM SuCo s JOIN PhongTro p ON p.maPhong=s.maPhong
       WHERE ${inScope("p.maCan")} AND s.trangThai='CHO_TIEP_NHAN' AND s.daXoa=0`).then(([row]) => row),
-    select(`SELECT COUNT(DISTINCT y.maYeuCau) AS requests FROM YeuCau y JOIN HopDong h ON h.maKhachThue=y.maKhachThue
-      JOIN PhongTro p ON p.maPhong=h.maPhong WHERE ${inScope("p.maCan")}
-      AND y.trangThai='CHO_XU_LY' AND h.trangThai IN ('DANG_HIEU_LUC','SAP_HET_HAN')`).then(([row]) => row),
+    select(`SELECT COUNT(*) AS requests FROM YeuCau y
+      LEFT JOIN YeuCauGiaHan yg ON yg.maYeuCau=y.maYeuCau
+      LEFT JOIN HopDong hg ON hg.maHopDong=yg.maHopDong
+      LEFT JOIN YeuCauTraPhong yt ON yt.maYeuCau=y.maYeuCau
+      LEFT JOIN HopDong ht ON ht.maHopDong=yt.maHopDong
+      LEFT JOIN DeXuatBanCungPhong dx ON dx.maYeuCau=y.maYeuCau
+      JOIN PhongTro p ON p.maPhong=COALESCE(hg.maPhong,ht.maPhong,dx.maPhong)
+      WHERE ${inScope("p.maCan")} AND y.trangThai='CHO_XU_LY'`).then(([row]) => row),
     select(`SELECT COUNT(*) AS readings FROM ChiSoDien e JOIN PhongTro p ON p.maPhong=e.maPhong
       WHERE ${inScope("p.maCan")} AND e.trangThaiXacNhan='CHO_XAC_NHAN' AND e.daXoa=0`).then(([row]) => row),
     select(`SELECT COUNT(*) AS vacant FROM PhongTro p WHERE ${inScope("p.maCan")} AND p.trangThai='TRONG'`).then(([row]) => row),
