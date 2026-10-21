@@ -2,7 +2,7 @@
 
 ## UI-2a: nguồn insights đã có, phần thân giao diện chờ UI-2a-2
 
-`GET /api/v1/dashboard/insights` (commit `546808b`) chỉ cho Chủ trọ, lấy căn từ `ownedBuildingIds`; `buildingId` không tồn tại/khác chủ trả 404 `RESOURCE_NOT_FOUND`. Một request trả các trường dưới đây, không tải danh sách rồi cộng số ở client. UI-2a-1 chỉ đổi token và khung; chưa hiển thị các ô mới.
+`GET /api/v1/dashboard/insights` (commit `546808b`, hoàn thiện `214a4da`) chỉ cho Chủ trọ, lấy căn từ `ownedBuildingIds`; `buildingId` không tồn tại/khác chủ trả 404 `RESOURCE_NOT_FOUND`. Một request trả các trường dưới đây, không tải danh sách rồi cộng số ở client. UI-2a-1 chỉ đổi token và khung; chưa hiển thị các ô mới.
 
 | Khối dự kiến | Route/trường response | Kiểu/đơn vị | Phép gom | Điều hướng |
 |---|---|---|---|---|
@@ -13,7 +13,7 @@
 | Dự báo hết hạn | `contractForecast.d30,d60,d90` | hợp đồng, cộng dồn | Từ ngày Việt Nam đến đúng 30/60/90 ngày; gồm `DANG_HIEU_LUC` và `SAP_HET_HAN`, không gồm `HET_HAN`/`DA_THANH_LY` | Chưa cho bấm lọc |
 | Việc cần xử lý | `tasks[].type,count`, `contractWarningDays` | mục, ngày | Thứ tự 7 loại cố định ở service; dòng hợp đồng dùng ngưỡng cấu hình, khác dự báo 30/60/90 | Chỉ gắn liên kết khi trang đích thực sự đọc tham số |
 
-Sáu tháng gần nhất tính theo ngày nghiệp vụ Việt Nam. Giá trị tiền lấy từ service cashflow: một Chủ trọ tính chi toàn chuỗi chưa phân căn; từ hai Chủ trọ tách `unassignedExpenses`, không âm thầm phân bổ. Xu hướng chỉ dành cho doanh thu, không gắn mũi tên cho KPI khác. Test `zz-dashboard-insights.integration.test.js` đối chiếu mỗi tháng với API cashflow, phân quyền hai Chủ trọ và ngày biên múi giờ; phép thử bỏ lọc sở hữu làm test đỏ (4 căn thay vì 1 cho B), khôi phục xanh. Đo 58 truy vấn cố định trên fixture hai Chủ trọ; hiện dùng 7 lần gọi service cashflow, không N+1 theo số căn/phòng.
+Sáu tháng gần nhất tính theo ngày nghiệp vụ Việt Nam. Giá trị tiền lấy từ service cashflow: một Chủ trọ tính chi toàn chuỗi chưa phân căn; từ hai Chủ trọ tách `unassignedExpenses`, không âm thầm phân bổ. Xu hướng chỉ dành cho doanh thu, không gắn mũi tên cho KPI khác. Yêu cầu chờ xử lý suy căn qua bản ghi chi tiết `YeuCauGiaHan`/`YeuCauTraPhong`/`DeXuatBanCungPhong`, không suy qua mọi hợp đồng lịch sử của khách. Test `zz-dashboard-insights.integration.test.js` đối chiếu mỗi tháng với API cashflow, phân quyền hai Chủ trọ, ngày biên múi giờ, scoped due rule ngày 05→06 và dự báo `SAP_HET_HAN`; phép thử bỏ lọc sở hữu làm test đỏ (4 căn thay vì 1 cho B), khôi phục xanh. Đo 57 truy vấn khi cache cấu hình đã ấm, 58 khi lạnh trên fixture hai Chủ trọ; hiện dùng 7 lần gọi service cashflow, không N+1 theo số căn/phòng.
 
 Ảnh mockup chỉ hướng dẫn bố cục/màu; mọi số đều lấy từ API. Phạm vi UI-1a không có thu–chi sáu tháng, lấp đầy theo căn và việc cần xử lý (chờ Đợt B). Không hiển thị con số giả hoặc ô trống thay thế.
 

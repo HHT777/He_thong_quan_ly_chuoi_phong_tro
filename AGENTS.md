@@ -2,8 +2,8 @@
 
 ## Điểm dừng UI-2a-1 (21/10/2026; hiện hành)
 
-- Nhánh `ui-2a-giao-dien` từ `main` `a36c479`. Backend insights chỉ đọc đã commit `546808b`: unit 150/150, integration 82/82 trên đúng `qlpt_authz_test` TCP 127.0.0.1:3307, 28 nhóm bất biến 0. Đo 58 truy vấn cố định trên fixture hai Chủ trọ; đối chiếu từng tháng với cashflow API. Phép thử phủ định bỏ lọc căn: test đỏ, sau khôi phục xanh.
-- UI-2a-1 token/khung chung đã commit `b7da7dc`; 3/3 test frontend token/khung xanh; phép thử phủ định đổi chữ chính sang xám nhạt làm test tương phản đỏ, khôi phục xanh. KHÔNG làm thân dashboard UI-2a-2 trước khi người dùng nhắn “build UI-2a-1 OK”. Frontend build/chụp màn hình thực tế **chưa chạy**; người dùng tự build và xem. Ảnh `docs/design/dashboard-reference.png` là tham chiếu, không dùng số giả.
+- Nhánh `ui-2a-giao-dien` từ `main` `a36c479`. Backend insights chỉ đọc commit `546808b`, sửa scoped due rule/sở hữu yêu cầu `214a4da`, hồi quy kỳ trước bằng 0 `9e5f5d2`: unit 150/150, integration đầy đủ 82/82 trên đúng `qlpt_authz_test` TCP 127.0.0.1:3307; 28 nhóm bất biến 0. Đo 57–58 truy vấn cố định trên fixture hai Chủ trọ; đối chiếu từng tháng với cashflow API. Phép thử phủ định bỏ lọc căn, bỏ `SAP_HET_HAN`, làm sai điều kiện dư nợ: test đỏ, sau khôi phục xanh.
+- UI-2a-1 token/khung chung commit `b7da7dc`, test chuông chưa đọc `8df2b1e`, docs/ảnh `0bc191f`: 4/4 test frontend xanh; phép thử phủ định đổi chữ chính sang xám nhạt hoặc giả chuông luôn có chưa đọc làm test đỏ, khôi phục xanh. HEAD trước commit docs cập nhật này: `8df2b1e`. KHÔNG làm thân dashboard UI-2a-2 trước khi người dùng nhắn “build UI-2a-1 OK”. Frontend build/chụp màn hình thực tế **chưa chạy**; người dùng tự build và xem. Ảnh `docs/design/dashboard-reference.png` là tham chiếu, không dùng số giả.
 - Không kết nối DB `phong_tro*` hay MariaDB cổng 3306; chỉ DB test được duyệt như trên. Không chạm file untracked chủ ý. Mốc mới tối thiểu unit 150, integration 82, 28 nhóm bất biến 0.
 
 ## Cập nhật FR-200 (21/10/2026; ưu tiên hơn lịch sử bên dưới)
