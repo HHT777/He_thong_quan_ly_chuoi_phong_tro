@@ -1,5 +1,12 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Trạng thái DB và khóa ghi schema (21/10/2026; ưu tiên hiện hành)
+
+- Người dùng đã xác nhận DB phát triển `phong_tro` ở 37 bảng; `phong_tro_copy_ci` chỉ để đối chiếu. Không còn việc "nâng cấp DB thật cần làm". Không ai được chạy migration, `sequelize.sync` hoặc seed lên `phong_tro` nếu không có quy trình sao lưu và xác nhận riêng của người dùng. Nguồn gốc DDL ngày 19/10 chưa được chứng minh; không suy đoán là do một lệnh cụ thể.
+- Startup ngoài `NODE_ENV=test` bỏ qua `DB_SYNC`/`DB_SYNC_ALTER`, chỉ cảnh báo và kiểm tra schema. `scripts/seed.js` từ chối trước khi mở kết nối nếu thiếu xác nhận tên DB test.
+- Mọi script tạo/xóa DB test bắt buộc `TEST_DB_ALLOWED_NAME` khớp chính xác DB đích (đuôi `_test`/`_ci`), `TEST_DB_HOST=127.0.0.1`, `TEST_DB_PORT` bằng cổng test đã duyệt, `TEST_DB_USER`; không dùng `DB_HOST`/`DB_PORT` của `.env` làm đích ghi. Seed còn cần `NODE_ENV=test` và `--confirm-db=<TEST_DB_NAME>`. Trong sandbox hiện chỉ `qlpt_authz_test` tại `127.0.0.1:3307` được duyệt reset.
+- Nhánh công việc hiện tại: `giai-doan-p3-cau-hinh-v2` từ `main` `e08b17d`; không sửa nhánh `giai-doan-p3-cau-hinh` cũ. Baseline trước sửa: unit 140/140, integration 78/78, 28 nhóm bất biến 0. Sau khóa ghi schema: unit 143/143; mốc integration cập nhật sau khi chạy xong. Frontend build: người dùng tự chạy, chưa báo đạt.
+
 ## Cập nhật hiện hành G3 (19/10/2026; ưu tiên hơn các mốc lịch sử bên dưới)
 
 - Nhánh làm việc: `giai-doan-g3-xuat-excel`, HEAD mã/test đã kiểm chứng `3e32798` (sau `d26bb9a`, `5acc9f5` và mốc `163525c`); không merge nhánh này vào `main` trong lượt này. Khi bắt đầu lượt, `main` đã có merge `c0b4d7f` từ bên ngoài; commit docs bàn giao đứng sau HEAD mã/test này.
@@ -17,7 +24,7 @@ Hệ thống quản lý chuỗi phòng trọ. Phạm vi đang làm: chức năng
 
 ## 2. Môi trường kiểm thử
 - MySQL 8.0.46 trong container `qlpt-mysql8`, kết nối TCP cục bộ qua cổng 3307. MariaDB 10.4 qua TCP cục bộ cổng 3306. Triển khai thật là MySQL ≥ 8.0.16. Lấy thông tin đăng nhập từ môi trường kiểm thử, không ghi vào tài liệu hoặc log.
-- Biến test: `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`, `TEST_DB_NAME` (kết thúc `_test`/`_ci`), `MIGRATION_TEST_DB_NAME`, cùng các biến fixture `TEST_*` (xem README). Ở chế độ test, JWT tự bootstrap; ở production thiếu `JWT_SECRET`/`JWT_EXPIRE` thì khởi động thất bại.
+- Biến test: `TEST_DB_HOST`, `TEST_DB_PORT`, `TEST_DB_USER`, `TEST_DB_PASSWORD`, `TEST_DB_NAME` (kết thúc `_test`/`_ci`), `TEST_DB_ALLOWED_NAME` (bắt buộc, bằng chính xác tên DB đích), `MIGRATION_TEST_DB_NAME` khi kiểm chứng migration, cùng các biến fixture `TEST_*` (xem README). Ở chế độ test, JWT tự bootstrap; ở production thiếu `JWT_SECRET`/`JWT_EXPIRE` thì khởi động thất bại.
 - Mất kết nối DB: thử lại tối đa 5 lần cách nhau 10 giây rồi dừng, báo lỗi nguyên văn.
 - TUYỆT ĐỐI không chạy migration lên database thật của người dùng; chỉ DB tạm/DB test.
 - AN TOÀN: chỉ thao tác trên DB tạm/DB test (tên kết thúc `_test`/`_ci`). TUYỆT ĐỐI không chạy migration, seed hay lệnh xóa lên DB dev/thật của người dùng. Trước mọi lệnh có thể xóa dữ liệu hoặc ghi đè (`DROP`, `TRUNCATE`, `rm -rf`, `git reset --hard`, `git clean`, `git checkout .`, `docker rm`, `docker volume rm`) PHẢI hỏi người dùng trong chat.
