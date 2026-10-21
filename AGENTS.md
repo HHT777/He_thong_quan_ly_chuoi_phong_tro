@@ -1,5 +1,10 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Bổ sung kiểm chứng UI-2a-1 (21/10/2026)
+
+- Commit `f8a4d8f` tăng kiểm chứng `contractWarningDays` đọc từ cấu hình runtime: hợp đồng kết thúc sau 50 ngày không nằm trong mốc 30 nhưng nằm trong mốc 60. Phép thử phủ định cố định ngưỡng 30 làm test đỏ; khôi phục mã nguồn và chạy lại test xanh.
+- Sau commit này: unit 150/150, integration 82/82 trên đúng `qlpt_authz_test` TCP 127.0.0.1:3307, 28 nhóm bất biến 0 ở seed và sau integration; test frontend UI-2a-1 4/4. DB test đã được runner xóa sau kiểm chứng. Frontend build và xem giao diện thực tế **chưa chạy**; người dùng tự build. Vẫn dừng trước UI-2a-2 cho đến khi nhận “build UI-2a-1 OK”.
+
 ## Điểm dừng UI-2a-1 (21/10/2026; hiện hành)
 
 - Nhánh `ui-2a-giao-dien` từ `main` `a36c479`. Backend insights chỉ đọc commit `546808b`, sửa scoped due rule/sở hữu yêu cầu `214a4da`, hồi quy kỳ trước bằng 0 `9e5f5d2`: unit 150/150, integration đầy đủ 82/82 trên đúng `qlpt_authz_test` TCP 127.0.0.1:3307; 28 nhóm bất biến 0. Đo 57–58 truy vấn cố định trên fixture hai Chủ trọ; đối chiếu từng tháng với cashflow API. Phép thử phủ định bỏ lọc căn, bỏ `SAP_HET_HAN`, làm sai điều kiện dư nợ: test đỏ, sau khôi phục xanh.
