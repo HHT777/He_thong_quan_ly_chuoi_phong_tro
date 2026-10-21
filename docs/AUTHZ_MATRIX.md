@@ -42,7 +42,7 @@ Danh sách còn lại theo khai báo route, ghi rõ phương thức; route bí d
 | `tenant.routes.js` | `GET /thong-bao`, `POST /su-co` | Chỉ chủ thể đăng nhập |
 | `hopDong.routes.js` | `GET /expiring`, `GET /:id/history`, `POST /:id/renew` | List đã vá G1; lịch sử/renew khóa cần test riêng |
 | `datCoc.routes.js` | `PUT /:id` | List/detail đã vá G1; update có guard qua `getDatCocById` nhưng chưa có test A/B riêng |
-| `khoanPhaiThu.routes.js` | `GET /list/overdue`, `GET /khach-thue/:khachThueId` | List/detail/payment list/payment detail đã vá G1; overdue/khách chưa đủ test A/B |
+| `khoanPhaiThu.routes.js` | `GET /khach-thue/:khachThueId` | List/detail/payment list/payment detail đã vá G1; overdue đã kiểm A/B ở BE-1c, route theo khách còn P2 |
 | `meterReading.routes.js` | `GET /me/meter-reading-context`, `POST /me/meter-reading-ocr-previews`, `POST /me/meter-readings` | Khách tự phục vụ |
 | `mvp.routes.js` | `PATCH /account/password`; `GET/PUT /system-config[/:key]`, `GET/POST /incident-categories`; `POST /jobs/debt-lifecycle|close-overdue-debt|remind-due-bills|billing`; `GET/POST /notifications` được liệt kê ở Giai đoạn 2 | Global/system/self, phải quyết định phạm vi vận hành nhiều Chủ trọ |
 
@@ -74,7 +74,7 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | hopDong.routes.js | POST | /:id/renew | N/A: luôn 409, gia hạn trực tiếp bị khóa |
 | khoanPhaiThu.routes.js | POST | / | G1 `3bf4ae6` |
 | khoanPhaiThu.routes.js | GET | / | G1 `3bf4ae6` |
-| khoanPhaiThu.routes.js | GET | /list/overdue | P2-3: danh sách quá hạn chưa có test riêng |
+| khoanPhaiThu.routes.js | GET | /list/overdue | BE-1c FR-173: lọc SQL theo kỳ đến hạn, phạm vi Chủ trọ/Khách; test A/B |
 | khoanPhaiThu.routes.js | GET | /:id | G1 `3bf4ae6` |
 | khoanPhaiThu.routes.js | GET | /khach-thue/:khachThueId | P2-3: lọc khách chưa có test A/B riêng |
 | khoanPhaiThu.routes.js | POST | /payment/create | G1 `2223786` |
@@ -239,4 +239,4 @@ Chạy `AUTHZ_ROUTE=<tên route>` cùng `AUTHZ_MUTATION_ROUTE=<tên route>` và 
 
 **Chi phí chưa phân căn (quyết định G3/P2):** `GET /reports/cashflow` và bản `.xlsx` giữ `KhoanChi.maCan IS NULL` trong `totalExpenses`/`profit` khi hệ thống có đúng một `ChuTro` và không lọc riêng một căn. Khi có ít nhất hai `ChuTro`, không gán khoản này cho bất kỳ chủ nào; JSON, Excel và màn hình công khai `unassignedExpenses: {count,total}`. Trước khi bật nhiều Chủ trọ P2 phải quyết định phân bổ/xử lý các khoản chưa phân căn; không được âm thầm loại khỏi đối soát toàn hệ thống. Test: `01-cashflow-unassigned.integration.test.js`, `cashflow-export.integration.test.js`.
 
-**BE-1 tổng quan chỉ-đọc:** `GET /api/v1/dashboard/summary?period=YYYY-MM` chỉ cho `CHU_TRO`; không truyền kỳ thì lấy tháng theo `Asia/Ho_Chi_Minh`. `rooms.total` là mọi phòng thuộc căn sở hữu, `rooms.byStatus` gồm năm trạng thái chuẩn và `KHAC` cho trạng thái chưa biết. `bills` chỉ đếm phiếu `DINH_KY` trong kỳ, không trộn nợ `SAU_THANH_LY`: `daThu` khi dư nợ bằng 0; `conNo` khi dư nợ dương và chưa đến hạn; `quaHan` khi dư nợ dương và đã đến hạn. Ngày hạn được suy ra bằng hàm thuần `actionDue` dùng chung với cron, từ ngày nghiệp vụ Việt Nam và `overdueDay` trong cấu hình DB (mặc định ngày 06/T), không đọc cờ lịch sử `ThanhToan.quaHan`. Các nhóm loại trừ nhau và cộng bằng `total`. Các endpoint công nợ khác còn đọc cờ lịch sử, cần quyết định đồng bộ riêng. Test: `dashboard-summary.test.js`, `zz-dashboard-summary.integration.test.js`.
+**BE-1 tổng quan chỉ-đọc:** `GET /api/v1/dashboard/summary?period=YYYY-MM` chỉ cho `CHU_TRO`; không truyền kỳ thì lấy tháng theo `Asia/Ho_Chi_Minh`. `rooms.total` là mọi phòng thuộc căn sở hữu, `rooms.byStatus` gồm năm trạng thái chuẩn và `KHAC` cho trạng thái chưa biết. `bills` chỉ đếm phiếu `DINH_KY` trong kỳ, không trộn nợ `SAU_THANH_LY`: `daThu` khi dư nợ bằng 0; `conNo` khi dư nợ dương và chưa đến hạn; `quaHan` khi dư nợ dương và đã đến hạn. Ngày hạn được suy ra bằng hàm thuần `actionDue` dùng chung với cron, từ ngày nghiệp vụ Việt Nam và `overdueDay` trong cấu hình DB (mặc định ngày 06/T), không đọc cờ lịch sử `ThanhToan.quaHan`. Các nhóm loại trừ nhau và cộng bằng `total`. BE-1c đồng bộ `/api/v1/debt` và `/api/khoan-phai-thu/list/overdue` với cùng quy tắc; route overdue lọc tại DB trước khi lấy danh sách, trả mảng không phân trang như trước. Test: `dashboard-summary.test.js`, `zz-dashboard-summary.integration.test.js`, `zz-overdue-sync.integration.test.js`.

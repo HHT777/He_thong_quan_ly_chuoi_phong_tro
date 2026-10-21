@@ -5,6 +5,9 @@ const { writeAuditLog } = require("./auditLog.service");
 const { BILL_LINE_TYPES } = require("../domain/billing.constants");
 const { sumSignedLineAmounts } = require("../utils/billLine.util");
 const { assertOwned, getOwnedBuildingIds, notFoundError } = require("./ownership.service");
+const { getPersistedSystemConfig } = require("./systemConfig.service");
+const { actionDue } = require("./debtLifecycle.service");
+const { businessDate } = require("../utils/businessDate.util");
 
 function splitPeriod(period) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || "");
@@ -111,13 +114,24 @@ class KhoanPhaiThuService {
     return bill;
   }
 
-  async getOverdueBills(requester) {
+  async getOverdueBills(requester, now = new Date()) {
+    const [year, month, day] = businessDate(now).split("-").map(Number);
+    const currentPeriodDue = actionDue(
+      { nam: year, thang: month }, { year, month, day }, await getPersistedSystemConfig(),
+    ).overdue;
+    // Filter before fetching rows. January before the due day has month < 1,
+    // correctly selecting only bills from earlier years.
+    const periodWhere = { [Op.or]: [
+      { nam: { [Op.lt]: year } },
+      { nam: year, thang: { [Op.lte]: currentPeriodDue ? month : month - 1 } },
+    ] };
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
-    return ThanhToan.findAll({ where: { qua_han: true, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" },
+    const rows = await ThanhToan.findAll({ where: { ...periodWhere, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" },
       include: billInclude.map((item) => item.as === "hopDong" ? { ...item, required: true,
         ...(requester?.vai_tro === "KHACH_THUE" ? { where: { ma_khach_thue: requester.ma_khach_thue } } : {}),
         include: item.include.map((nested) => nested.as === "phongTro" && ownedBuildings
           ? { ...nested, required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : nested) } : item) });
+    return rows.map((row) => ({ ...row.toJSON(), isOverdue: true }));
   }
 }
 

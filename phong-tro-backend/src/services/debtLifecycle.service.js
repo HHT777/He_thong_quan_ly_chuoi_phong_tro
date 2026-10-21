@@ -5,6 +5,7 @@ const { getPersistedSystemConfig } = require("./systemConfig.service");
 const { withNamedLock } = require("./dbNamedLock.service");
 const { writeAuditLog } = require("./auditLog.service");
 const { getOwnedBuildingIds } = require("./ownership.service");
+const { businessDate } = require("../utils/businessDate.util");
 
 function localParts(now, timezone) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
@@ -74,12 +75,15 @@ async function run({ now = new Date(), actorId: explicitActor } = {}) {
 
 async function listDebt({ tenantId, requester, now = new Date() } = {}) {
   const where = { so_tien_con_no: { [Op.gt]: 0 } };
+  const config = await getPersistedSystemConfig();
+  const [year, month, day] = businessDate(now).split("-").map(Number);
+  const local = { year, month, day };
   const contractWhere = tenantId ? { ma_khach_thue: tenantId } : undefined;
   const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
   const rows = await ThanhToan.findAll({ where, include: [{ model: HopDong, as: "hopDong", required: Boolean(tenantId) || Boolean(ownedBuildings), where: contractWhere, include: [{ model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] }, { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "ma_can", "so_phong"], ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}) }] }], order: [["loai_thanh_toan", "ASC"], ["nam", "ASC"], ["thang", "ASC"]] });
   return rows.map((row) => {
     const item = row.toJSON(); const start = Date.UTC(item.nam, item.thang - 1, 1); const ageDays = Math.max(0, Math.floor((now.getTime() - start) / 86400000));
-    return { ...item, isOverdue: Boolean(item.qua_han && Number(item.so_tien_con_no) > 0), debtAgeDays: ageDays, debtGroup: { type: item.loai_thanh_toan === "SAU_THANH_LY" ? "SAU_THANH_LY" : "DINH_KY", buildingId: item.hopDong?.phongTro?.ma_can || null, roomId: item.hopDong?.phongTro?.ma_phong || null, tenantId: item.hopDong?.khachThue?.ma_khach_thue || null } };
+    return { ...item, isOverdue: item.loai_thanh_toan === "DINH_KY" && actionDue(item, local, config).overdue, debtAgeDays: ageDays, debtGroup: { type: item.loai_thanh_toan === "SAU_THANH_LY" ? "SAU_THANH_LY" : "DINH_KY", buildingId: item.hopDong?.phongTro?.ma_can || null, roomId: item.hopDong?.phongTro?.ma_phong || null, tenantId: item.hopDong?.khachThue?.ma_khach_thue || null } };
   }).sort((left, right) => {
     const group = (item) => [item.debtGroup.type, item.debtGroup.buildingId, item.debtGroup.roomId, item.debtGroup.tenantId].map((value) => value || "").join(":");
     return group(left).localeCompare(group(right)) || left.nam - right.nam || left.thang - right.thang;
