@@ -28,3 +28,15 @@ test("FR-065 OCR read and timeout have deterministic fallback statuses", async (
     const timeout = await service.callOcr(path.resolve(__dirname, "../package.json")); assert.equal(timeout.status, "MANUAL_REQUIRED"); assert.equal(timeout.warning.code, "OCR_TIMEOUT");
   } finally { global.fetch = original; }
 });
+
+test("FR-065 distinguishes an unreadable image from an offline OCR service", async () => {
+  const original = global.fetch;
+  try {
+    global.fetch = async () => ({ ok: true, json: async () => ({ success: false, error_code: "OCR_FAILED" }) });
+    const unreadable = await service.callOcr(path.resolve(__dirname, "../package.json"));
+    assert.equal(unreadable.warning.code, "OCR_FAILED");
+    global.fetch = async () => { throw new Error("connect refused"); };
+    const offline = await service.callOcr(path.resolve(__dirname, "../package.json"));
+    assert.equal(offline.warning.code, "OCR_UNAVAILABLE");
+  } finally { global.fetch = original; }
+});

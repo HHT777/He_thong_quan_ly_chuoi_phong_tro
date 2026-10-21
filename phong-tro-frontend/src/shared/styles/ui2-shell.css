@@ -43,6 +43,7 @@ body, button, input, select, textarea { font-family: var(--font-sans); }
 .nav-group { color: #e8efff; min-height: 48px; }
 .nav-group.is-active, .nav-group:hover { background: var(--ui2-navy-active); border-color: transparent; box-shadow: none; }
 .sidebar-action-btn { color: #e8efff; }
+.sidebar-action-btn.is-active { background: var(--ui2-navy-active); color: #fff; }
 .sidebar-user-card { background: transparent; border-color: #47608e; }
 .sidebar-user-sub { color: #d8e4fb; }
 .navbar { min-height: 68px; height: auto; padding: 10px 28px; background: #fff; border-color: var(--ui2-border); }

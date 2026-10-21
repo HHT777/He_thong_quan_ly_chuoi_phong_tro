@@ -16,7 +16,7 @@ function markup(rows) {
 }
 
 export default {
-  id: "system-config", route: "/settings/system-config", title: "Cấu hình hệ thống", group: "operations", hiddenFromNav: true, roles: ["CHU_TRO"],
+  id: "system-config", route: "/settings/system-config", title: "Cấu hình hệ thống", group: "settings", hiddenFromNav: true, roles: ["CHU_TRO"],
   async render(context) {
     context.main.innerHTML = shellPage("Cấu hình hệ thống", "Thay đổi có hiệu lực cho tác vụ sau khi lưu; phiếu đã lập không tính lại.");
     const content = context.main.querySelector("[data-content]");

@@ -1,6 +1,6 @@
 import { listTab } from "../../shared/components/tab-factory.js";
 import { date, money } from "../../shared/components/view.js";
-export default listTab({ id: "incidents", route: "/operations/incidents", title: "Sự cố", tabLabel: "Sự cố", group: "operations", order: 51, roles: ["CHU_TRO"] }, {
+export default listTab({ id: "incidents", route: "/operations/incidents", title: "Sự cố", tabLabel: "Sự cố", group: "incidents", order: 51, roles: ["CHU_TRO"] }, {
   title: "Sự cố",
   description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố.",
   endpoint: "/v1/incidents",

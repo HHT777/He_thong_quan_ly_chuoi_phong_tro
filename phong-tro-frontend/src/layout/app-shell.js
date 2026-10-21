@@ -13,6 +13,10 @@ const GROUP_LABELS = {
   "residents-contracts": "Cư dân & Hợp đồng",
   finance: "Tài chính",
   operations: "Vận hành",
+  "meter-readings": "Chỉ số điện",
+  incidents: "Sự cố",
+  "move-outs": "Trả phòng",
+  settings: "Cài đặt",
   notifications: "Thông báo",
   "tenant-info": "Thông tin thuê",
   "tenant-finance": "Tài chính",
@@ -27,6 +31,10 @@ const GROUP_ICONS = {
   "residents-contracts": icons.users,
   finance: icons.money,
   operations: icons.tool,
+  "meter-readings": icons.zap,
+  incidents: icons.tool,
+  "move-outs": icons.door,
+  settings: icons.settings,
   notifications: icons.bell,
   "tenant-info": icons.door,
   "tenant-finance": icons.money,
@@ -378,4 +386,5 @@ export function setShellActive(root, tab) {
   root.querySelectorAll(".nav-group").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.navGroup === tab.group);
   });
+  root.querySelector("#sidebarSettingsBtn")?.classList.toggle("is-active", tab.group === "settings");
 }

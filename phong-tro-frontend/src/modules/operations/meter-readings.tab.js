@@ -10,7 +10,7 @@ function validateImage(file, maxBytes) {
 }
 
 export default {
-  id: "meter-readings", route: "/operations/meter-readings", title: "Chỉ số điện", tabLabel: "Chỉ số điện", group: "operations", order: 50, roles: ["CHU_TRO"],
+  id: "meter-readings", route: "/operations/meter-readings", title: "Chỉ số điện", tabLabel: "Chỉ số điện", group: "meter-readings", order: 50, roles: ["CHU_TRO"],
   async render(context) {
     context.main.innerHTML = shellPage("Chỉ số điện", "Tải ảnh, kiểm tra OCR và xác nhận chỉ số trước khi lưu.");
     const content = context.main.querySelector("[data-content]");
@@ -34,7 +34,13 @@ export default {
         history.innerHTML = readings.filter((row) => row.room?.id === form.elements.roomId.value).map((row) => `<tr><td>${escapeHtml(row.room?.code || row.room?.id)}</td><td>${escapeHtml(row.period)}</td><td>${escapeHtml(typeLabels[row.readingType] || typeLabels.DINH_KY)}</td><td>${escapeHtml(row.readingValue)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(date(row.submittedAt))}</td><td>${row.status === "CHO_XAC_NHAN" ? `<button type="button" data-confirm="${escapeHtml(row.id)}">Xác nhận</button>` : ""}</td></tr>`).join("");
       };
       renderHistory();
-      for (const name of ["roomId", "period", "file"]) form.elements[name].addEventListener("change", () => { token = null; renderHistory(); });
+      for (const name of ["roomId", "period", "file"]) form.elements[name].addEventListener("change", () => {
+        token = null;
+        form.elements.readingValue.value = "";
+        form.querySelector("[data-preview-result]").textContent = "";
+        message.textContent = "";
+        renderHistory();
+      });
       form.querySelector("[data-preview]").addEventListener("click", async (event) => {
         const button = event.currentTarget; button.disabled = true; message.textContent = "";
         try {
@@ -43,8 +49,13 @@ export default {
           const preview = (await context.api.postForm("/v1/meter-readings/ocr-previews", body)).data;
           token = preview.uploadToken;
           if (preview.suggestedReading != null) form.elements.readingValue.value = preview.suggestedReading;
-          form.querySelector("[data-preview-result]").textContent = preview.ocrStatus === "MANUAL_REQUIRED" ? "OCR chưa đọc được; hãy nhập chỉ số bằng tay rồi xác nhận." : `OCR gợi ý ${preview.suggestedReading}; chỉ số trước ${preview.previousReading}.`;
-        } catch (error) { message.textContent = error.message; } finally { button.disabled = false; }
+          else form.elements.readingValue.value = "";
+          const warning = preview.warnings?.[0];
+          const fallback = warning?.code === "OCR_UNAVAILABLE" ? "Không kết nối được dịch vụ OCR. Hãy kiểm tra dịch vụ OCR rồi thử lại, hoặc nhập chỉ số bằng tay."
+            : warning?.code === "OCR_TIMEOUT" ? "OCR xử lý quá lâu. Hãy thử lại hoặc nhập chỉ số bằng tay."
+              : "OCR không đọc được chỉ số trên ảnh. Hãy thử ảnh rõ hơn hoặc nhập chỉ số bằng tay.";
+          form.querySelector("[data-preview-result]").textContent = preview.ocrStatus === "MANUAL_REQUIRED" ? `${fallback} Chỉ số trước: ${preview.previousReading}.` : `OCR gợi ý ${preview.suggestedReading}; chỉ số trước ${preview.previousReading}.`;
+        } catch (error) { token = null; form.querySelector("[data-preview-result]").textContent = ""; message.textContent = error.message; } finally { button.disabled = false; }
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault(); const button = form.querySelector("[type=submit]"); button.disabled = true; message.textContent = "";

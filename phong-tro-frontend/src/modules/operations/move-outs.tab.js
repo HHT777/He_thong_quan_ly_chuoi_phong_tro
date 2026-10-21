@@ -2,7 +2,7 @@ import { shellPage, escapeHtml, money, date, confirmAction } from "../../shared/
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 
-const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "operations", order: 52, roles: ["CHU_TRO"] };
+const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "move-outs", order: 52, roles: ["CHU_TRO"] };
 const requestKeys = createRequestKeyStore();
 const localToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
 

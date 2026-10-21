@@ -125,10 +125,12 @@ async function callOcr(filePath) {
     form.append("file", new File([fs.readFileSync(filePath)], path.basename(filePath), { type: path.extname(filePath).toLowerCase() === ".png" ? "image/png" : "image/jpeg" }));
     const response = await fetch(`${process.env.OCR_BASE_URL || "http://127.0.0.1:8000"}/ocr`, { method: "POST", body: form, signal: controller.signal });
     const body = await response.json().catch(() => null);
-    if (!response.ok || body?.success !== true || !/^\d+$/.test(body.ocr_value || "")) throw new Error("OCR_FAILED");
+    if (!response.ok || body?.success !== true || !/^\d+$/.test(body.ocr_value || "")) throw Object.assign(new Error("OCR_FAILED"), { code: "OCR_FAILED" });
     return { status: "RECOGNIZED", rawValue: body.ocr_value, numericValue: Number(body.ocr_value) };
   } catch (error) {
-    return { status: "MANUAL_REQUIRED", rawValue: null, numericValue: null, warning: { code: error.name === "AbortError" ? "OCR_TIMEOUT" : "OCR_UNAVAILABLE", message: "OCR không sẵn sàng. Vui lòng nhập tay." } };
+    const code = error.name === "AbortError" ? "OCR_TIMEOUT" : error.code === "OCR_FAILED" ? "OCR_FAILED" : "OCR_UNAVAILABLE";
+    const message = code === "OCR_FAILED" ? "Không đọc được chỉ số từ ảnh. Vui lòng nhập tay hoặc thử ảnh rõ hơn." : "Dịch vụ OCR không sẵn sàng. Vui lòng nhập tay.";
+    return { status: "MANUAL_REQUIRED", rawValue: null, numericValue: null, warning: { code, message } };
   } finally { clearTimeout(timer); }
 }
 async function createPreview(tenantId, period, file, roomId, actorId) {
