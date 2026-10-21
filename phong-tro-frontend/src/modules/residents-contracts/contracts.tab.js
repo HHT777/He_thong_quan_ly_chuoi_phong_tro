@@ -1,5 +1,6 @@
 import { listTab } from "../../shared/components/tab-factory.js";
 import { date, money, openFormModal, escapeHtml, confirmAction } from "../../shared/components/view.js";
+import { statusLabel } from "../../shared/components/status-labels.mjs";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
 const reservationPrefill = () => {
   try { return JSON.parse(sessionStorage.getItem("qlpt:contract-reservation") || "null"); } catch (_) { return null; }
@@ -27,23 +28,63 @@ const numericContractValues = (raw) => ({
 });
 
 async function openContractDetail(context, row) {
+  const previousFocus = document.activeElement;
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Chi tiết hợp đồng</h3><div data-detail>Đang tải...</div><div data-print-state></div><button type="button" data-print>In hợp đồng</button> <button type="button" data-close>Đóng</button></div>`;
+  overlay.innerHTML = `<div class="modal-dialog contract-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="contract-detail-title">
+    <div class="modal-header"><h3 class="modal-title" id="contract-detail-title">Chi tiết hợp đồng</h3>
+      <button type="button" class="modal-close-btn" data-close aria-label="Đóng chi tiết hợp đồng">×</button></div>
+    <div class="modal-body contract-detail-body">
+      <div data-detail>Đang tải chi tiết...</div>
+      <section class="contract-detail-history"><h4>Lịch sử hợp đồng</h4><div data-history>Đang tải lịch sử...</div></section>
+      <div class="contract-print-state" data-print-state></div>
+    </div>
+    <div class="modal-footer contract-detail-footer"><button type="button" class="btn btn--secondary" data-close>Đóng</button>
+      <button type="button" class="btn btn--primary" data-print>In hợp đồng</button></div>
+  </div>`;
+  const close = () => {
+    document.removeEventListener("keydown", onKeydown);
+    overlay.remove();
+    if (previousFocus?.isConnected) previousFocus.focus();
+  };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+  overlay.addEventListener("click", (event) => { if (event.target === overlay || event.target.closest("[data-close]")) close(); });
+  document.addEventListener("keydown", onKeydown);
   document.body.appendChild(overlay);
-  overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("[data-close]").focus();
   const detail = overlay.querySelector("[data-detail]");
+  const history = overlay.querySelector("[data-history]");
   const state = overlay.querySelector("[data-print-state]");
   const printButton = overlay.querySelector("[data-print]");
   const loadDetail = async () => {
     try {
       const response = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}`);
       const contract = response.data || {};
-      detail.innerHTML = `<p>Khách: ${escapeHtml(contract.khachThue?.ho_ten)}</p><p>Phòng: ${escapeHtml(contract.phongTro?.so_phong)}</p><p>Giá thuê hợp đồng: ${money(contract.gia_thue)}</p><p>Thời hạn: ${escapeHtml(date(contract.ngay_bat_dau))} – ${escapeHtml(date(contract.ngay_ket_thuc))}</p>`;
+      if (!overlay.isConnected) return;
+      detail.innerHTML = `<dl class="contract-detail-grid">
+        <div><dt>Khách thuê</dt><dd>${escapeHtml(contract.khachThue?.ho_ten)}</dd></div>
+        <div><dt>Phòng</dt><dd>${escapeHtml(contract.phongTro?.so_phong || contract.ma_phong)}</dd></div>
+        <div><dt>Giá thuê hợp đồng</dt><dd>${escapeHtml(money(contract.gia_thue))}</dd></div>
+        <div><dt>Trạng thái</dt><dd>${escapeHtml(statusLabel(contract.trang_thai))}</dd></div>
+        <div><dt>Ngày bắt đầu</dt><dd>${escapeHtml(date(contract.ngay_bat_dau))}</dd></div>
+        <div><dt>Ngày kết thúc</dt><dd>${escapeHtml(date(contract.ngay_ket_thuc))}</dd></div>
+        <div class="contract-detail-grid__wide"><dt>Điều khoản</dt><dd>${escapeHtml(contract.dieu_khoan)}</dd></div>
+      </dl>`;
     } catch (error) {
+      if (!overlay.isConnected) return;
       detail.textContent = `Không tải được chi tiết: ${error.message} `;
       const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
       retry.addEventListener("click", loadDetail); detail.append(retry);
+    }
+  };
+  const loadHistory = async () => {
+    try {
+      const result = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/history`);
+      if (!overlay.isConnected) return;
+      const entries = (result.data || []).map(safeHistory);
+      history.innerHTML = entries.map((item) => `<div class="contract-history-item"><strong>${escapeHtml(item.type)}</strong><time>${escapeHtml(item.date)}</time><p>${escapeHtml(item.detail)}</p></div>`).join("") || "Chưa có lịch sử.";
+    } catch (error) {
+      if (overlay.isConnected) history.textContent = `Không tải được lịch sử: ${error.message}`;
     }
   };
   const loadPrint = async () => {
@@ -55,11 +96,11 @@ async function openContractDetail(context, row) {
       const frame = document.createElement("iframe");
       frame.title = "Bản in hợp đồng";
       frame.setAttribute("sandbox", "allow-same-origin allow-modals");
-      frame.style.cssText = "width:100%;height:55vh;border:1px solid #ddd";
+      frame.className = "contract-print-frame";
       frame.srcdoc = html;
-      const button = document.createElement("button"); button.type = "button"; button.textContent = "Mở hộp thoại in";
+      const button = document.createElement("button"); button.type = "button"; button.className = "btn btn--secondary"; button.textContent = "Mở hộp thoại in";
       button.addEventListener("click", () => frame.contentWindow?.print());
-      state.append(frame, button);
+      if (overlay.isConnected) state.append(frame, button);
     } catch (error) {
       state.textContent = `Không tải được bản in: ${error.message} `;
       const retry = document.createElement("button"); retry.type = "button"; retry.textContent = "Thử lại";
@@ -67,14 +108,15 @@ async function openContractDetail(context, row) {
     } finally { printButton.disabled = false; }
   };
   printButton.addEventListener("click", loadPrint);
-  await loadDetail();
+  await Promise.all([loadDetail(), loadHistory()]);
 }
 
 export default listTab({ id: "contracts", route: "/residents-contracts/contracts", title: "Hợp đồng", tabLabel: "Hợp đồng", group: "residents-contracts", order: 31, roles: ["CHU_TRO"] }, {
   title: "Hợp đồng",
   description: "Tạo hợp đồng kèm hồ sơ cọc và gia hạn hợp đồng hiện có.",
   endpoint: "/hop-dong?limit=100",
-  columns: [{ label: "Khách thuê", format: (row) => row.khachThue?.ho_ten || "—" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || row.ma_phong }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Kết thúc", format: (row) => date(row.ngay_ket_thuc) }, { label: "Trạng thái", key: "trang_thai" }],
+  openDetail: openContractDetail,
+  columns: [{ label: "Khách thuê", format: (row) => row.khachThue?.ho_ten || "—" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Kết thúc", format: (row) => date(row.ngay_ket_thuc) }, { label: "Trạng thái", key: "trang_thai" }],
   create: {
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
@@ -98,15 +140,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
     map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; return result; },
   },
   rowActions: [{
-    id: "detail", label: "Chi tiết", run: openContractDetail,
-  }, {
-    id: "history", label: "Lịch sử", run: async (context, row) => {
-      const result = await context.api.get(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/history`);
-      const entries = (result.data || []).map(safeHistory);
-      const overlay = document.createElement("div"); overlay.className = "modal-overlay";
-      overlay.innerHTML = `<div class="modal-dialog" role="dialog" aria-modal="true"><h3>Lịch sử hợp đồng</h3><div>${entries.map((item) => `<p><strong>${escapeHtml(item.type)}</strong> — ${escapeHtml(item.date)}<br>${escapeHtml(item.detail)}</p>`).join("") || "Chưa có lịch sử."}</div><button type="button" data-close>Đóng</button></div>`;
-      overlay.querySelector("[data-close]").addEventListener("click", () => overlay.remove()); document.body.appendChild(overlay);
-    },
+    id: "detail", label: "Chi tiết", openDetail: true,
   }, {
     id: "transfer", label: "Chuyển phòng", visible: (row) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(row.trang_thai),
     run: async (context, row) => {

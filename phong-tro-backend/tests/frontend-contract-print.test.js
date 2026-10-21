@@ -7,7 +7,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 test("FR-184 contract detail offers print, loading error and retry", () => {
   const source = read("modules/residents-contracts/contracts.tab.js");
-  assert.match(source, /id: "detail", label: "Chi tiết", run: openContractDetail/);
+  assert.match(source, /openDetail: openContractDetail/);
+  assert.match(source, /id: "detail", label: "Chi tiết", openDetail: true/);
   assert.match(source, /data-print>In hợp đồng/);
   assert.match(source, /getHtml\(`\/hop-dong\/\$\{encodeURIComponent\(row\.ma_hop_dong\)\}\/print`\)/);
   assert.match(source, /Không tải được bản in/);

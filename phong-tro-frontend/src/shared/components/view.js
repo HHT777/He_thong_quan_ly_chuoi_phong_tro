@@ -29,13 +29,13 @@ export function formatStatusBadge(status) {
 
   const label = statusLabel(str);
 
-  if (["DANG_THUE", "DA_THANH_TOAN", "HIEU_LUC", "DA_XU_LY", "HOAT_DONG"].includes(str)) {
+  if (["DANG_THUE", "DA_THANH_TOAN", "HIEU_LUC", "DANG_HIEU_LUC", "DA_XU_LY", "HOAT_DONG"].includes(str)) {
     return `<span class="badge badge--rented">${label}</span>`;
   }
   if (["TRONG", "CHO_THANH_TOAN", "CHO_TIEP_NHAN", "SAP_HET_HAN"].includes(str)) {
     return `<span class="badge badge--vacant">${label}</span>`;
   }
-  if (["DANG_XU_LY_TRA_PHONG", "QUA_HAN", "DA_HUY", "TAM_DUNG"].includes(str)) {
+  if (["DANG_XU_LY_TRA_PHONG", "QUA_HAN", "DA_HUY", "DA_THANH_LY", "TAM_DUNG"].includes(str)) {
     return `<span class="badge badge--checkout">${label}</span>`;
   }
   return `<span class="badge badge--neutral">${label}</span>`;

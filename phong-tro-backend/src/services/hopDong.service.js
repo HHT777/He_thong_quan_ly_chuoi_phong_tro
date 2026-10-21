@@ -150,7 +150,7 @@ class HopDongService {
         {
           model: PhongTro,
           as: "phongTro",
-          attributes: ["ma_phong", "gia_thue"],
+          attributes: ["ma_phong", "so_phong", "gia_thue"],
           ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}),
         },
       ],
