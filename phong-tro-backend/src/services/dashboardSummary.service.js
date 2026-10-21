@@ -1,7 +1,9 @@
 const { QueryTypes } = require("sequelize");
 const sequelize = require("../config/database");
 const { getLandlordProfile } = require("./ownership.service");
-const { businessMonth } = require("../utils/businessDate.util");
+const { getPersistedSystemConfig } = require("./systemConfig.service");
+const { actionDue } = require("./debtLifecycle.service");
+const { businessDate, businessMonth } = require("../utils/businessDate.util");
 
 const ROOM_STATUSES = Object.freeze([
   "TRONG", "DA_GIU", "DANG_THUE", "DANG_XU_LY_TRA_PHONG", "NGUNG_SU_DUNG",
@@ -24,11 +26,20 @@ function roomSummary(rows) {
   return { total: Object.values(byStatus).reduce((sum, count) => sum + count, 0), byStatus };
 }
 
-async function getDashboardSummary(requester, periodValue) {
-  const period = resolvePeriod(periodValue);
+async function getDashboardSummary(requester, periodValue, now = new Date()) {
+  const period = resolvePeriod(periodValue, now);
   const owner = await getLandlordProfile(requester);
   const [year, month] = period.split("-").map(Number);
-  const replacements = { ownerId: owner.ma_chu_tro, year, month };
+  const [currentYear, currentMonth, currentDay] = businessDate(now).split("-").map(Number);
+  const config = await getPersistedSystemConfig();
+  // The same pure due rule drives the debt cron. Every selected bill has the
+  // same period, so SQL can aggregate with one calculated overdue value.
+  const overdue = actionDue(
+    { nam: year, thang: month },
+    { year: currentYear, month: currentMonth, day: currentDay },
+    config,
+  ).overdue ? 1 : 0;
+  const replacements = { ownerId: owner.ma_chu_tro, year, month, overdue };
   const roomRows = await sequelize.query(`
     SELECT p.trangThai AS status, COUNT(*) AS count
     FROM PhongTro p INNER JOIN CanTro c ON c.maCan = p.maCan
@@ -38,8 +49,8 @@ async function getDashboardSummary(requester, periodValue) {
   const billRows = await sequelize.query(`
     SELECT COUNT(*) AS total,
       COALESCE(SUM(t.soTienConNo = 0), 0) AS daThu,
-      COALESCE(SUM(t.soTienConNo > 0 AND t.quaHan = 0), 0) AS conNo,
-      COALESCE(SUM(t.soTienConNo > 0 AND t.quaHan = 1), 0) AS quaHan
+      COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 0), 0) AS conNo,
+      COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 1), 0) AS quaHan
     FROM ThanhToan t
     INNER JOIN HopDong h ON h.maHopDong = t.maHopDong
     INNER JOIN PhongTro p ON p.maPhong = h.maPhong
@@ -48,8 +59,8 @@ async function getDashboardSummary(requester, periodValue) {
       AND t.nam = :year AND t.thang = :month
   `, { replacements, type: QueryTypes.SELECT });
   const bill = billRows[0];
-  // quaHan is set by the debt cron (overdueDay defaults to day 6). A settled
-  // bill is never counted as overdue, even when its historical flag remains set.
+  // The stored quaHan flag remains cron history; this display follows the
+  // current Vietnam business date, configured due day and outstanding balance.
   const bills = {
     total: Number(bill.total), daThu: Number(bill.daThu),
     conNo: Number(bill.conNo), quaHan: Number(bill.quaHan),
