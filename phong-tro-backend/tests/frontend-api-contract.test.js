@@ -54,10 +54,13 @@ test("CT-003 meter-reading SPA consumes the API DTO contract", () => {
 test("CT-013 room status filters use the database status domain", () => {
   const view = frontendSource("shared/components/view.js");
   const dashboard = frontendSource("modules/overview/dashboard.tab.js");
-  const sources = `${view}\n${dashboard}`;
+  const metrics = frontendSource("modules/overview/dashboard.metrics.mjs");
+  const sources = `${view}\n${dashboard}\n${metrics}`;
 
   assert.match(view, /DANG_XU_LY_TRA_PHONG/);
-  assert.match(dashboard, /trang_thai === "DANG_XU_LY_TRA_PHONG"/);
+  assert.match(metrics, /"DANG_XU_LY_TRA_PHONG"/);
+  assert.match(dashboard, /ROOM_STATES\.map/);
+  assert.match(metrics, /data\.rooms\.byStatus/);
   assert.doesNotMatch(sources, /\bDANG_XU_LY_TRA\b|\bDANG_TRA\b/);
 });
 

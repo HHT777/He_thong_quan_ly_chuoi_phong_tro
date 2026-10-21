@@ -492,3 +492,85 @@
     grid-template-columns: 1fr;
   }
 }
+/* UI-1a: dashboard-only palette; navy reuses the sidebar brand token. */
+.ui1-dashboard {
+  --ui1-navy: var(--brand-primary-deep);
+  --ui1-blue: #5b6fa8;
+  --ui1-blue-light: #a9b6d9;
+  --ui1-track: #e8ecf6;
+  --ui1-amber: #e0a526;
+  --ui1-red: #d62f3a;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  color: var(--ui1-navy);
+}
+.ui1-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; font-size: 13px; color: var(--text-secondary); }
+.ui1-quick { position: relative; }
+.ui1-quick__button, .ui1-quick__menu button { border: 1px solid var(--ui1-track); border-radius: 9px; padding: 9px 12px; background: white; color: var(--ui1-navy); font: inherit; cursor: pointer; }
+.ui1-quick__button { background: var(--ui1-navy); color: white; }
+.ui1-quick__menu { position: absolute; z-index: 10; top: 100%; right: 0; min-width: 165px; padding: 6px; background: white; box-shadow: 0 8px 24px #072e5c24; border: 1px solid var(--ui1-track); border-radius: 9px; }
+.ui1-quick__menu[hidden] { display: none; }
+.ui1-quick__menu button { display: block; width: 100%; text-align: left; border: 0; }
+.ui1-quick__menu button:hover { background: var(--ui1-track); }
+.ui1-dashboard button:focus-visible { outline: 3px solid var(--ui1-amber); outline-offset: 2px; }
+.ui1-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ui1-kpi, .ui1-card { background: white; border: 1px solid var(--ui1-track); border-radius: 12px; box-shadow: 0 3px 12px #072e5c0b; min-width: 0; }
+.ui1-kpi { padding: 18px; min-height: 145px; }
+.ui1-kpi h2, .ui1-card h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ui1-navy); }
+.ui1-kpi__value { display: block; margin: 13px 0 5px; font-size: clamp(21px, 2.6vw, 34px); line-height: 1.2; color: var(--ui1-navy); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui1-kpi__value--money { font-size: clamp(17px, 2vw, 29px); }
+.ui1-kpi__value--danger { color: var(--ui1-red); }
+.ui1-kpi__value small { font-size: .48em; }
+.ui1-kpi__note, .ui1-note, .ui1-card header p { margin: 6px 0 0; font-size: 12px; line-height: 1.5; color: var(--ui1-blue); }
+.ui1-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ui1-card { padding: 18px 20px; min-height: 215px; }
+.ui1-card__body { margin-top: 16px; }
+.ui1-room-layout { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; align-items: center; }
+.ui1-ring { position: relative; width: 160px; height: 160px; }
+.ui1-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ui1-ring span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; font-size: 12px; }
+.ui1-ring strong { font-size: 25px; font-variant-numeric: tabular-nums; }
+.ui1-ring__dang_thue { stroke: var(--ui1-navy); }
+.ui1-ring__trong { stroke: var(--ui1-blue-light); }
+.ui1-ring__da_giu { stroke: var(--ui1-amber); }
+.ui1-ring__dang_xu_ly_tra_phong { stroke: var(--ui1-blue); }
+.ui1-ring__ngung_su_dung { stroke: #8792a6; }
+.ui1-ring__khac { stroke: #8792a6; }
+.ui1-legend, .ui1-status-list, .ui1-recent { margin: 0; padding: 0; list-style: none; }
+.ui1-legend li { display: flex; align-items: center; gap: 8px; min-width: 0; margin: 8px 0; font-size: 12px; }
+.ui1-legend li span { flex: 1; }
+.ui1-legend li strong, .ui1-status-list strong { font-variant-numeric: tabular-nums; }
+.ui1-dot { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--ui1-blue); }
+.ui1-dot--dang_thue, .ui1-dot--daThu { background: var(--ui1-navy); }
+.ui1-dot--trong { background: var(--ui1-blue-light); }
+.ui1-dot--da_giu, .ui1-dot--conNo { background: var(--ui1-amber); }
+.ui1-dot--ngung_su_dung { background: #8792a6; }
+.ui1-dot--quaHan { background: var(--ui1-red); }
+.ui1-dot--khac { background: #8792a6; }
+.ui1-bar { display: flex; overflow: hidden; min-height: 36px; border-radius: 6px; background: var(--ui1-track); color: white; }
+.ui1-bar span { display: grid; place-items: center; min-width: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ui1-bar__daThu { background: var(--ui1-navy); }
+.ui1-bar__conNo { background: var(--ui1-amber); color: var(--ui1-navy); }
+.ui1-bar__quaHan { background: var(--ui1-red); }
+.ui1-legend--horizontal { display: flex; flex-wrap: wrap; gap: 16px; }
+.ui1-incident-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.ui1-incident-layout > div + div { border-left: 1px solid var(--ui1-track); padding-left: 18px; }
+.ui1-incident-layout h3 { font-size: 13px; margin: 0 0 10px; }
+.ui1-status-list li { display: grid; grid-template-columns: 94px 1fr 22px; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; }
+.ui1-status-track { height: 9px; border-radius: 9px; background: var(--ui1-track); overflow: hidden; }
+.ui1-status-fill { display: block; height: 100%; border-radius: inherit; background: var(--ui1-blue); }
+.ui1-status-fill--cho_tiep_nhan { background: var(--ui1-red); }
+.ui1-status-fill--da_xu_ly { background: var(--ui1-navy); }
+.ui1-recent li { padding: 8px 0; border-bottom: 1px solid var(--ui1-track); min-width: 0; }
+.ui1-recent li:last-child { border: 0; }
+.ui1-recent strong, .ui1-recent span { display: block; overflow-wrap: anywhere; }
+.ui1-recent strong { font-size: 13px; }
+.ui1-recent span { font-size: 12px; color: var(--ui1-blue); margin-top: 3px; }
+.ui1-loading { color: var(--ui1-blue); font-size: 13px; }
+.ui1-error { color: var(--ui1-navy); font-size: 12px; }
+.ui1-error button { border: 1px solid var(--ui1-navy); border-radius: 7px; color: var(--ui1-navy); background: white; padding: 6px 10px; cursor: pointer; }
+.ui1-error button:hover { background: var(--ui1-track); }
+@media (max-width: 1250px) { .ui1-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 820px) { .ui1-grid { grid-template-columns: 1fr; } .ui1-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .ui1-kpis { grid-template-columns: 1fr; } .ui1-room-layout, .ui1-incident-layout { grid-template-columns: 1fr; } .ui1-incident-layout > div + div { border-left: 0; border-top: 1px solid var(--ui1-track); padding-left: 0; padding-top: 12px; } }

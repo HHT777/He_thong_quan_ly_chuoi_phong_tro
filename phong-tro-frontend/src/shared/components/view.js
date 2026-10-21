@@ -1,5 +1,6 @@
 import { icons } from "./icons.js";
 import { showToast } from "./toast.js";
+import { statusLabel } from "./status-labels.mjs";
 
 export function confirmAction(message) {
   return new Promise((resolve) => {
@@ -26,25 +27,7 @@ export function formatStatusBadge(status) {
   if (!status) return "—";
   const str = String(status).trim().toUpperCase();
 
-  const labels = {
-    DANG_THUE: "Đang thuê",
-    TRONG: "Trống",
-    DANG_XU_LY_TRA_PHONG: "Đang xử lý trả",
-    DA_THANH_TOAN: "Đã thanh toán",
-    CHO_THANH_TOAN: "Chờ thanh toán",
-    QUA_HAN: "Quá hạn",
-    HIEU_LUC: "Hiệu lực",
-    SAP_HET_HAN: "Sắp hết hạn",
-    HET_HAN: "Hết hạn",
-    DA_XU_LY: "Đã xử lý",
-    DANG_XU_LY: "Đang xử lý",
-    CHO_TIEP_NHAN: "Chờ tiếp nhận",
-    DA_HUY: "Đã hủy",
-    HOAT_DONG: "Hoạt động",
-    TAM_DUNG: "Tạm dừng",
-  };
-
-  const label = labels[str] || escapeHtml(status);
+  const label = statusLabel(str);
 
   if (["DANG_THUE", "DA_THANH_TOAN", "HIEU_LUC", "DA_XU_LY", "HOAT_DONG"].includes(str)) {
     return `<span class="badge badge--rented">${label}</span>`;
