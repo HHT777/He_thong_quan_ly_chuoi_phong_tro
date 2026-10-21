@@ -1,5 +1,12 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Cập nhật FR-200 (21/10/2026; ưu tiên hơn lịch sử bên dưới)
+
+- Nhánh `giai-doan-p3-cau-hinh-v2`: `634ca7c` thêm danh mục một nguồn 13 khóa số + timezone, API GET/PUT/reset, validation 400 theo khóa, audit trong transaction, test mỗi khóa; `bda77ee` thêm màn hình Chủ trọ, retry, xác nhận reset và test contract. `contractStatusJobCron` không hiển thị vì chưa có consumer runtime.
+- Mốc kiểm chứng trước: unit 144/144, integration 79/79; sau: unit 147/147, integration 81/81 trên duy nhất `qlpt_authz_test` TCP 127.0.0.1:3307, 28 nhóm bất biến 0 ở seed và sau integration. Frontend build **chưa chạy**; người dùng tự build.
+- Hạn giữ mặc định không tự áp: UC-26 yêu cầu Chủ trọ xác nhận theo từng thỏa thuận. Chưa có khóa cấu hình cho gợi ý ngày; muốn thêm khóa phải hỏi trước. Ngày ghi chỉ số chỉ là ngày nhắc, không đổi `submissionWindowOpen`; danh mục chi phí hoãn vì cần DDL.
+- Ngưỡng cảnh báo hợp đồng đang là số ngày (`contractWarningDays`, mặc định 30) chứ không phải một tháng lịch theo FR-158; cần quyết định nếu muốn đồng nhất. Các khóa ảnh hưởng tiền/lịch không tính lại phiếu đã lập. Không dùng `npm run seed`, không kết nối `phong_tro`/`phong_tro_copy_ci`/MariaDB 3306 trong lượt FR-200.
+
 ## Trạng thái DB và khóa ghi schema (21/10/2026; ưu tiên hiện hành)
 
 - Người dùng đã xác nhận DB phát triển `phong_tro` ở 37 bảng; `phong_tro_copy_ci` chỉ để đối chiếu. Không còn việc "nâng cấp DB thật cần làm". Không ai được chạy migration, `sequelize.sync` hoặc seed lên `phong_tro` nếu không có quy trình sao lưu và xác nhận riêng của người dùng. Nguồn gốc DDL ngày 19/10 chưa được chứng minh; không suy đoán là do một lệnh cụ thể.
