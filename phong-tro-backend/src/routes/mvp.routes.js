@@ -11,6 +11,7 @@ const coTenantService = require("../services/coTenant.service");
 const cashflowReportService = require("../services/cashflowReport.service");
 const cashflowExportService = require("../services/cashflowExport.service");
 const dashboardSummaryService = require("../services/dashboardSummary.service");
+const dashboardInsightsService = require("../services/dashboardInsights.service");
 const { validateQuery } = require("../utils/queryValidation");
 const { businessDate } = require("../utils/businessDate.util");
 const billAdjustmentService = require("../services/billAdjustment.service");
@@ -45,6 +46,10 @@ router.get("/dashboard/summary", landlord, async (req, res, next) => {
     if (Object.keys(req.query).some((key) => key !== "period")) throw fail(400, "Tham số báo cáo không hợp lệ", "INVALID_PERIOD");
     return data(res, await dashboardSummaryService.getDashboardSummary(req.user, req.query.period));
   } catch (error) { return next(error); }
+});
+router.get("/dashboard/insights", landlord, async (req, res, next) => {
+  try { return data(res, await dashboardInsightsService.getDashboardInsights(req.user, req.query)); }
+  catch (error) { return next(error); }
 });
 const INCIDENT_PRIORITIES = Object.freeze(["THAP", "TRUNG_BINH", "CAO", "KHAN_CAP"]);
 const incidentPriority = (value) => {

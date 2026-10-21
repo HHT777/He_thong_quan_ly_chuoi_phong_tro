@@ -136,6 +136,7 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | POST | /bills/generate | G1 `3bf4ae6` |
 | mvp.routes.js | GET | /debt | G1 `aa0acf6` |
 | mvp.routes.js | GET | /dashboard/summary | BE-1 FR-024/144: Chủ trọ; tổng hợp phòng và phiếu DINH_KY chỉ trong căn sở hữu |
+| mvp.routes.js | GET | /dashboard/insights | UI-2a FR-132/158: chỉ Chủ trọ; mọi bộ đếm và báo cáo theo căn sở hữu, buildingId khác chủ/không tồn tại trả 404; chỉ đọc |
 | mvp.routes.js | POST | /bills/:id/mark-paid | G1 `2223786` |
 | mvp.routes.js | POST | /bills/mark-all-paid | G1 `2223786` |
 | mvp.routes.js | POST | /payments/:id/cancel | G1 `2223786` |
