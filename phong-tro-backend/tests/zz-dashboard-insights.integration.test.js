@@ -2,11 +2,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { TaiKhoan, ChuTro, CanTro, PhongTro, HopDong, KhachThue, YeuCau, DeXuatBanCungPhong } = require("../src/models");
+const { TaiKhoan, ChuTro, CanTro, PhongTro, HopDong, KhachThue, YeuCau, DeXuatBanCungPhong, CauHinhHeThong } = require("../src/models");
 const sequelize = require("../src/config/database");
-const { QueryTypes, Op } = require("sequelize");
+const { QueryTypes } = require("sequelize");
 const { getDashboardInsights } = require("../src/services/dashboardInsights.service");
 const { getOwnedBuildingIds } = require("../src/services/ownership.service");
+const { invalidateSystemConfigCache } = require("../src/services/systemConfig.service");
 const { integration, request, headers, login } = require("./helpers/integration-api");
 
 test("UI-2a insights scopes two landlords, partitions bills, reconciles six cashflow months and enforces roles", async () => {
@@ -24,6 +25,9 @@ test("UI-2a insights scopes two landlords, partitions bills, reconciles six cash
   let pendingDetail;
   let changedContract;
   let previousContract;
+  let warningConfig;
+  let previousWarningValue;
+  let createdWarningConfig = false;
   try {
     const a = await request("/api/v1/dashboard/insights?period=2026-10", { headers: headers(tokenA) });
     const b = await request("/api/v1/dashboard/insights?period=2026-10", { headers: headers(tokenB) });
@@ -98,8 +102,13 @@ test("UI-2a insights scopes two landlords, partitions bills, reconciles six cash
     assert.equal(scopedDay6.billBuckets.overdue, Number(scopedBill.outstanding));
     assert.equal(scopedDay6.billBuckets.outstanding, 0);
     const idsA = await getOwnedBuildingIds(requesterA);
-    changedContract = await HopDong.findOne({ where: { ngay_bat_dau: { [Op.lt]: "2026-10-21" }, trang_thai: { [Op.ne]: "DA_THANH_LY" } },
-      include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: idsA } } }] });
+    const [candidate] = await sequelize.query(`SELECT h.maHopDong AS id FROM HopDong h
+      JOIN PhongTro p ON p.maPhong=h.maPhong WHERE p.maCan IN (:ids)
+      AND h.ngayBatDau < '2026-10-21' AND h.trangThai <> 'DA_THANH_LY'
+      AND NOT EXISTS (SELECT 1 FROM YeuCauGiaHan yg JOIN YeuCau y ON y.maYeuCau=yg.maYeuCau
+        WHERE yg.maHopDong=h.maHopDong AND y.trangThai='CHO_XU_LY') LIMIT 1`,
+    { replacements: { ids: idsA }, type: QueryTypes.SELECT });
+    changedContract = candidate && await HopDong.findByPk(candidate.id);
     assert.ok(changedContract, "Seed needs an owner A contract starting before forecast day");
     previousContract = { trang_thai: changedContract.trang_thai, ngay_ket_thuc: changedContract.ngay_ket_thuc };
     await changedContract.update({ trang_thai: "HET_HAN", ngay_ket_thuc: "2026-11-10" });
@@ -110,6 +119,23 @@ test("UI-2a insights scopes two landlords, partitions bills, reconciles six cash
       "SAP_HET_HAN is forecast while HET_HAN is excluded");
     assert.equal(includedForecast.contractForecast.d60, excludedForecast.contractForecast.d60 + 1);
     assert.equal(includedForecast.contractForecast.d90, excludedForecast.contractForecast.d90 + 1);
+    await changedContract.update({ ngay_ket_thuc: "2026-12-10" });
+    warningConfig = await CauHinhHeThong.findOne({ where: { khoa: "contractWarningDays" } });
+    if (!warningConfig) {
+      warningConfig = await CauHinhHeThong.create({ khoa: "contractWarningDays", gia_tri: 30, nguoi_cap_nhat_id: accountA.ma_tai_khoan });
+      createdWarningConfig = true;
+    } else previousWarningValue = warningConfig.gia_tri;
+    await warningConfig.update({ gia_tri: 30 });
+    invalidateSystemConfigCache();
+    const warning30 = await getDashboardInsights(requesterA, { period: "2026-10" }, new Date("2026-10-21T05:00:00Z"));
+    await warningConfig.update({ gia_tri: 60 });
+    invalidateSystemConfigCache();
+    const warning60 = await getDashboardInsights(requesterA, { period: "2026-10" }, new Date("2026-10-21T05:00:00Z"));
+    assert.equal(warning30.contractWarningDays, 30);
+    assert.equal(warning60.contractWarningDays, 60);
+    assert.ok(warning60.tasks.find((item) => item.type === "EXPIRING_CONTRACTS").count
+      > warning30.tasks.find((item) => item.type === "EXPIRING_CONTRACTS").count,
+    "Runtime warningDays must include a contract 50 days away when set to 60, but not 30");
     const foreign = await request(`/api/v1/dashboard/insights?buildingId=${buildingB.ma_can}`, { headers: headers(tokenA) });
     assert.equal(foreign.response.status, 404);
     assert.equal(foreign.body.error.code, "RESOURCE_NOT_FOUND");
@@ -122,6 +148,11 @@ test("UI-2a insights scopes two landlords, partitions bills, reconciles six cash
     assert.equal(afterMidnight.period, "2026-11");
   } finally {
     if (changedContract && previousContract) await changedContract.update(previousContract);
+    if (warningConfig) {
+      if (createdWarningConfig) await warningConfig.destroy();
+      else await warningConfig.update({ gia_tri: previousWarningValue });
+      invalidateSystemConfigCache();
+    }
     if (pendingDetail) await pendingDetail.destroy();
     if (pendingRequest) await pendingRequest.destroy();
     await roomB.destroy(); await buildingB.destroy(); await profileB.destroy(); await accountB.destroy();
