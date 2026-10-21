@@ -233,11 +233,12 @@ class HopDongService {
 
     return await HopDong.findAll({
       where: {
-        trang_thai: "DANG_HIEU_LUC",
+        trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] },
         ngay_ket_thuc: {
           [Op.between]: [today, expiryDate],
         },
       },
+      order: [["ngay_ket_thuc", "ASC"]],
       include: [
         {
           model: KhachThue,
