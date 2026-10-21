@@ -224,6 +224,17 @@
   border-color: var(--border-strong);
 }
 
+.grid-card-item[role="button"] { cursor: pointer; }
+.grid-card-item[role="button"]:focus-visible { outline: 3px solid var(--ui2-amber); outline-offset: 3px; }
+
+.room-detail-dialog { max-width: 640px; }
+.room-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; margin: 0; }
+.room-detail-grid > div { min-width: 0; }
+.room-detail-grid dt { color: var(--text-muted); font-size: 12px; margin-bottom: 5px; }
+.room-detail-grid dd { margin: 0; color: var(--text-primary); font-weight: 600; overflow-wrap: anywhere; white-space: pre-line; }
+.room-detail-grid__wide { grid-column: 1 / -1; }
+@media (max-width: 600px) { .room-detail-grid { grid-template-columns: 1fr; } }
+
 .grid-card-header {
   display: flex;
   align-items: center;

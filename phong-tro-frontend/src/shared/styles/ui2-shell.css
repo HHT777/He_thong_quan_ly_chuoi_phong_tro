@@ -65,6 +65,7 @@ body, button, input, select, textarea { font-family: var(--font-sans); }
 .navbar-create-item:hover { background: #eef3fc; }
 .panel, .table-wrap, .empty-state, .dashboard-card { border-radius: var(--ui2-radius); border-color: var(--ui2-border); box-shadow: var(--ui2-shadow); }
 .btn--primary, .module-tab.is-active { background: var(--ui2-navy); color: #fff; }
+.module-tabs { min-height: 56px; align-items: center; padding: 8px 28px; }
 .ui2-card { padding: 20px; border: 1px solid var(--ui2-border); border-radius: var(--ui2-radius); background: #fff; box-shadow: var(--ui2-shadow); }
 .ui2-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: #edf2fb; color: var(--ui2-ink); font-weight: 700; }
 .ui2-progress { width: 100%; height: 10px; overflow: hidden; border-radius: 999px; background: #e8edf7; }
@@ -82,6 +83,7 @@ body, button, input, select, textarea { font-family: var(--font-sans); }
   .sidebar { width: 254px; }
 }
 @media (max-width: 767px) {
+  .module-tabs { padding-inline: 14px; }
   .navbar { gap: 8px; padding-inline: 14px; }
   .navbar-heading-title, .navbar h2 { font-size: 21px; }
   .navbar__right { gap: 6px; }

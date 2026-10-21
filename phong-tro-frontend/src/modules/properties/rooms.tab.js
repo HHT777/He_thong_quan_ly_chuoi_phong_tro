@@ -1,15 +1,54 @@
 import { listTab } from "../../shared/components/tab-factory.js";
-import { money } from "../../shared/components/view.js";
+import { escapeHtml, formatStatusBadge, money } from "../../shared/components/view.js";
 
 const numberFields = (raw) => ({ ...raw, dien_tich: Number(raw.dien_tich), gia_thue: Number(raw.gia_thue), so_nguoi_toi_da: Number(raw.so_nguoi_toi_da) });
+
+async function openRoomDetails(context, summary) {
+  const previousFocus = document.activeElement;
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<div class="modal-dialog room-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="room-detail-title">
+    <div class="modal-header"><h3 class="modal-title" id="room-detail-title">Phòng ${escapeHtml(summary.so_phong || summary.ma_phong)}</h3>
+      <button type="button" class="modal-close-btn" data-modal-close aria-label="Đóng chi tiết phòng">×</button></div>
+    <div class="modal-body" data-room-detail>Đang tải thông tin phòng...</div>
+  </div>`;
+  const close = () => {
+    document.removeEventListener("keydown", onKeydown);
+    overlay.remove();
+    if (previousFocus?.isConnected) previousFocus.focus();
+  };
+  const onKeydown = (event) => { if (event.key === "Escape") close(); };
+  overlay.addEventListener("click", (event) => { if (event.target === overlay || event.target.closest("[data-modal-close]")) close(); });
+  document.addEventListener("keydown", onKeydown);
+  document.body.appendChild(overlay);
+  overlay.querySelector("[data-modal-close]").focus();
+  try {
+    const room = (await context.api.get(`/phong/${encodeURIComponent(summary.ma_phong)}`)).data;
+    if (!overlay.isConnected) return;
+    overlay.querySelector("[data-room-detail]").innerHTML = `<dl class="room-detail-grid">
+      <div><dt>Căn trọ</dt><dd>${escapeHtml(room.canTro?.ten_can)}</dd></div>
+      <div><dt>Trạng thái</dt><dd>${formatStatusBadge(room.trang_thai)}</dd></div>
+      <div><dt>Địa chỉ căn</dt><dd>${escapeHtml(room.canTro?.dia_chi)}</dd></div>
+      <div><dt>Mã phòng</dt><dd>${escapeHtml(room.ma_phong)}</dd></div>
+      <div><dt>Giá thuê mỗi tháng</dt><dd>${escapeHtml(money(room.gia_thue))}</dd></div>
+      <div><dt>Diện tích</dt><dd>${escapeHtml(room.dien_tich)} m²</dd></div>
+      <div><dt>Số người tối đa</dt><dd>${escapeHtml(room.so_nguoi_toi_da)} người</dd></div>
+      <div class="room-detail-grid__wide"><dt>Mô tả nội thất</dt><dd>${escapeHtml(room.noi_that_mo_ta || "Chưa có mô tả")}</dd></div>
+    </dl>`;
+  } catch (error) {
+    if (overlay.isConnected) overlay.querySelector("[data-room-detail]").textContent = `Không tải được chi tiết phòng: ${error.message}`;
+  }
+}
 
 export default listTab({ id: "rooms", route: "/properties/rooms", title: "Phòng", tabLabel: "Phòng", group: "properties", order: 21, roles: ["CHU_TRO"] }, {
   title: "Phòng",
   description: "Danh sách phòng, giá thuê, sức chứa và trạng thái sử dụng.",
   endpoint: "/phong?limit=100",
+  openDetail: openRoomDetails,
   columns: [{ label: "Số phòng", key: "so_phong" }, { label: "Căn trọ", format: (row) => row.canTro?.ten_can || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Tối đa", key: "so_nguoi_toi_da" }, { label: "Trạng thái", key: "trang_thai" }],
   create: { label: "Thêm phòng", fields: [{ name: "so_phong", label: "Số phòng", required: true }, { name: "ma_can", label: "Mã căn trọ", required: true }, { name: "dien_tich", label: "Diện tích", type: "number", required: true }, { name: "gia_thue", label: "Giá thuê", type: "number", required: true }, { name: "so_nguoi_toi_da", label: "Số người tối đa", type: "number", required: true }], map: numberFields },
   rowActions: [
+    { id: "details", label: "Xem chi tiết", openDetail: true },
     {
       id: "edit",
       label: "Sửa",

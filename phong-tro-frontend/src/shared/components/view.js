@@ -245,8 +245,8 @@ function renderCardGrid(container, rows) {
     <div class="card-grid-container">
       ${rows
         .map(
-          (room) => `
-        <article class="grid-card-item">
+          (room, index) => `
+        <article class="grid-card-item" role="button" tabindex="0" data-room-index="${escapeHtml(index)}" aria-label="Xem chi tiết phòng ${escapeHtml(room.so_phong || room.ma_phong)}">
           <div class="grid-card-header">
             <div>
               <h4 class="grid-card-title">Phòng ${escapeHtml(room.so_phong || room.ma_phong || "—")}</h4>
@@ -541,6 +541,7 @@ export async function renderList(context, config) {
           const action = (config.rowActions || []).find((item) => item.id === button.dataset.rowAction);
           const row = paginated[Number(button.dataset.rowIndex)];
           if (!action || !row) return;
+          if (action.openDetail) { await config.openDetail(context, row); return; }
           const execute = async (raw = {}) => {
             button.disabled = true;
             try {
@@ -564,6 +565,17 @@ export async function renderList(context, config) {
           } else if (!action.confirm || window.confirm(action.confirm(row))) {
             await execute();
           }
+        });
+      });
+
+      viewContainer.querySelectorAll("[data-room-index]").forEach((card) => {
+        const open = () => {
+          const row = paginated[Number(card.dataset.roomIndex)];
+          if (row && config.openDetail) config.openDetail(context, row);
+        };
+        card.addEventListener("click", open);
+        card.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
         });
       });
 
