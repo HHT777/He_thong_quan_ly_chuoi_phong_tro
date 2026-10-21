@@ -357,6 +357,7 @@ body {
 }
 
 /* Room status badges */
+.badge { white-space: nowrap; }
 .badge--rented, .badge--success {
   background-color: var(--green-surface);
   color: var(--green-text);

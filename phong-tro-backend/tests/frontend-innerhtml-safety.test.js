@@ -48,6 +48,9 @@ function scan(source, file) {
       const helper = [...safeMarkup.keys()].find((name) => expression.startsWith(name));
       if (helper) { exceptions.push({ at, reason: safeMarkup.get(helper) }); continue; }
       if (/^(?:index|i|Number\(|String\(|\d+\b)/.test(expression)) { exceptions.push({ at, reason: "Index or explicitly numeric/static value" }); continue; }
+      if (/^(?:kpi|panel)\(\s*"[^"]*"(?:\s*,\s*"[^"]*")*\s*\)$/.test(expression)) {
+        exceptions.push({ at, reason: "Dashboard component called only with static string literals" }); continue;
+      }
       // Remaining expressions are reviewed per line below; adding a new expression must fail closed.
       const approved = reviewedExceptions.get(`${file}:${lineIndex + offsetLine + 1}`);
       if (!approved) violations.push(`${at}: ${expression}`);
@@ -66,9 +69,6 @@ const reviewedExceptions = new Map([
   ["finance/reports.tab.js:94", "month is YYYY-MM from the Vietnam business date"],
   ["finance/reports.tab.js:95", "year is YYYY from the Vietnam business date"],
   ["finance/reports.tab.js:97", "year is YYYY from the Vietnam business date"],
-  ["overview/dashboard.tab.js:47", "Static skeleton HTML generated in code"],
-  ...[171,172,180,189,198,199,212,228,230,233,234,244,246,273,275,289,291,348,364,406,418,441,443,444,446,447,449,450,454,466,474,482,551,555,581,590,594,605,620,624]
-    .map((line) => [`overview/dashboard.tab.js:${line}`, "Numeric aggregate or static label derived in dashboard code"]),
   ["residents-contracts/co-tenants.tab.js:42", "Conditional emits a static disabled attribute"],
   ["residents-contracts/reservations.tab.js:26", "Conditional emits a static overdue badge"],
 ]);

@@ -17,7 +17,9 @@ test("FR-144 bill loading errors replace the spinner and offer retry", () => {
 test("dashboard does not convert failed API calls into zero-valued data", () => {
   const source = read("src/modules/overview/dashboard.tab.js");
   assert.doesNotMatch(source, /\.catch\(\(\) => \(\{ data:/);
-  assert.match(source, /btnRetryDashboard/);
+  assert.match(source, /data-retry="\$\{source\}"/);
+  assert.match(source, /dashboardError\(error\)/);
+  assert.match(source, /sourcePanels\[source\]\.forEach/);
 });
 
 test("legacy API pages show a retry control instead of console-only errors", () => {
