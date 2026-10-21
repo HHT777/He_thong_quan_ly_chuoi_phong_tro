@@ -4,6 +4,7 @@ import { logout } from "../core/session.js";
 import { escapeHtml } from "../shared/components/view.js";
 import { icons } from "../shared/components/icons.js";
 import { api } from "../core/api.js";
+import { hasUnreadNotifications } from "./shell-data.mjs";
 import { openProfileModal, openSettingsModal, openSupportModal } from "./modals.js";
 
 const GROUP_LABELS = {
@@ -300,7 +301,7 @@ export function mountShell(root, currentUser) {
   const refreshNotificationDot = async () => {
     try {
       const result = await api.get("/v1/notifications");
-      const unread = Array.isArray(result.data) && result.data.some((item) => item.da_doc === false || item.da_doc === 0);
+      const unread = hasUnreadNotifications(result.data);
       const dot = root.querySelector("#unreadNotificationDot");
       if (dot) dot.hidden = !unread;
     } catch (_) {

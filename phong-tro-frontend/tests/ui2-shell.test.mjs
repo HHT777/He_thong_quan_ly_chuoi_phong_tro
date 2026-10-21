@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { contrastRatio } from "../src/shared/design/contrast.mjs";
+import { hasUnreadNotifications } from "../src/layout/shell-data.mjs";
 
 const css = readFileSync(new URL("../src/shared/styles/ui2-shell.css", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../src/layout/app-shell.js", import.meta.url), "utf8");
@@ -21,7 +22,7 @@ test("UI-2a-1 token text and graphic pairs meet WCAG contrast thresholds", () =>
 
 test("UI-2a-1 shell retains real navigation, hides unread dot until API confirms and only lists real creation tabs", () => {
   assert.match(shell, /get\("\/v1\/notifications"\)/);
-  assert.match(shell, /item\.da_doc === false \|\| item\.da_doc === 0/);
+  assert.match(shell, /hasUnreadNotifications\(result\.data\)/);
   assert.match(shell, /id="unreadNotificationDot" hidden/);
   assert.match(shell, /CREATE_SHORTCUTS\.map[\s\S]*available\.find/);
   assert.match(shell, /createShortcuts\.length >= 2/);
@@ -29,6 +30,14 @@ test("UI-2a-1 shell retains real navigation, hides unread dot until API confirms
   assert.doesNotMatch(shell, /Không gian quản lý/);
   assert.match(shell, /sidebarCollapseBtn/);
   assert.match(shell, /globalSearchInput/);
+});
+
+test("UI-2a-1 unread bell uses actual per-user notification state", () => {
+  assert.equal(hasUnreadNotifications([]), false);
+  assert.equal(hasUnreadNotifications([{ da_doc: true }, { da_doc: 1 }]), false);
+  assert.equal(hasUnreadNotifications([{ da_doc: true }, { da_doc: false }]), true);
+  assert.equal(hasUnreadNotifications([{ da_doc: 0 }]), true);
+  assert.equal(hasUnreadNotifications(null), false);
 });
 
 test("UI-2a-1 dynamic shell HTML is escaped and final font cascade supports Vietnamese", () => {
