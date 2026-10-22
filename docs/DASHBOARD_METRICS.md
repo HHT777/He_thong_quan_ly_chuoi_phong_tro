@@ -1,23 +1,32 @@
 # UI-1a — Hợp đồng số liệu Tổng quan Chủ trọ
 
-## UI-2a: nguồn insights đã có, phần thân giao diện chờ UI-2a-2
+## UI-2a-2: thân dashboard dùng nguồn insights
 
-`GET /api/v1/dashboard/insights` (commit `546808b`, hoàn thiện `214a4da`) chỉ cho Chủ trọ, lấy căn từ `ownedBuildingIds`; `buildingId` không tồn tại/khác chủ trả 404 `RESOURCE_NOT_FOUND`. Một request trả các trường dưới đây, không tải danh sách rồi cộng số ở client. UI-2a-1 chỉ đổi token và khung; chưa hiển thị các ô mới.
+`GET /api/v1/dashboard/insights` (commit `546808b`, hoàn thiện `214a4da`) chỉ cho Chủ trọ, lấy căn từ `ownedBuildingIds`; `buildingId` không tồn tại/khác chủ trả 404 `RESOURCE_NOT_FOUND`. Dashboard gọi ba nguồn đúng một lần mỗi nguồn: `summary` cho tổng/trạng thái phòng, `insights` cho doanh thu và các nhóm tổng hợp, `incidents` cho trạng thái và ba sự cố mới nhất. Không gọi riêng cashflow hoặc expiring lần nữa. Không tự suy `buildingId` từ client.
 
-| Khối dự kiến | Route/trường response | Kiểu/đơn vị | Phép gom | Điều hướng |
+| Khối hiện hành | Route/trường response | Kiểu/đơn vị | Phép gom | Điều hướng |
 |---|---|---|---|---|
+| Tổng phòng / đang thuê / lấp đầy / donut | `summary`: `rooms.total`, `rooms.byStatus.*` | phòng, % | Tổng/đang thuê hiển thị nguyên trường; chỉ tỷ lệ `DANG_THUE / total` tính trong `readSummary` | Không bấm lọc |
+| Doanh thu thực nhận, xu hướng | `insights`: `cashflow6m[5].totalRevenue`, `revenueChangePct` | VND, % hoặc null | Hiển thị nguyên trường; null → “Chưa có kỳ trước để so sánh” | Không |
 | Thu–chi 6 tháng | `cashflow6m[].month,totalRevenue,totalExpenses,profit,unassignedExpenses` | `YYYY-MM`, VND | Không cộng lại; từng tháng gọi cùng service cashflow của báo cáo | Chưa cho bấm lọc vì trang đích chưa đọc URL |
 | Xu hướng doanh thu | `revenueChangePct` | phần trăm hoặc null | Backend so tháng hiện tại với tháng trước; mẫu số 0 → null | Không |
 | Lấp đầy theo căn | `occupancyByBuilding[].buildingId,buildingName,total,rented,pct,inComparison` | phòng, % | SQL gom theo căn; căn ngừng hoạt động vẫn có, không so sánh | Chưa cho bấm lọc |
-| Phiếu thu kỳ này | `billBuckets.paid,outstanding,overdue,total` | phiếu `DINH_KY` | Ba nhóm loại trừ nhau; suy ngày quá hạn theo `actionDue`, không dùng cột `qua_han` | Chưa cho bấm lọc |
+| Phiếu thu kỳ này / KPI quá hạn | `billBuckets.paid,outstanding,overdue,total` | phiếu `DINH_KY` | Hiển thị trường server, chỉ chia tỷ lệ để vẽ độ rộng thanh; ba nhóm loại trừ nhau | Chưa cho bấm lọc |
 | Dự báo hết hạn | `contractForecast.d30,d60,d90` | hợp đồng, cộng dồn | Từ ngày Việt Nam đến đúng 30/60/90 ngày; gồm `DANG_HIEU_LUC` và `SAP_HET_HAN`, không gồm `HET_HAN`/`DA_THANH_LY` | Chưa cho bấm lọc |
+| Sự cố | `GET /api/v1/incidents`: `data[].trang_thai,ngay_gui,mo_ta,phongTro.so_phong` | sự cố, ngày | `readIncidents` phân nhóm và chọn ba dòng mới nhất | Chưa cho bấm lọc |
 | Việc cần xử lý | `tasks[].type,count`, `contractWarningDays` | mục, ngày | Thứ tự 7 loại cố định ở service; dòng hợp đồng dùng ngưỡng cấu hình, khác dự báo 30/60/90 | Chỉ gắn liên kết khi trang đích thực sự đọc tham số |
 
-Sáu tháng gần nhất tính theo ngày nghiệp vụ Việt Nam. Giá trị tiền lấy từ service cashflow: một Chủ trọ tính chi toàn chuỗi chưa phân căn; từ hai Chủ trọ tách `unassignedExpenses`, không âm thầm phân bổ. Xu hướng chỉ dành cho doanh thu, không gắn mũi tên cho KPI khác. Yêu cầu chờ xử lý suy căn qua bản ghi chi tiết `YeuCauGiaHan`/`YeuCauTraPhong`/`DeXuatBanCungPhong`, không suy qua mọi hợp đồng lịch sử của khách. Test `zz-dashboard-insights.integration.test.js` đối chiếu mỗi tháng với API cashflow, phân quyền hai Chủ trọ, ngày biên múi giờ, scoped due rule ngày 05→06 và dự báo `SAP_HET_HAN`; phép thử bỏ lọc sở hữu làm test đỏ (4 căn thay vì 1 cho B), khôi phục xanh. Đo 57 truy vấn khi cache cấu hình đã ấm, 58 khi lạnh trên fixture hai Chủ trọ; hiện dùng 7 lần gọi service cashflow, không N+1 theo số căn/phòng.
+Sáu tháng gần nhất tính theo ngày nghiệp vụ Việt Nam. Giá trị tiền lấy từ service cashflow: một Chủ trọ tính chi toàn chuỗi chưa phân căn; từ hai Chủ trọ tách `unassignedExpenses`, không âm thầm phân bổ. UI hiển thị chú giải khi có khoản chi chưa phân căn. Xu hướng chỉ dành cho doanh thu, không gắn mũi tên cho KPI khác. Dự báo 30/60/90 là cố định; riêng dòng việc “Hợp đồng sắp hết hạn” dùng `contractWarningDays` runtime. Tối đa năm việc hiển thị trước, việc còn lại mở bằng “Xem thêm” tại chỗ, không gọi API thêm. Không gắn liên kết lọc giả khi trang đích chưa đọc tham số URL. Yêu cầu chờ xử lý suy căn qua bản ghi chi tiết `YeuCauGiaHan`/`YeuCauTraPhong`/`DeXuatBanCungPhong`, không suy qua mọi hợp đồng lịch sử của khách. Test `zz-dashboard-insights.integration.test.js` đối chiếu mỗi tháng với API cashflow, phân quyền hai Chủ trọ, ngày biên múi giờ, scoped due rule ngày 05→06 và dự báo `SAP_HET_HAN`; phép thử bỏ lọc sở hữu làm test đỏ (4 căn thay vì 1 cho B), khôi phục xanh. Đo 57 truy vấn khi cache cấu hình đã ấm, 58 khi lạnh trên fixture hai Chủ trọ; hiện dùng 7 lần gọi service cashflow, không N+1 theo số căn/phòng.
+
+`dashboard.insights.mjs` chỉ kiểm kiểu, miền, phép phân hoạch và biến dữ liệu server thành cấu trúc UI; không tính lại doanh thu, chi phí hoặc lợi nhuận. Biểu đồ SVG có bảng ẩn chứa đúng số server cho người dùng đọc màn hình; thang có đường 0 và nhận lợi nhuận âm hoặc sáu tháng toàn 0. `tests/fixtures/dashboard-insights.sample.mjs` là response thật của `owner_ci` trên `qlpt_authz_test` kỳ 2026-10 ngày 22/10/2026; test hợp đồng kiểm từng trường. Phép thử phủ định thay `totalRevenue` bằng `grossRevenue` làm test đỏ; bỏ escape tên căn làm test render đỏ; cả hai đã khôi phục. Frontend build/chụp màn hình UI-2a-2: **chưa chạy trong sandbox**.
 
 Ảnh mockup chỉ hướng dẫn bố cục/màu; mọi số đều lấy từ API. Phạm vi UI-1a không có thu–chi sáu tháng, lấp đầy theo căn và việc cần xử lý (chờ Đợt B). Không hiển thị con số giả hoặc ô trống thay thế.
 
-## Nguồn → ô hiển thị
+## Lịch sử UI-1a (đã thay bằng UI-2a-2 ở trên)
+
+Các bảng bên dưới lưu đối chiếu của giao diện cũ; số request, khối hiển thị và kết luận “chưa làm” ở phần này không mô tả giao diện UI-2a-2 hiện hành.
+
+### Nguồn → ô hiển thị
 
 | Route (mỗi route gọi một lần) | Trường response | Kiểu/đơn vị | Hàm gom | Ô hiển thị |
 |---|---|---|---|---|

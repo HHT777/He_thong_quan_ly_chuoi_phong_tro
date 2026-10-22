@@ -20,4 +20,4 @@ Khung desktop thanh bên 254px; màn hình dưới 900px dùng drawer hiện có
 
 Thẻ “Không gian quản lý” cũ không có click handler hay dữ liệu nghiệp vụ riêng nên được bỏ. Các lối tạo thật tìm được: Thêm căn trọ (`buildings`), Thêm phòng (`rooms`), Tạo hợp đồng (`contracts`), Tạo sự cố (`incidents`); menu điều hướng đến tab có nút tạo, không ghi dữ liệu ngay. Chấm chuông dùng `GET /api/v1/notifications` và `da_doc`, mặc định ẩn cho đến khi tải xong. Ô tìm kiếm giữ phím Ctrl/Cmd+K để focus, chưa thêm tìm kiếm toàn hệ thống giả.
 
-Nội dung thẻ/bản đồ dashboard chưa làm ở UI-2a-1; chờ người dùng xác nhận build trước UI-2a-2.
+Người dùng đã xác nhận “Build UI-2a-1 OK”. Phần thân dashboard UI-2a-2 đã dùng các token trên; xem `docs/DASHBOARD_METRICS.md`. Build và xem trực tiếp UI-2a-2 vẫn do người dùng thực hiện.

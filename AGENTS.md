@@ -1,5 +1,11 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Điểm dừng UI-2a-2 (22/10/2026; ưu tiên hiện hành)
+
+- Người dùng xác nhận “Build UI-2a-1 OK”; nhánh vẫn là `ui-2a-giao-dien`. `f3a0eaf` thêm adapter dữ liệu, fixture API thật và test; `83cf7aa` dựng thân dashboard đủ KPI, thu–chi sáu tháng, tình trạng phòng, lấp đầy theo căn, phiếu thu, dự báo 30/60/90, sự cố và việc cần xử lý. Dashboard chỉ gọi `summary`, `insights`, `incidents`, mỗi nguồn một lần. Các trang đích chưa đọc URL lọc nên biểu đồ và việc cần xử lý không gắn điều hướng giả.
+- Baseline trước sửa: backend unit 153/153, frontend test 14/14; integration đầu tiên 81/82 vì ca OCR nhận `MANUAL_REQUIRED` khi thiếu cấu hình OCR stub tường minh. Chạy lại ca OCR riêng với `OCR_BASE_URL=http://127.0.0.1:8000` xanh; toàn bộ integration sau đó 82/82, 28 nhóm bất biến 0 ở seed và sau integration, chỉ reset `qlpt_authz_test` TCP 127.0.0.1:3307. Sau UI-2a-2: backend unit 153/153, frontend test 22/22, bộ quét `innerHTML` 0 vi phạm. Phép thử phủ định đổi `totalRevenue` thành `grossRevenue` và bỏ escape tên căn đều đỏ, sau khôi phục xanh.
+- `docs/DASHBOARD_METRICS.md` là bảng nối UI-2a-2 hiện hành. Chưa chạy frontend build/chưa xem trực tiếp UI-2a-2 trong sandbox; người dùng tự build và kiểm tra. Không làm thêm phần dashboard sau điểm dừng này khi chưa có phản hồi. Giữ nguyên sửa dở `phong-tro-frontend/src/shared/styles/management.css` (CSS hộp thoại in) và các file untracked chủ ý; không stage/commit chúng. Không merge/push.
+
 ## Cập nhật đưa OCR vào repository chính (22/10/2026; ưu tiên cho đường dẫn OCR)
 
 - Người dùng đã chọn chép mã và hai model từ bản clone `OCR/meter_ocr` vào `phong-tro-ocr/` để repository chính có đủ dịch vụ OCR. Bản clone cũ `OCR/` cùng `.git` bên trong vẫn bị ignore và không được sửa/xóa.
