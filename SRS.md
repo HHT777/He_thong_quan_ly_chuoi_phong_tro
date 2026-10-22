@@ -6,9 +6,9 @@
 
 | Mục                    | Nội dung                                                                                                                                 |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Phiên bản / Trạng thái | 0.3 — **APPROVED FOR DESIGN** (Chủ trọ chốt N-01…N-16 với chỉnh sửa N-06…N-10 ngày 04/10/2026; thiết kế kỹ thuật vẫn cần xác nhận riêng) |
+| Phiên bản / Trạng thái | 0.4 — cập nhật yêu cầu giao diện Chủ trọ đã nêu ngày 21–22/10/2026; các quy tắc nghiệp vụ v0.3 tiếp tục có hiệu lực, các điểm chưa chốt nêu tại §22.9 |
 | Chế độ / Độ sâu        | DRAFT / FULL (có tiền, công nợ, dữ liệu cá nhân CCCD)                                                                                    |
-| Ngày cập nhật          | 04/10/2026                                                                                                                               |
+| Ngày cập nhật          | 22/10/2026                                                                                                                               |
 | Người duyệt            | Chủ trọ (khách hàng) — đã xác nhận là người duyệt duy nhất (Q-34)                                                                        |
 | Ngôn ngữ               | Tiếng Việt; giữ thuật ngữ gốc khi chuẩn ngành dùng (OCR, JWT…)                                                                           |
 
@@ -28,6 +28,7 @@
 | 0.1       | 03/10/2026 | Tạo bản nháp từ S1, S2; chuẩn hóa ID/trạng thái; ghi nhận mâu thuẫn và khoảng trống                                                                                                                                                                                                                                                                                         |
 | 0.2       | 04/10/2026 | Tích hợp trả lời S4: chốt công thức kỳ/ngày, sổ thanh toán, nợ cũ, từ chối yêu cầu, giữ phòng, người ở cùng, hợp đồng điện tử, phí phát sinh cố định/theo kỳ, trả phòng ≥ 30 ngày; bỏ gia hạn trực tiếp và UC-21; thông báo chỉ trong ứng dụng (Kafka); thêm UC-22…29, FR-167…198, BR-33…50; viết lại mục 8–10, 21–23                                                       |
 | 0.3       | 04/10/2026 | Chủ trọ duyệt N-01…N-16 có sửa: N-06 cho cập nhật số còn thiếu qua thu bổ sung/điều chỉnh có lịch sử; N-07 điều khoản giữ phòng theo từng thỏa thuận; N-08 quy trình ngoại lệ trả phòng trong hệ thống; N-09 sự cố đã hoàn tất không mở lại trực tiếp; N-10 thông tin tùy thân người ở cùng bắt buộc; thống nhất OPS-01 với NFR-008; bổ sung AC/UAT và audit thay đổi §22.8 |
+| 0.4       | 22/10/2026 | Bổ sung FR-201…FR-210 và tiêu chí kiểm nhận cho điều hướng Chủ trọ, lọc căn, OCR, chi tiết phòng/hợp đồng, in hợp đồng, tiền cọc và căn lề giao diện; ghi chênh lệch giữa SRS v0.3 và mã hiện tại tại §22.9. Không thay công thức tiền hoặc trạng thái nghiệp vụ. |
 
 ---
 
@@ -39,7 +40,7 @@
 
 **Hệ thống là gì / không là gì.** Là hệ thống **ghi nhận và quản lý dữ liệu, trạng thái, kết quả nghiệp vụ**. Không thực hiện chuyển tiền, hoàn cọc thực tế, thương lượng giá, sửa chữa thực tế, môi giới tìm phòng (S1 §2.3, §3.4).
 
-**Tình trạng (v0.3).** Chủ trọ đã trả lời Q-01…Q-34 và duyệt N-01…N-16 với điều chỉnh ghi tại §22.2/22.8. Các quy tắc tiền, giữ phòng theo thỏa thuận, cập nhật thanh toán muộn, ngoại lệ trả phòng và hồ sơ người ở cùng đã được đồng bộ. Các nhãn `[ASSUMED]` còn xuất hiện ở nội dung v0.2 được hiểu theo quyết định chốt tại §22.8; những giả định kỹ thuật chưa được Chủ trọ duyệt cụ thể vẫn là quyết định thiết kế, không phải yêu cầu nghiệp vụ mới.
+**Tình trạng (v0.4).** Chủ trọ đã trả lời Q-01…Q-34 và duyệt N-01…N-16 với điều chỉnh ghi tại §22.2/22.8. Các quy tắc tiền, giữ phòng theo thỏa thuận, cập nhật thanh toán muộn, ngoại lệ trả phòng và hồ sơ người ở cùng của v0.3 vẫn có hiệu lực. FR-201…FR-210 bổ sung các yêu cầu giao diện Chủ trọ đã nêu trong quá trình triển khai. Các chênh lệch chưa chốt giữa văn bản v0.3 và mã hiện tại được nêu tại §22.9; không suy từ trạng thái triển khai thành thay đổi nghiệp vụ.
 
 ---
 
@@ -891,6 +892,25 @@ Cú pháp EARS. Mặc định Release = **MVP** `[ASSUMED]` (`Q-33`); `Pri`: M =
 | FR-199 | Chủ trọ    | Hệ thống phải cho ghi nhận vi phạm hợp đồng (nội dung, điều khoản, ngày), hiển thị cho khách và làm căn cứ khấu trừ khi trả phòng (BR-24)                                                                                     | S   | UC-06        | `[ASSUMED]`                      |
 | FR-200 | Chủ trọ    | Hệ thống phải cho Chủ trọ cấu hình các mốc ngày (ghi chỉ số, hạn thanh toán, ghi công nợ, ngưỡng cảnh báo hợp đồng, hạn giữ mặc định), lịch phiếu tự động, danh mục sự cố/chi phí và giới hạn ảnh (NFR-013)                   | M   | UC-20        | `[ASSUMED]`                      |
 
+### 11.10 Bổ sung yêu cầu giao diện Chủ trọ v0.4 (21–22/10/2026)
+
+Các yêu cầu dưới đây ghi lại quyết định giao diện Chủ trọ trong quá trình triển khai. Chúng bổ sung cách truy cập và trình bày cho các UC/FR ở trên; không thay quyền truy cập, công thức tiền hoặc trạng thái dữ liệu. Số FR mới được cấp tiếp sau FR-200 để có thể theo dõi và kiểm thử riêng.
+
+| ID | Actor | Yêu cầu | Pri | UC/FR liên quan | Tiêu chí kiểm nhận |
+| --- | --- | --- | --- | --- | --- |
+| FR-201 | Chủ trọ | Sidebar phải có mục riêng cho **Chỉ số điện**, **Sự cố** và **Trả phòng**; **Cấu hình hệ thống** thuộc **Cài đặt**. | M | UC-10, UC-15, UC-17, UC-20 | Từ sidebar mở trực tiếp đúng trang; trang cấu hình không nằm trong nhóm Vận hành. |
+| FR-202 | Chủ trọ | Màn Chỉ số điện phải chọn **căn trước, phòng sau**; ô phòng chỉ liệt kê phòng thuộc căn đã chọn và chưa cho chọn khi chưa chọn căn. Kỳ trên màn này dùng để **lọc lịch sử chỉ số**. | M | UC-10, FR-063…FR-068 | Đổi căn làm mất lựa chọn phòng cũ và tải phòng đúng căn; đổi kỳ chỉ đổi danh sách đang xem, không tự đổi kỳ ghi chỉ số mới. |
+| FR-203 | Chủ trọ | Nút **Xem OCR** phải hiển thị kết quả nhận dạng hoặc thông báo lỗi cụ thể; nếu OCR không đọc được, Chủ trọ có thể nhập chỉ số bằng tay rồi xác nhận theo luồng hợp lệ. | M | UC-10, FR-065…FR-068 | Có phản hồi khi OCR thành công/thất bại; chỉ số nhập tay được kiểm tra với chỉ số trước; không coi OCR lỗi là chỉ số đã xác nhận. |
+| FR-204 | Chủ trọ | Ở chế độ thẻ của danh sách phòng, nhấn vào thẻ phải mở chi tiết phòng gồm căn, số phòng, giá thuê, diện tích, sức chứa, trạng thái và thông tin nội thất sẵn có. | M | UC-04, FR-026 | Có thể đóng chi tiết; chi tiết đúng phòng vừa chọn. |
+| FR-205 | Mọi actor | Thanh tab của các nhóm trang phải căn giữa nội dung theo chiều dọc; tiêu đề, mô tả, bộ lọc và nội dung trong các khung có khoảng đệm nhất quán, không sát viền. | S | NFR-010 | Kiểm tra các trang dùng chung khung/tab ở kích thước desktop và màn hẹp, không cắt chữ hoặc che thao tác. |
+| FR-206 | Chủ trọ | Danh sách hợp đồng phải hiển thị **số/tên phòng** dễ đọc thay cho UUID/mã nội bộ; hộp thoại chi tiết hợp đồng phải có khoảng đệm, nút đóng rõ ràng và hiển thị **lịch sử hợp đồng** trong cùng hộp thoại. | M | UC-06, FR-035, FR-041, FR-042 | Danh sách và chi tiết cùng phòng; lịch sử tải theo hợp đồng đã chọn; đóng bằng nút và phím Escape. |
+| FR-207 | Chủ trọ | Trong chi tiết hợp đồng chỉ có **một thao tác In hợp đồng**; bản in được xem trước trong chi tiết trước khi gọi hộp thoại in của trình duyệt. | S | UC-06, FR-184 | Không có hai nút cùng dẫn đến một lệnh in; bản xem trước đúng hợp đồng; lệnh in được kích hoạt từ nút duy nhất. |
+| FR-208 | Chủ trọ | Tiền cọc phải là một phần của **chi tiết hợp đồng**, thể hiện số tiền, ngày nhận, trạng thái, số đã hoàn và đã khấu trừ nếu có. | M | UC-06, FR-043, FR-049 | Mở chi tiết hợp đồng thấy phần cọc của chính hợp đồng; không cần tab Tiền cọc riêng trên thanh điều hướng chính. |
+| FR-209 | Chủ trọ | Cả sáu tab **Giữ phòng, Cư dân, Tài khoản, Hợp đồng, Người ở cùng, Yêu cầu** phải có bộ lọc theo căn; danh sách và lựa chọn phòng/hợp đồng trong thao tác phải theo căn đang chọn. | M | UC-02, UC-05, UC-06, UC-08, UC-16, UC-26 | Chọn căn A không hiển thị bản ghi của căn B; chọn “Tất cả căn trọ” xem toàn bộ trong phạm vi Chủ trọ; đổi căn cập nhật các lựa chọn phụ thuộc. |
+| FR-210 | Chủ trọ | Trang Người ở cùng phải căn lề tiêu đề, mô tả và bảng nhất quán với các trang quản lý khác; bảng dài phải đọc được ở màn hẹp. | S | UC-28, FR-166 | Phần “Đề xuất chờ xử lý” và “Người ở cùng đã duyệt” có khoảng đệm tương ứng; không có chữ sát mép khung. |
+
+**Phạm vi lọc của FR-202 và FR-209:** bộ lọc giao diện không thay thế kiểm tra quyền sở hữu tại API. Khi không có căn hoặc phòng phù hợp, hiển thị trạng thái rỗng rõ ràng. Các form tạo/sửa chỉ được chọn tài nguyên thuộc căn đang lọc và thuộc Chủ trọ đăng nhập.
+
 ---
 
 ## 12. Business Rules
@@ -1247,6 +1267,8 @@ Không dùng dữ liệu cá nhân thật; SĐT/CCCD là giá trị giả hợp 
 | UC-29    | WF-05, 06, 08, 10 | BG-04, BG-05  | 153, 158, 168, 172, 173, 186 | 02, 19, 41, 45                 | NFR-021 / NTF-05, 12, 13, 15         | UC29-AC1…2 | MVP     |
 | Hệ thống | mọi WF            | BG-01         | 157, 159, 160, 161, 200      | 03, 15, 22                     | NFR-013                              | —          | MVP     |
 
+**Bổ sung truy vết v0.4:** FR-201 → UC-10/15/17/20; FR-202/203 → UC-10; FR-204 → UC-04; FR-205 → NFR-010 (khung giao diện dùng chung); FR-206/207/208 → UC-06; FR-209 → UC-02/05/06/08/16/26; FR-210 → UC-28. Tiêu chí kiểm nhận tương ứng nằm tại §11.10.
+
 ### 21.2 Business Goal → phủ
 
 BG-01 → WF-04, 05, UC-09, 10, 20, 25, FR-157 · BG-02 → UC-02…05, 08, 24, 26, 28 · BG-03 → UC-10, 11, 20, 22 · BG-04 → UC-11, 12, 23, 29 · BG-05 → UC-06, 07, 13, 14, 16, 29 · BG-06 → UC-09, 10 · BG-07 → UC-17, 19 · BG-08 → UC-17, 18 · BG-09 → UC-06, 14, 15.
@@ -1418,9 +1440,27 @@ GAP-01 → UC-24 · GAP-02 → UC-25 · GAP-03 → UC-29 · GAP-04 → UC-26 · 
 
 **AC bổ sung cần kiểm thử:** AC-V03-01 thu thêm sau ngày 10 làm giảm nợ kỳ gốc; AC-V03-02 điều chỉnh tổng thấp hơn đã thu bị từ chối; AC-V03-03 hủy giữ hoàn một phần; AC-V03-04 rút duyệt trước ngày trả khiến job không chuyển phòng; AC-V03-05 ngoại lệ trả sớm chỉ có hiệu lực khi Chủ trọ duyệt; AC-V03-06 sự cố hoàn tất giữ nguyên khoản chi; AC-V03-07 thiếu trường tùy thân người ở cùng bị từ chối; AC-V03-08 làm tròn BR-44 có tổng đối ứng bằng thực thu.
 
+### 22.9 Đối chiếu yêu cầu với bản triển khai tháng 10/2026
+
+Mục này ghi **trạng thái đối chiếu**, không tự sửa các quyết định nghiệp vụ v0.3. Mốc đọc mã: 22/10/2026 trên nhánh `ui-2a-giao-dien`. Bằng chứng ở đây chỉ xác nhận vị trí triển khai hoặc khoảng trống đã nhìn thấy; nghiệm thu giao diện thực tế và tích hợp đầy đủ vẫn cần kiểm thử riêng.
+
+| Nội dung | Yêu cầu hiện hành / quyết định đã có | Mã/tài liệu hiện tại | Trạng thái cần theo dõi |
+| --- | --- | --- | --- |
+| FR-201…FR-210 | Các điều chỉnh giao diện Chủ trọ đã yêu cầu | `phong-tro-frontend/src/layout/app-shell.js`, các tab trong `src/modules/`, `src/shared/styles/`; một phần OCR trong `phong-tro-backend/src/services/meterReading.service.js` | Các phần liên quan đã được sửa trong mã ngày 21–22/10; chưa coi toàn bộ tiêu chí §11.10 là đã nghiệm thu trực quan. |
+| FR-132 / FR-194 | Dashboard/báo cáo theo phạm vi Chủ trọ và xuất Excel | `dashboardInsights.service.js`, `cashflowReport.service.js`, `cashflowExport.service.js`, `overview/dashboard.tab.js` | Đã có triển khai và test riêng; số liệu, bộ lọc và file Excel vẫn cần đối chiếu trên môi trường nghiệm thu. |
+| FR-192 | Sự cố mới có thể tham chiếu sự cố đã hoàn tất trước đó | `incident.service.js`, migration 016 và các test sự cố | Đã có luồng liên kết sự cố mới/cũ; việc hủy và lịch sử vẫn phải theo SM-06/BR-50. |
+| FR-158 / BR-02 | Cảnh báo hợp đồng **tối thiểu một tháng trước** | Cấu hình runtime `contractWarningDays`, mặc định **30 ngày**, tại `phong-tro-backend/src/services/systemConfig.service.js` | **Chưa đồng nhất** “một tháng lịch” và “30 ngày”. Chưa tự đổi ngưỡng hay lịch cảnh báo; cần Chủ trọ xác nhận cách hiểu trước khi sửa nghiệp vụ. |
+| FR-200 / UC-26 | FR-200 v0.3 liệt kê “hạn giữ mặc định”; UC-26 và N-07 yêu cầu hạn giữ theo **từng thỏa thuận** | Màn/API cấu hình hiện có timezone, giới hạn ảnh và 13 khóa số về cảnh báo, hạn, lịch tác vụ; chưa có khóa hạn giữ mặc định, ngày ghi chỉ số hoặc danh mục sự cố/chi phí | Hạn giữ **không tự áp mặc định** theo quyết định N-07. Phần FR-200 còn lại cần làm rõ/phê duyệt trước khi thêm khóa hoặc DDL; không tự thêm danh mục chi phí. Nếu thêm khóa ngày ghi chỉ số, chỉ dùng để nhắc và không tự thay cửa sổ nhận chỉ số. |
+| Thông báo Q-08 / INT-02 | Văn bản v0.3 ghi Kafka cho thông báo trong ứng dụng | Bản đang chạy dùng bảng thông báo, khóa sự kiện và cron trong backend; không có tiến trình Kafka được triển khai trong repository | Chênh lệch kỹ thuật cần quyết định: giữ Kafka là yêu cầu triển khai tương lai hay điều chỉnh SRS theo kiến trúc hiện tại. Không tuyên bố Kafka đã có. |
+| Giao diện Khách thuê | UC-07…09, UC-12…14, UC-18, UC-28 vẫn là phạm vi yêu cầu | `docs/HANDOFF_TENANT.md` ghi các tab hiện có và chức năng còn thiếu | Bàn giao để tiếp tục phát triển; sự tồn tại của tab/API không đồng nghĩa UC đã hoàn tất. |
+
+**Điểm cần Chủ trọ quyết định trước khi đổi nghiệp vụ:** (1) “một tháng” là tháng lịch hay số ngày cố định; (2) phạm vi cấu hình FR-200 còn thiếu, đặc biệt hạn giữ và danh mục có thể cần thay schema; (3) Kafka có còn là ràng buộc triển khai bắt buộc. Trong lúc chờ, giữ quyết định tiền, trạng thái và an toàn dữ liệu của v0.3.
+
 ---
 
-## 23. Handoff cho bước Design (prompt 02)
+## 23. Handoff cho bước Design (prompt 02; bản v0.3 lưu tham khảo)
+
+Khối handoff dưới đây là bản gốc của v0.3. Khi phát triển tiếp, đọc thêm §11.10 và §22.9; các câu “chưa chốt kỹ thuật” trong khối lịch sử không còn mô tả đầy đủ mã hiện hành.
 
 ```text
 HANDOFF — Hệ thống quản lý chuỗi phòng trọ (SRS v0.3, READY FOR ARCHITECTURE)
@@ -1460,9 +1500,9 @@ FR-151/153/156 (phiếu không trùng), FR-157 (khoản phải thu), FR-122 (chi
 
 ## SRS READINESS REPORT
 
-**Số lượng:** BG 9 · STK 7 · ACT 3 (+ EXT 2) · WF 11 · SM 13 · UC 28 (UC-01…20, 22…29; UC-21 bỏ) · FR 200 (1 `DEPRECATED`) · BR 50 · NFR 22 · SEC 14 · INT 2 · AUD 10 · NTF 15 · RPT 7 · OPS 5 · MIG 4 · AST 10 · RSK 11.
+**Số lượng v0.4:** BG 9 · STK 7 · ACT 3 (+ EXT 2) · WF 11 · SM 13 · UC 28 (UC-01…20, 22…29; UC-21 bỏ) · FR 210 (1 `DEPRECATED`; FR-201…210 là bổ sung giao diện) · BR 50 · NFR 22 · SEC 14 · INT 2 · AUD 10 · NTF 15 · RPT 7 · OPS 5 · MIG 4 · AST 10 · RSK 11.
 
-**Nhãn FR v0.2:** 17 mục `[ASSUMED]` đã được rà soát theo N-01…N-16; các chi tiết kỹ thuật còn do bước Design quyết định. `[PROPOSED]` 0. **Q-01…Q-34:** đã trả lời. **Mâu thuẫn:** 21/21 có quyết định. **N-01…N-16:** 16/16 chốt. **TBD nghiệp vụ:** 0.
+**Nhãn FR v0.2:** 17 mục `[ASSUMED]` đã được rà soát theo N-01…N-16. `[PROPOSED]` 0. **Q-01…Q-34:** đã trả lời. **Mâu thuẫn nguồn ban đầu:** 21/21 có quyết định. **N-01…N-16:** 16/16 chốt. **Chênh lệch mới cần quyết định:** ngưỡng một tháng/30 ngày, phạm vi FR-200 và ràng buộc Kafka (§22.9).
 
 **Điểm chất lượng (0–5):** Completeness **4** · Clarity **4** · Testability **4** · Traceability **4** · Consistency **4** (cần kiểm chứng số đo NFR qua UAT).
 
@@ -1476,4 +1516,4 @@ FR-151/153/156 (phiếu không trùng), FR-157 (khoản phải thu), FR-122 (chi
 - Mâu thuẫn "phiếu không sửa sau khi có thanh toán" và "sửa chỉ số sau khi lập phiếu" đã thống nhất (BR-35, BR-47). ✔
 - Sơ đồ Mermaid **chưa render-test**; một số FR gộp nhiều trường dữ liệu trong cùng form (FR-021, 025, 036) sẽ tách khi viết test. △
 
-**Kết luận: `READY FOR ARCHITECTURE`.** Chủ trọ đã chốt N-01…N-16. Các lựa chọn kỹ thuật thuộc System Design; số đo NFR cần xác minh khi UAT.
+**Kết luận:** Phần nghiệp vụ v0.3 đã được Chủ trọ chốt; v0.4 bổ sung yêu cầu giao diện đã nêu và ghi rõ các chênh lệch chưa thể tự quyết tại §22.9. Cần kiểm thử giao diện thực tế, tích hợp và số đo NFR trước khi nghiệm thu.
