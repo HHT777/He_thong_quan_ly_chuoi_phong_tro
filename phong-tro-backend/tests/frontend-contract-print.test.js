@@ -10,7 +10,7 @@ test("FR-184 contract detail opens browser print from one button after preload",
   assert.match(source, /openDetail: openContractDetail/);
   assert.match(source, /id: "detail", label: "Chi tiết", openDetail: true/);
   assert.match(source, /data-print disabled>In hợp đồng/);
-  assert.match(source, /Promise\.all\(\[loadDetail\(\), loadHistory\(\), loadPrint\(\)\]\)/);
+  assert.match(source, /Promise\.all\(\[loadDetail\(\), loadDeposit\(\), loadHistory\(\), loadPrint\(\)\]\)/);
   assert.match(source, /printButton\.addEventListener\("click", \(\) => printFrame\?\.contentWindow\?\.print\(\)\)/);
   assert.doesNotMatch(source, /Mở hộp thoại in/);
   assert.match(source, /getHtml\(`\/hop-dong\/\$\{encodeURIComponent\(row\.ma_hop_dong\)\}\/print`\)/);

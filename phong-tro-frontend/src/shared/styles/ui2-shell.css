@@ -91,3 +91,5 @@ body, button, input, select, textarea { font-family: var(--font-sans); }
   .navbar-create-btn { padding: 0 10px; }
   .navbar-create-btn span { display: none; }
 }
+.resident-building-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 600; white-space: nowrap; }
+.resident-building-filter select { min-width: 180px; }

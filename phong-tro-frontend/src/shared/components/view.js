@@ -155,10 +155,10 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
 }
 
 // Modal helper for create forms
-function openCreateModal(config, onCreated) {
+function openCreateModal(config, onCreated, buildingScope) {
   return openFormModal({
     title: config.create.label || "Thêm mới",
-    fields: config.create.fields,
+    fields: typeof config.create.fields === "function" ? config.create.fields(buildingScope) : config.create.fields,
     initial: typeof config.create.initial === "function" ? config.create.initial() : config.create.initial || {},
     submitLabel: config.create.label || "Thêm mới",
     submit: (raw) => onCreated(config.create.map ? config.create.map(raw) : raw),
@@ -348,7 +348,18 @@ export async function renderList(context, config) {
 
   try {
     const response = await context.api.get(config.endpoint);
-    const data = config.transform ? config.transform(response.data) : response.data;
+    const buildingScope = config.buildingScope ? await config.buildingScope(context.api) : null;
+    buildingScope?.mount(actions, () => renderList(context, config));
+    let data = config.transform ? config.transform(response.data) : response.data;
+    if (config.loadAllPages && response.pagination?.hasNext) {
+      data = [...(data || [])];
+      for (let page = 2; ; page += 1) {
+        const separator = config.endpoint.includes("?") ? "&" : "?";
+        const next = await context.api.get(`${config.endpoint}${separator}page=${page}`);
+        data.push(...(next.data || []));
+        if (!next.pagination?.hasNext) break;
+      }
+    }
     const allRows = Array.isArray(data) ? data : [];
 
     // Check if this is the "Phòng" module
@@ -412,6 +423,7 @@ export async function renderList(context, config) {
     // Filter rows logic
     const getFilteredRows = () => {
       return allRows.filter((row) => {
+        if (buildingScope && !config.buildingMatch(row, buildingScope)) return false;
         // Status filter
         if (statusFilter !== "ALL" && row.trang_thai !== statusFilter) {
           return false;
@@ -661,7 +673,7 @@ export async function renderList(context, config) {
           await context.api.post(config.create.endpoint || config.endpoint, body, headers);
           config.create.onCreated?.(body);
           await renderList(context, config);
-        });
+        }, buildingScope);
       });
     };
 

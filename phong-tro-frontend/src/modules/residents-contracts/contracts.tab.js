@@ -2,6 +2,7 @@ import { listTab } from "../../shared/components/tab-factory.js";
 import { date, money, openFormModal, escapeHtml, confirmAction } from "../../shared/components/view.js";
 import { statusLabel } from "../../shared/components/status-labels.mjs";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
+import { loadBuildingScope } from "./building-scope.js";
 const reservationPrefill = () => {
   try { return JSON.parse(sessionStorage.getItem("qlpt:contract-reservation") || "null"); } catch (_) { return null; }
 };
@@ -142,6 +143,9 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   title: "Hợp đồng",
   description: "Tạo hợp đồng kèm hồ sơ cọc và gia hạn hợp đồng hiện có.",
   endpoint: "/hop-dong?limit=100",
+  loadAllPages: true,
+  buildingScope: loadBuildingScope,
+  buildingMatch: (row, scope) => scope.matchesContract(row),
   openDetail: openContractDetail,
   columns: [{ label: "Khách thuê", format: (row) => row.khachThue?.ho_ten || "—" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Kết thúc", format: (row) => date(row.ngay_ket_thuc) }, { label: "Trạng thái", key: "trang_thai" }],
   create: {
@@ -149,10 +153,10 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
     endpoint: "/hop-dong",
     onCreated: () => sessionStorage.removeItem("qlpt:contract-reservation"),
     initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "" }),
-    fields: [
+    fields: (scope) => [
       { name: "ma_dat_giu", label: "Mã giữ phòng (nếu có)" },
       { name: "ma_khach_thue", label: "Mã khách thuê", required: true },
-      { name: "ma_phong", label: "Mã phòng", required: true },
+      { name: "ma_phong", label: "Phòng", options: [{ value: "", label: "Chọn phòng" }, ...scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && ["TRONG", "DA_GIU"].includes(room.trang_thai)).map((room) => ({ value: room.ma_phong, label: `${room.canTro?.ten_can || "Căn trọ"} · ${room.so_phong}` }))], required: true },
       { name: "ngay_bat_dau", label: "Ngày bắt đầu", type: "date", required: true },
       { name: "ngay_ket_thuc", label: "Ngày kết thúc", type: "date", required: true },
       { name: "gia_thue", label: "Giá thuê", type: "number", required: true },
@@ -171,8 +175,8 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   }, {
     id: "transfer", label: "Chuyển phòng", visible: (row) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(row.trang_thai),
     run: async (context, row) => {
-      const rooms = (await context.api.get("/phong?limit=100")).data || [];
-      const vacant = rooms.filter((room) => room.trang_thai === "TRONG" && room.ma_phong !== row.ma_phong);
+      const scope = await loadBuildingScope(context.api);
+      const vacant = scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && room.trang_thai === "TRONG" && room.ma_phong !== row.ma_phong);
       if (!vacant.length) throw new Error("Không có phòng trống để chuyển.");
       openFormModal({ title: "Chuyển phòng", submitLabel: "Xác nhận chuyển", fields: [
         { name: "targetRoomId", label: "Phòng đích trống", options: vacant.map((room) => ({ value: room.ma_phong, label: room.so_phong })), required: true },

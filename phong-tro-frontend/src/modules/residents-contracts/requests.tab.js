@@ -1,13 +1,17 @@
 import { shellPage, escapeHtml, date, openFormModal, confirmAction } from "../../shared/components/view.js";
 import { requiredText } from "../../core/idempotency.js";
+import { loadBuildingScope } from "./building-scope.js";
 
 export default {
   id: "requests", route: "/residents-contracts/requests", title: "Yêu cầu cư dân", tabLabel: "Yêu cầu", group: "residents-contracts", order: 34, roles: ["CHU_TRO"],
   async render(context) {
     context.main.innerHTML = shellPage("Yêu cầu cư dân", "Duyệt gia hạn, trả phòng và đề xuất người ở cùng sau khi đối chiếu thông tin.");
     const content = context.main.querySelector("[data-content]");
+    const actions = context.main.querySelector("[data-actions]");
     try {
-      const { data = [] } = await context.api.get("/v1/requests");
+      const [result, scope] = await Promise.all([context.api.get("/v1/requests"), loadBuildingScope(context.api)]);
+      scope.mount(actions, () => this.render(context));
+      const data = (result.data || []).filter((row) => scope.matchesRoom(row.ma_phong));
       content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Loại</th><th>Nội dung</th><th>Ngày gửi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${data.map((item, index) => `<tr><td>${escapeHtml(item.loai_yeu_cau)}</td><td>${escapeHtml(item.noi_dung)}</td><td>${escapeHtml(date(item.ngay_gui))}</td><td>${escapeHtml(item.trang_thai)}</td><td>${item.trang_thai === "CHO_XU_LY" ? `${item.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" ? "Cần đối chiếu hồ sơ định danh trước khi duyệt" : `<button data-approve="${index}">Duyệt</button>`} <button data-reject="${index}">Từ chối</button>` : item.loai_yeu_cau === "TRA_PHONG" && item.trang_thai === "DA_PHE_DUYET" ? `<button data-revoke="${index}">Rút duyệt</button>` : "—"}</td></tr>`).join("")}</tbody></table></div><p data-message role="status"></p>`;
       if (data.some((item) => item.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && item.trang_thai === "CHO_XU_LY")) content.insertAdjacentHTML("afterbegin", '<p><a href="#/residents-contracts/co-tenants">Mở màn hình người ở cùng để xem định danh và duyệt đề xuất</a></p>');
       const message = content.querySelector("[data-message]");

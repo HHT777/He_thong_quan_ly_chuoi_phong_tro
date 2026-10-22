@@ -1,6 +1,7 @@
 import { shellPage, escapeHtml, date, money, confirmAction } from "../../shared/components/view.js";
 import { openFormModal } from "../../shared/components/view.js";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
+import { loadBuildingScope } from "./building-scope.js";
 
 export default {
   id: "reservations", route: "/residents-contracts/reservations", title: "Giữ phòng", tabLabel: "Giữ phòng", group: "residents-contracts", order: 30, roles: ["CHU_TRO"],
@@ -9,14 +10,16 @@ export default {
     const content = context.main.querySelector("[data-content]");
     const actions = context.main.querySelector("[data-actions]");
     try {
-      const [holdResult, roomResult] = await Promise.all([context.api.get("/v1/reservations"), context.api.get("/phong?limit=100")]);
-      const holds = holdResult.data || [];
-      const vacant = (roomResult.data || []).filter((room) => room.trang_thai === "TRONG");
+      const [holdResult, scope] = await Promise.all([context.api.get("/v1/reservations"), loadBuildingScope(context.api)]);
+      const holds = (holdResult.data || []).filter((row) => scope.matchesRoom(row.ma_phong));
+      const vacant = scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && room.trang_thai === "TRONG");
       actions.innerHTML = '<button type="button" class="btn btn--primary" data-create-hold>Giữ phòng mới</button>';
+      scope.mount(actions, () => this.render(context));
+      actions.querySelector("[data-create-hold]").disabled = !vacant.length;
       actions.querySelector("[data-create-hold]").addEventListener("click", () => openFormModal({
         title: "Giữ phòng trống", submitLabel: "Tạo giữ phòng",
         fields: [
-          { name: "roomId", label: "Phòng trống", options: vacant.map((room) => ({ value: room.ma_phong, label: room.so_phong })), required: true },
+          { name: "roomId", label: "Phòng trống", options: [{ value: "", label: "Chọn phòng" }, ...vacant.map((room) => ({ value: room.ma_phong, label: `${room.canTro?.ten_can || "Căn trọ"} · ${room.so_phong}` }))], required: true },
           { name: "holderName", label: "Tên người giữ", required: true }, { name: "phone", label: "Số điện thoại", required: true },
           { name: "amount", label: "Tiền giữ", type: "number", required: true }, { name: "receivedOn", label: "Ngày nhận", type: "date", required: true },
           { name: "expiresOn", label: "Hạn giữ", type: "date", required: true }, { name: "terms", label: "Điều kiện", type: "textarea", required: true },

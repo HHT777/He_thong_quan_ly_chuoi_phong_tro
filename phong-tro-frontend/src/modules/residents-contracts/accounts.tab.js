@@ -1,8 +1,11 @@
 import { listTab } from "../../shared/components/tab-factory.js";
+import { loadBuildingScope } from "./building-scope.js";
 export default listTab({ id: "tenant-accounts", route: "/residents-contracts/accounts", title: "Tài khoản khách thuê", tabLabel: "Tài khoản", group: "residents-contracts", order: 30.5, roles: ["CHU_TRO"] }, {
   title: "Tài khoản khách thuê",
   description: "Cấp tài khoản khi đủ hợp đồng/cọc, khóa hoặc mở khóa và đặt lại mật khẩu mặc định.",
   endpoint: "/management/khach-thue",
+  buildingScope: loadBuildingScope,
+  buildingMatch: (row, scope) => scope.matchesResident(row),
   columns: [
     { label: "Họ tên", key: "ho_ten" },
     { label: "Điện thoại", key: "so_dien_thoai" },

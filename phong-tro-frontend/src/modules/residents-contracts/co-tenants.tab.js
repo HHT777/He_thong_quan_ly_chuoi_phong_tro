@@ -1,5 +1,6 @@
 import { shellPage, escapeHtml, date, openFormModal, confirmAction } from "../../shared/components/view.js";
 import { requiredText } from "../../core/idempotency.js";
+import { loadBuildingScope } from "./building-scope.js";
 
 const nextPeriod = () => {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "numeric" }).formatToParts(new Date());
@@ -13,10 +14,12 @@ export default {
   async render(context) {
     context.main.innerHTML = shellPage("Người ở cùng", "Xét đề xuất và theo dõi cư trú. Rời phòng có hiệu lực từ kỳ nước kế tiếp.");
     const content = context.main.querySelector("[data-content]");
+    const actions = context.main.querySelector("[data-actions]");
     try {
-      const [memberResult, requestResult] = await Promise.all([context.api.get("/v1/co-tenants"), context.api.get("/v1/requests")]);
-      const members = memberResult.data || [];
-      const pending = (requestResult.data || []).filter((row) => row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && row.trang_thai === "CHO_XU_LY");
+      const [memberResult, requestResult, scope] = await Promise.all([context.api.get("/v1/co-tenants"), context.api.get("/v1/requests"), loadBuildingScope(context.api, { contracts: true })]);
+      scope.mount(actions, () => this.render(context));
+      const members = (memberResult.data || []).filter((row) => scope.matchesContractId(row.ma_hop_dong));
+      const pending = (requestResult.data || []).filter((row) => row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && row.trang_thai === "CHO_XU_LY" && scope.matchesRoom(row.ma_phong));
       content.innerHTML = `<section class="panel"><h3>Đề xuất chờ xử lý</h3><p>Mở chi tiết để đối chiếu đầy đủ giấy tờ, phòng và sức chứa trước khi duyệt.</p><div class="table-wrap"><table><thead><tr><th>Nội dung</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>${pending.map((row, index) => `<tr><td>${escapeHtml(row.noi_dung)}</td><td>${escapeHtml(date(row.ngay_gui))}</td><td><button data-approve="${index}">Xem và duyệt</button> <button data-reject="${index}">Từ chối</button></td></tr>`).join("")}</tbody></table></div></section>
       <section class="panel"><h3>Người ở cùng đã duyệt</h3><div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Điện thoại</th><th>Giấy tờ</th><th>Ngày sinh</th><th>Giới tính</th><th>Thường trú</th><th>Quan hệ</th><th>Ngày vào</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${members.map((row, index) => `<tr><td>${escapeHtml(row.ho_ten)}</td><td>${escapeHtml(row.so_dien_thoai)}</td><td>${escapeHtml(row.cccd_giay_to)}</td><td>${escapeHtml(date(row.ngay_sinh))}</td><td>${escapeHtml(row.gioi_tinh)}</td><td>${escapeHtml(row.dia_chi_thuong_tru)}</td><td>${escapeHtml(row.quan_he)}</td><td>${escapeHtml(date(row.ngay_vao))}</td><td>${escapeHtml(row.trang_thai_cu_tru)}</td><td>${row.trang_thai_cu_tru === "DANG_O" ? `<button data-leave="${index}">Rời phòng</button>` : "—"}</td></tr>`).join("")}</tbody></table></div></section><p data-message role="status"></p>`;
       const message = content.querySelector("[data-message]");

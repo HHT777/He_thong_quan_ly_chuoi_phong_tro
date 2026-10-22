@@ -13,6 +13,7 @@ const cashflowExportService = require("../services/cashflowExport.service");
 const dashboardSummaryService = require("../services/dashboardSummary.service");
 const dashboardInsightsService = require("../services/dashboardInsights.service");
 const { validateQuery } = require("../utils/queryValidation");
+const { attachRequestRooms } = require("../utils/requestBuildingScope");
 const { businessDate } = require("../utils/businessDate.util");
 const billAdjustmentService = require("../services/billAdjustment.service");
 const billGenerationService = require("../services/billGeneration.service");
@@ -234,7 +235,22 @@ router.post("/requests", tenant, async (req, res, next) => {
     }); return data(res, row, 201);
   } catch (e) { next(e); }
 });
-router.get("/requests", async (req, res, next) => { try { return data(res, await YeuCau.findAll({ where: req.user.vai_tro === "KHACH_THUE" ? { ma_khach_thue: req.user.ma_khach_thue } : {}, order: [["ngay_gui", "DESC"]] })); } catch (e) { next(e); } });
+router.get("/requests", async (req, res, next) => {
+  try {
+    const requests = await YeuCau.findAll({ where: req.user.vai_tro === "KHACH_THUE" ? { ma_khach_thue: req.user.ma_khach_thue } : {}, order: [["ngay_gui", "DESC"]] });
+    if (!requests.length) return data(res, []);
+    const ids = requests.map((row) => row.ma_yeu_cau);
+    const where = { ma_yeu_cau: { [Op.in]: ids } };
+    const [renewals, moveOuts, proposals] = await Promise.all([
+      YeuCauGiaHan.findAll({ where, attributes: ["ma_yeu_cau", "ma_hop_dong"], raw: true }),
+      YeuCauTraPhong.findAll({ where, attributes: ["ma_yeu_cau", "ma_hop_dong"], raw: true }),
+      DeXuatBanCungPhong.findAll({ where, attributes: ["ma_yeu_cau", "ma_phong"], raw: true }),
+    ]);
+    const contractIds = [...new Set([...renewals, ...moveOuts].map((row) => row.ma_hop_dong))];
+    const contracts = contractIds.length ? await HopDong.findAll({ where: { ma_hop_dong: { [Op.in]: contractIds } }, attributes: ["ma_hop_dong", "ma_phong"], raw: true }) : [];
+    return data(res, attachRequestRooms(requests, renewals, moveOuts, proposals, contracts));
+  } catch (e) { next(e); }
+});
 router.patch("/requests/:id", landlord, async (req, res, next) => {
   try {
     const status = req.body.status === "DA_DUYET" ? "DA_PHE_DUYET" : req.body.status;

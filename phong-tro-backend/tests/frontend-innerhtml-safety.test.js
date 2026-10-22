@@ -70,8 +70,8 @@ const reviewedExceptions = new Map([
   ["finance/reports.tab.js:94", "month is YYYY-MM from the Vietnam business date"],
   ["finance/reports.tab.js:95", "year is YYYY from the Vietnam business date"],
   ["finance/reports.tab.js:97", "year is YYYY from the Vietnam business date"],
-  ["residents-contracts/co-tenants.tab.js:42", "Conditional emits a static disabled attribute"],
-  ["residents-contracts/reservations.tab.js:26", "Conditional emits a static overdue badge"],
+  ["residents-contracts/co-tenants.tab.js:45", "Conditional emits a static disabled attribute"],
+  ["residents-contracts/reservations.tab.js:29", "Conditional emits a static overdue badge"],
 ]);
 
 test("FR-159 all Group 1-3 innerHTML interpolations are escaped or reviewed", () => {
