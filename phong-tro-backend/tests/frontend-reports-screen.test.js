@@ -37,12 +37,12 @@ test("FR-136/137 report screen separates inactive buildings and shows snapshot d
 });
 
 test("FR-133 dashboard reads server report fields and does not synthesize money totals", () => {
-  const source = read("modules/overview/dashboard.tab.js");
-  const metrics = read("modules/overview/dashboard.metrics.mjs");
-  assert.match(source, /readCashflow\(/);
-  assert.match(metrics, /response\?\.data\?\.totalRevenue/);
-  assert.match(metrics, /Number\.isSafeInteger\(value\)/);
-  assert.match(source, /periodType=month&periodValue=\$\{period\}/);
+  const source = read("modules/overview/dashboard.view.mjs");
+  const insights = read("modules/overview/dashboard.insights.mjs");
+  assert.match(source, /readInsights\(await context\.api\.get\(`\/v1\/dashboard\/insights\?period=\$\{period\}`\)\)/);
+  assert.match(source, /insights\.cashflow6m\[5\]\.totalRevenue/);
+  assert.match(source, /formatVnd\(insights\.cashflow6m\[5\]\.totalRevenue\)/);
+  assert.match(insights, /Number\.isSafeInteger\(value\)/);
   assert.doesNotMatch(source, /due \*|avgRevenuePerRoom|billRows\.reduce/);
   assert.doesNotMatch(source, /\+12\.5%|Tháng hiện tại/);
 });

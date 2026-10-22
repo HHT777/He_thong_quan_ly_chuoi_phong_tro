@@ -15,7 +15,7 @@ test("FR-144 bill loading errors replace the spinner and offer retry", () => {
 });
 
 test("dashboard does not convert failed API calls into zero-valued data", () => {
-  const source = read("src/modules/overview/dashboard.tab.js");
+  const source = read("src/modules/overview/dashboard.view.mjs");
   assert.doesNotMatch(source, /\.catch\(\(\) => \(\{ data:/);
   assert.match(source, /data-retry="\$\{source\}"/);
   assert.match(source, /dashboardError\(error\)/);

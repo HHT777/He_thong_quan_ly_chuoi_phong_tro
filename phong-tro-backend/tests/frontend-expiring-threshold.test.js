@@ -15,7 +15,8 @@ test("FR-158 dashboard reads configured warning days from expiring response", as
     assert.equal(value.rows[0].room, "A1");
   }
   assert.throws(() => readExpiring({ data: [] }), /warning days/);
-  const screen = fs.readFileSync(path.join(root, "dashboard.tab.js"), "utf8");
-  assert.match(screen, /Ngưỡng \$\{warningDays\} ngày/);
+  const screen = fs.readFileSync(path.join(root, "dashboard.view.mjs"), "utf8");
+  assert.match(screen, /ngưỡng \$\{warningDays\} ngày/);
+  assert.match(screen, /d30.*d60.*d90/);
   assert.doesNotMatch(screen, /Kết thúc trong 30 ngày|hợp đồng trong 30 ngày/);
 });

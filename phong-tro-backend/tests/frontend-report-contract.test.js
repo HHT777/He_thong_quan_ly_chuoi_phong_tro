@@ -7,14 +7,15 @@ const read = (file) => fs.readFileSync(path.resolve(__dirname, "../../phong-tro-
 
 test("FR-133 report consumers use net, gross, discount, deposit and snapshot detail fields", () => {
   const reports = read("modules/finance/reports.tab.js");
-  const dashboard = read("modules/overview/dashboard.tab.js");
-  const dashboardMetrics = read("modules/overview/dashboard.metrics.mjs");
+  const dashboard = read("modules/overview/dashboard.view.mjs");
+  const dashboardMetrics = read("modules/overview/dashboard.insights.mjs");
   assert.match(reports, /totalRevenue/);
   assert.match(reports, /grossRevenue/);
   assert.match(reports, /discounts/);
   assert.match(reports, /depositDeductions/);
-  assert.match(dashboard, /readCashflow\(/);
-  assert.match(dashboardMetrics, /response\?\.data\?\.totalRevenue/);
+  assert.match(dashboard, /readInsights\(/);
+  assert.match(dashboard, /insights\.cashflow6m\[5\]\.totalRevenue/);
+  assert.match(dashboardMetrics, /row\.totalRevenue/);
   assert.match(dashboardMetrics, /Number\.isSafeInteger\(value\)/);
   assert.match(reports, /grossAmount/);
   assert.match(reports, /discountAllocated/);

@@ -6,7 +6,7 @@ const path = require("node:path");
 const modulesRoot = path.resolve(__dirname, "../../phong-tro-frontend/src/modules");
 const reviewedModules = [
   "finance/bills.tab.js", "finance/debts.tab.js", "finance/reports.tab.js",
-  "operations/meter-readings.tab.js", "operations/move-outs.tab.js", "overview/dashboard.tab.js",
+  "operations/meter-readings.tab.js", "operations/move-outs.tab.js", "overview/dashboard.tab.js", "overview/dashboard.view.mjs",
   "residents-contracts/contracts.tab.js", "residents-contracts/co-tenants.tab.js",
   "residents-contracts/requests.tab.js", "residents-contracts/reservations.tab.js",
   "settings/system-config.tab.js",

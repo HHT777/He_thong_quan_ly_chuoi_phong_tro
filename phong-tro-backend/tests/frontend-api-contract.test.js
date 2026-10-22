@@ -53,7 +53,7 @@ test("CT-003 meter-reading SPA consumes the API DTO contract", () => {
 
 test("CT-013 room status filters use the database status domain", () => {
   const view = frontendSource("shared/components/view.js");
-  const dashboard = frontendSource("modules/overview/dashboard.tab.js");
+  const dashboard = frontendSource("modules/overview/dashboard.view.mjs");
   const metrics = frontendSource("modules/overview/dashboard.metrics.mjs");
   const sources = `${view}\n${dashboard}\n${metrics}`;
 
