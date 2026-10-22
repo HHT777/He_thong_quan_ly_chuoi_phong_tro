@@ -1,5 +1,11 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Cập nhật đưa OCR vào repository chính (22/10/2026; ưu tiên cho đường dẫn OCR)
+
+- Người dùng đã chọn chép mã và hai model từ bản clone `OCR/meter_ocr` vào `phong-tro-ocr/` để repository chính có đủ dịch vụ OCR. Bản clone cũ `OCR/` cùng `.git` bên trong vẫn bị ignore và không được sửa/xóa.
+- `phong-tro-ocr/` là source OCR dùng chung, chạy FastAPI riêng theo `docs/OCR_SETUP.md`; ảnh mẫu `test/`, virtualenv, cache và ảnh upload không được đưa vào repository chính. `run.py` nhận đường dẫn ảnh qua tham số CLI.
+- Thay đổi OCR này không sửa backend/frontend hoặc database. Không suy từ việc có model trong Git rằng đã nghiệm thu độ chính xác OCR hay chạy được trên mọi máy; phải kiểm chứng môi trường Python và ảnh thực tế riêng.
+
 ## Cập nhật dọn repo (22/10/2026; ưu tiên cho đường dẫn hiện hành)
 
 - Frontend đang dùng duy nhất `phong-tro-frontend/index.html` và `src/` qua Vite SPA. Bộ nguyên mẫu `pages/`, `assets/`, `components/`, cây thư mục cũ, favicon rỗng và logo giả đã được bỏ. Các test còn tham chiếu nguyên mẫu đã chuyển sang kiểm tra SPA hiện hành. `member.html` là trang giới thiệu độc lập.

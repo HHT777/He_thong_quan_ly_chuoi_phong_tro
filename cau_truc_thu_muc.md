@@ -26,10 +26,11 @@ QLPT_luu1/
 │   ├── design/                       # Token giao diện và ảnh tham chiếu dashboard.
 │   └── archive/                      # Tài liệu kiểm tra cũ được lưu tham khảo.
 ├── phong-tro-backend/                # API Express, nghiệp vụ, truy cập MySQL và tác vụ định kỳ.
-└── phong-tro-frontend/               # Giao diện Vite SPA cho Chủ trọ và Khách thuê.
+├── phong-tro-frontend/               # Giao diện Vite SPA cho Chủ trọ và Khách thuê.
+└── phong-tro-ocr/                    # Dịch vụ FastAPI và hai model đọc ảnh công tơ.
 ```
 
-Hai ứng dụng nằm trong **một repository**. Backend dùng Node.js, Express, Sequelize và MySQL; frontend dùng JavaScript, CSS và Vite. Không có Kafka, PostgreSQL hoặc bộ frontend `pages/`, `assets/`, `components/` cũ trong mã đang theo dõi.
+Ba thành phần nằm trong **một repository** nhưng chạy bằng các tiến trình riêng. Backend dùng Node.js, Express, Sequelize và MySQL; frontend dùng JavaScript, CSS và Vite; OCR dùng Python, FastAPI và hai model YOLO. Không có Kafka, PostgreSQL hoặc bộ frontend `pages/`, `assets/`, `components/` cũ trong mã đang theo dõi.
 
 ## 2. Backend: `phong-tro-backend/`
 
@@ -106,7 +107,7 @@ phong-tro-backend/
 
 `data2.md`, `migrations/`, `src/models/schema.js` và `src/models/index.js` cần được đối chiếu cùng nhau khi sửa schema. Một số file model đang hiện trên ổ đĩa nhưng **chưa được Git theo dõi** (`IdempotencyKey.js`, `MeterUpload.js`, `NguoiO.js`, `OutboxEvent.js`, `SuCo.js`, `YeuCau.js`); đây là bản nháp có chủ ý, không được suy ra rằng chúng là model runtime hoặc tự ý xóa/sửa.
 
-OCR là dự án Python riêng trong `OCR/` bị Git ignore. Backend tích hợp với dịch vụ đó qua HTTP theo `docs/OCR_SETUP.md`; thư mục OCR không nằm trong cây mã backend được Git theo dõi. File `.env`, `node_modules/` và `uploads/` là dữ liệu môi trường/runtime, không phải source để commit.
+Backend tích hợp với dịch vụ OCR qua HTTP theo `docs/OCR_SETUP.md`; source dùng chung nằm trong `phong-tro-ocr/`. Bản clone OCR cũ ở `OCR/` vẫn bị Git ignore. File `.env`, `node_modules/` và `uploads/` là dữ liệu môi trường/runtime, không phải source để commit.
 
 ## 3. Frontend: `phong-tro-frontend/`
 
@@ -151,18 +152,39 @@ Các file `*.tab.js` trong `src/modules/` là đơn vị trang/tab của SPA, đ
 
 `node_modules/` và `dist/` là thư mục sinh ra khi cài/build, không phải source. Frontend phát triển bằng `npm run dev`; kiểm tra bản phát hành bằng `npm run build`. Backend dùng `npm run dev` hoặc `npm start` theo `phong-tro-backend/README.md`.
 
-## 4. Luồng cần biết khi sửa tính năng
+## 4. OCR: `phong-tro-ocr/`
+
+```text
+phong-tro-ocr/
+├── README.md                         # Cài đặt và chạy dịch vụ OCR.
+├── requirements.txt                  # Dependency Python của FastAPI và YOLO.
+├── run.py                            # Thử nhận dạng trực tiếp với một đường dẫn ảnh được cung cấp.
+├── flow.md                           # Mô tả pipeline OCR và API.
+├── app/
+│   ├── main.py                       # Tạo FastAPI, nạp hai model một lần và cung cấp /health.
+│   ├── api/ocr.py                    # Endpoint POST /ocr nhận ảnh multipart.
+│   ├── core/config.py               # Đường dẫn model và ngưỡng nhận dạng.
+│   └── services/digit_pipeline.py   # Tìm vùng số và ghép chữ số từ kết quả YOLO.
+└── models/
+    ├── digit_detection.pt           # Model tìm vùng hiển thị số.
+    └── number_detection.pt          # Model nhận dạng các chữ số.
+```
+
+Source và hai model được sao chép từ repository OCR riêng để có thể clone một repository và chạy đủ ba thành phần. Bộ ảnh mẫu `test/` của repository OCR gốc không được đưa lên; khi thử `run.py`, truyền đường dẫn ảnh do người dùng chọn. Bản clone cũ cùng thư mục `.git` trong `OCR/` không được thay đổi.
+
+## 5. Luồng cần biết khi sửa tính năng
 
 ```text
 Trình duyệt
-  → frontend/index.html → src/main.js → core/router.js → modules/*.tab.js
-  → core/api.js → backend/src/app.js → routes → controllers → services
-  → models/schema.js + models/index.js → MySQL
+  → phong-tro-frontend/index.html → src/main.js → core/router.js → modules/*.tab.js
+  → core/api.js → phong-tro-backend/src/app.js → routes → controllers → services
+                                                          ├→ models/schema.js + models/index.js → MySQL
+                                                          └→ HTTP tới phong-tro-ocr/app/main.py → POST /ocr
 ```
 
 - **Thêm/sửa API:** cập nhật route, controller/service, validation và test liên quan; đối chiếu `docs/AUTHZ_MATRIX.md` khi thay route hoặc quyền sở hữu.
 - **Thêm/sửa DB:** bắt đầu từ `data2.md` và quy trình migration/test trong `AGENTS.md`; không chạy migration, seed hoặc sync lên DB phát triển/thật nếu chưa có quy trình sao lưu và xác nhận riêng.
 - **Thêm/sửa giao diện:** sửa module tương ứng trong `src/modules/`, dùng `src/core/api.js` để gọi API và CSS trong `src/shared/styles/`; kiểm tra quyền Chủ trọ/Khách thuê.
-- **OCR:** xem `docs/OCR_SETUP.md` và `meterReading.service.js`; dịch vụ Python `OCR/` là dự án riêng, không phải module JavaScript trong frontend.
+- **OCR:** xem `docs/OCR_SETUP.md`, `meterReading.service.js` và `phong-tro-ocr/`; dịch vụ Python chạy riêng, không phải module JavaScript trong frontend.
 
 Các lệnh chạy, biến môi trường và phạm vi test được cập nhật chi tiết trong `README.md` gốc và README của từng ứng dụng. Tài liệu này chỉ mô tả cấu trúc, không xác nhận build hoặc test mới trong lần cập nhật tài liệu.
