@@ -4,6 +4,21 @@
 
 `GET /api/v1/dashboard/insights` (commit `546808b`, hoàn thiện `214a4da`) chỉ cho Chủ trọ, lấy căn từ `ownedBuildingIds`; `buildingId` không tồn tại/khác chủ trả 404 `RESOURCE_NOT_FOUND`. Dashboard gọi ba nguồn đúng một lần mỗi nguồn: `summary` cho tổng/trạng thái phòng, `insights` cho doanh thu và các nhóm tổng hợp, `incidents` cho trạng thái và ba sự cố mới nhất. Không gọi riêng cashflow hoặc expiring lần nữa. Không tự suy `buildingId` từ client.
 
+### Chi tiết khi rê chuột / dùng Tab
+
+Các phần biểu đồ dưới đây hiển thị chi tiết ngay trong thẻ khi rê chuột hoặc lấy focus bàn phím. Không gọi thêm endpoint khi tương tác; số tiền chỉ được định dạng, không tính lại. Chỉ tỷ lệ phần trăm dùng để mô tả kích thước lát/thanh được suy từ số đếm đã kiểm tra.
+
+| Biểu đồ | Endpoint đã tải | Trường hiển thị thêm |
+|---|---|---|
+| Tình trạng phòng | `GET /api/v1/dashboard/summary?period=YYYY-MM` | `rooms.byStatus.*`, `rooms.total`: trạng thái, số phòng, tỷ lệ |
+| Thu–chi sáu tháng | `GET /api/v1/dashboard/insights?period=YYYY-MM` | `cashflow6m[].month,totalRevenue,totalExpenses,profit`: kỳ, thu, chi, lợi nhuận theo từng tháng |
+| Lấp đầy theo căn | Như trên | `occupancyByBuilding[].buildingName,rented,total,pct,inComparison`: tên căn, số phòng, tỷ lệ, cờ không so sánh |
+| Phiếu thu kỳ này | Như trên | `billBuckets.paid,outstanding,overdue,total`: nhóm, số phiếu, tỷ lệ |
+| Hợp đồng sắp hết hạn | Như trên | `contractForecast.d30,d60,d90`: số hợp đồng trong từng ngưỡng cộng dồn |
+| Sự cố | `GET /api/v1/incidents` | `data[].trang_thai,ngay_gui,mo_ta,phongTro.so_phong`: số theo trạng thái, ba sự cố gần đây |
+
+Thông tin động được escape trước khi đưa vào thuộc tính HTML và cập nhật vùng chi tiết bằng `textContent`. `dashboard-render.test.mjs` kiểm cả hover/focus, escape và không phát sinh request mới.
+
 | Khối hiện hành | Route/trường response | Kiểu/đơn vị | Phép gom | Điều hướng |
 |---|---|---|---|---|
 | Tổng phòng / đang thuê / lấp đầy / donut | `summary`: `rooms.total`, `rooms.byStatus.*` | phòng, % | Tổng/đang thuê hiển thị nguyên trường; chỉ tỷ lệ `DANG_THUE / total` tính trong `readSummary` | Không bấm lọc |

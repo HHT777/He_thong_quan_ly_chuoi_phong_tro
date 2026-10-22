@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import dashboard from "../src/modules/overview/dashboard.tab.js";
 import { insightsResponse } from "./fixtures/dashboard-insights.sample.mjs";
 
@@ -14,7 +15,7 @@ const source = (path) => Object.keys(responses).find((prefix) => path.startsWith
 function harness(reject = {}, customResponses = responses) {
   const elements = new Map();
   const extraTasks = [{ hidden: true }, { hidden: true }];
-  let onClick;
+  const listeners = new Map();
   const main = {
     innerHTML: "",
     querySelector(selector) {
@@ -23,12 +24,15 @@ function harness(reject = {}, customResponses = responses) {
       return elements.get(selector);
     },
     querySelectorAll(selector) { return selector === "[data-task-extra]" ? extraTasks : []; },
-    addEventListener(type, handler) { if (type === "click") onClick = handler; },
+    addEventListener(type, handler) { listeners.set(type, handler); },
   };
   const calls = [];
   const context = { main, go() {}, api: { async get(path) { calls.push(path); const key = source(path); if (reject[key]) throw reject[key]; return customResponses[key]; } } };
   const body = (key) => main.querySelector(`[data-body="${key}"]`).innerHTML;
-  return { context, main, calls, body, extraTasks, click: (target) => onClick({ target }) };
+  return { context, main, calls, body, extraTasks,
+    click: (target) => listeners.get("click")({ target }),
+    interact: (type, target, relatedTarget = null) => listeners.get(type)?.({ target, relatedTarget }),
+    element: (selector) => main.querySelector(selector) };
 }
 
 test("UI-2a-2 loads only summary, insights and incidents once, and renders all dashboard groups", async () => {
@@ -55,6 +59,32 @@ test("UI-2a-2 loads only summary, insights and incidents once, and renders all d
   assert.equal((ui.body("rooms").match(/class="ui1-ring__/g) || []).length, 4);
   assert.match(ui.body("rooms"), /class="ui1-ring__dang_thue"[^>]*pathLength="[^"]+"[^>]*stroke-linecap="butt"/);
   assert.doesNotMatch(ui.body("incidents"), /<script>/);
+});
+
+test("FR-132 chart details come from the three loaded APIs on hover and keyboard focus", async () => {
+  const ui = harness();
+  await dashboard.render(ui.context);
+  for (const key of ["rooms", "cashflow", "buildingOccupancy", "bills", "contracts", "incidents"]) {
+    assert.match(ui.body(key), /data-chart-detail=/, `${key} must expose a data-backed detail target`);
+    assert.match(ui.body(key), /data-hover-readout/, `${key} must show an inline detail area`);
+  }
+  assert.match(ui.body("rooms"), /data-chart-detail="Đang thuê: 15 phòng \(50%\)"/);
+  assert.match(ui.body("cashflow"), /Thu 29\.475\.661 đ; Chi 4\.380\.000 đ; Lợi nhuận 25\.095\.661 đ/);
+  assert.match(ui.body("buildingOccupancy"), /Căn trọ Hoa Sen: 5\/10 phòng đang thuê \(50%\)/);
+  assert.match(ui.body("bills"), /Quá hạn: 11\/16 phiếu định kỳ/);
+  assert.match(ui.body("contracts"), /Trong 30 ngày: 1 hợp đồng/);
+  assert.match(ui.body("incidents"), /Chờ tiếp nhận: 1\/1 sự cố/);
+  const css = readFileSync(new URL("../src/shared/styles/dashboard.css", import.meta.url), "utf8");
+  assert.match(css, /\.ui1-ring span\s*\{[^}]*pointer-events:\s*none/, "center label must not block hovering the ring");
+  const detail = { dataset: { chartPanel: "rooms", chartDetail: "Đang thuê: 15 phòng (50%)" }, closest(selector) { return selector === "[data-chart-detail]" ? this : null; } };
+  const readout = ui.element('[data-hover-readout="rooms"]');
+  ui.interact("mouseover", detail);
+  assert.equal(readout.textContent, detail.dataset.chartDetail);
+  ui.interact("focusin", detail);
+  assert.equal(readout.textContent, detail.dataset.chartDetail);
+  ui.interact("focusout", detail);
+  assert.match(readout.textContent, /dùng Tab/);
+  assert.equal(ui.calls.length, 3, "hover/focus must not fetch again");
 });
 
 test("UI-2a-2 one failed insights source shows its own safe error and retries once", async () => {
@@ -110,6 +140,7 @@ test("UI-2a-2 empty data, no previous month and hostile text render safely", asy
   await dashboard.render(other.context);
   assert.doesNotMatch(other.body("buildingOccupancy"), /<script>/);
   assert.match(other.body("buildingOccupancy"), /&lt;script&gt;/);
+  assert.match(other.body("buildingOccupancy"), /data-chart-detail="[^"]*&lt;script&gt;/);
   hostile.data.occupancyByBuilding[2].inComparison = false;
   hostile.data.cashflow6m[5].totalExpenses = 30000000;
   hostile.data.cashflow6m[5].profit = -524339;
