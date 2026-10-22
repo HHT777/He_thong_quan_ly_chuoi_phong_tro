@@ -52,6 +52,8 @@ test("UI-2a-2 loads only summary, insights and incidents once, and renders all d
   assert.match(ui.body("rooms"), /Khác/);
   assert.match(ui.body("contracts"), /Trong 90 ngày/);
   assert.match(ui.body("tasks"), /Phiếu thu quá hạn/);
+  assert.equal((ui.body("rooms").match(/class="ui1-ring__/g) || []).length, 4);
+  assert.match(ui.body("rooms"), /class="ui1-ring__dang_thue"[^>]*pathLength="[^"]+"[^>]*stroke-linecap="butt"/);
   assert.doesNotMatch(ui.body("incidents"), /<script>/);
 });
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { billSegments, cashflowScale, donutSegments, formatBusinessDate, formatVnd, readInsights } from "../src/modules/overview/dashboard.insights.mjs";
+import { billSegments, cashflowScale, donutSegments, donutStrokes, formatBusinessDate, formatVnd, readInsights } from "../src/modules/overview/dashboard.insights.mjs";
 import { insightsResponse } from "./fixtures/dashboard-insights.sample.mjs";
 
 const months = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"];
@@ -48,6 +48,24 @@ test("UI-2a-2 donut and bill segments conserve totals and omit zero without NaN"
   assert.deepEqual(donutSegments({ TRONG: 0 }, 0, ["TRONG"]), []);
   assert.deepEqual(billSegments({ paid: 0, outstanding: 0, overdue: 0, total: 0 }), []);
   assert.equal(billSegments({ paid: 2, outstanding: 1, overdue: 1, total: 4 }).reduce((sum, row) => sum + row.width, 0), 100);
+});
+
+test("UI-2a-2 donut joins overlap subtly without changing room proportions", () => {
+  const counts = { DANG_THUE: 15, TRONG: 12, DA_GIU: 0, DANG_XU_LY_TRA_PHONG: 1, NGUNG_SU_DUNG: 2, KHAC: 0 };
+  const states = Object.keys(counts);
+  const circumference = 2 * Math.PI * 62;
+  const segments = donutSegments(counts, 30, states);
+  const strokes = donutStrokes(segments, circumference);
+  assert.deepEqual(strokes.map((row) => row.state), ["DANG_THUE", "TRONG", "DANG_XU_LY_TRA_PHONG", "NGUNG_SU_DUNG"]);
+  assert.equal(segments[0].length / circumference, 0.5);
+  assert.ok(Math.abs(segments[1].length / circumference - 0.4) < 1e-12);
+  for (const [index, stroke] of strokes.entries()) {
+    assert.equal(stroke.offset, segments[index].offset);
+    assert.ok(stroke.dashLength > segments[index].length, "join must cover subpixel seam");
+    assert.ok(stroke.dashLength - segments[index].length <= 0.5, "join must not visibly change proportion");
+    assert.ok(stroke.gapLength >= 0);
+    assert.ok(Math.abs(stroke.dashLength + stroke.gapLength - circumference) < 1e-9);
+  }
 });
 
 test("UI-2a-2 cashflow scale includes negative profit and survives six zero months", () => {

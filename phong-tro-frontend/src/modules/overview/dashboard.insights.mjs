@@ -69,6 +69,17 @@ export function donutSegments(byStatus, total, states, circumference = 2 * Math.
   });
 }
 
+export function donutStrokes(segments, circumference = 2 * Math.PI * 62) {
+  return segments.map(({ state, length, offset }, index) => {
+    // A subpixel overlap hides SVG anti-aliasing seams at arc boundaries.
+    // Keep it smaller than either adjacent segment, including tiny categories.
+    const nextLength = segments[(index + 1) % segments.length]?.length ?? length;
+    const overlap = segments.length > 1 ? Math.min(0.5, length / 4, nextLength / 4, Math.max(0, circumference - length)) : 0;
+    const dashLength = length + overlap;
+    return { state, offset, dashLength, gapLength: circumference - dashLength };
+  });
+}
+
 export function billSegments(bills) {
   return ["paid", "outstanding", "overdue"].filter((key) => bills[key] > 0)
     .map((key) => ({ key, count: bills[key], width: bills.total ? bills[key] * 100 / bills.total : 0 }));

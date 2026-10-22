@@ -1,6 +1,6 @@
 import { escapeHtml } from "../../shared/components/view.js";
 import { dashboardError, INCIDENT_LABELS, readIncidents, readSummary, ROOM_LABELS, ROOM_STATES } from "./dashboard.metrics.mjs";
-import { billSegments, cashflowScale, donutSegments, formatBusinessDate, formatVnd, readInsights, TASK_DETAILS } from "./dashboard.insights.mjs";
+import { billSegments, cashflowScale, donutSegments, donutStrokes, formatBusinessDate, formatVnd, readInsights, TASK_DETAILS } from "./dashboard.insights.mjs";
 
 const number = (value) => new Intl.NumberFormat("vi-VN").format(value);
 const currentPeriod = () => {
@@ -15,7 +15,7 @@ function roomMarkup(summary) {
   if (!total) return `<p class="ui1-note">Chưa có phòng trong danh mục.</p>`;
   const circumference = 2 * Math.PI * 62;
   const segments = donutSegments(byStatus, total, ROOM_STATES);
-  const rings = segments.map(({ state, length, offset }) => `<circle class="ui1-ring__${state.toLowerCase()}" cx="80" cy="80" r="62" fill="none" stroke-width="16" stroke-dasharray="${length} ${circumference - length}" stroke-dashoffset="${-offset}" />`).join("");
+  const rings = donutStrokes(segments, circumference).map(({ state, dashLength, gapLength, offset }) => `<circle class="ui1-ring__${state.toLowerCase()}" cx="80" cy="80" r="62" pathLength="${circumference}" fill="none" stroke-width="16" stroke-linecap="butt" stroke-dasharray="${dashLength} ${gapLength}" stroke-dashoffset="${-offset}" />`).join("");
   const rows = ROOM_STATES.map((state) => `<li><i class="ui1-dot ui1-dot--${state.toLowerCase()}" aria-hidden="true"></i><span>${ROOM_LABELS[state]}</span><strong>${number(byStatus[state])}</strong></li>`).join("");
   return `<div class="ui1-room-layout"><div class="ui1-ring"><svg role="img" aria-label="Tình trạng ${total} phòng" viewBox="0 0 160 160"><circle cx="80" cy="80" r="62" fill="none" stroke="var(--ui1-track)" stroke-width="16" />${rings}</svg><span><strong>${number(total)}</strong> phòng</span></div><ul class="ui1-legend">${rows}</ul></div><table class="ui2-sr-only"><caption>Tình trạng phòng</caption><tbody>${ROOM_STATES.map((state) => `<tr><th>${ROOM_LABELS[state]}</th><td>${byStatus[state]}</td></tr>`).join("")}</tbody></table>`;
 }
