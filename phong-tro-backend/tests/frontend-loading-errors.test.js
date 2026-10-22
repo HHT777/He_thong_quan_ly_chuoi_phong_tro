@@ -22,13 +22,9 @@ test("dashboard does not convert failed API calls into zero-valued data", () => 
   assert.match(source, /sourcePanels\[source\]\.forEach/);
 });
 
-test("legacy API pages show a retry control instead of console-only errors", () => {
-  for (const file of ["suCo", "thanhToan", "khachThue/yeuCauGiaHan", "khachThue/yeuCauTraPhong"]) {
-    const source = read(`assets/js/pages/${file}.page.js`);
-    assert.match(source, /data\.apiLoadError|dataset\.apiLoadError/);
-    assert.match(source, /retry\.addEventListener\("click", load\)/);
-    assert.doesNotMatch(source, /catch \(error\) \{ console\.error\(error\); \}/);
-  }
+test("co-tenant page shows an API loading error instead of leaving stale content", () => {
+  const source = read("src/modules/residents-contracts/co-tenants.tab.js");
+  assert.match(source, /catch \(error\) \{ content\.innerHTML = `<div class="empty-state empty-state--error">\$\{escapeHtml\(error\.message\)\}<\/div>`; \}/);
 });
 
 test("Vietnamese heading uses a Vietnamese-capable font and source text is valid UTF-8", () => {

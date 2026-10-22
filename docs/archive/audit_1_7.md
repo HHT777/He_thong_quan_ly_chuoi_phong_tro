@@ -1,6 +1,6 @@
 # AUDIT THAY ĐỔI HỆ THỐNG QUA 7 GIAI ĐOẠN
 
-Tài liệu này tổng hợp các thay đổi đã thực hiện từ kết quả audit trong `audit_chutro.md`. Phạm vi gồm backend `phong-tro-backend`, SPA mới `phong-tro-frontend/src`, dữ liệu `data2.md` và bộ kiểm thử. Mỗi lỗi được sửa bằng commit riêng để có thể truy vết và hoàn tác độc lập.
+Đây là báo cáo lịch sử, không phải trạng thái triển khai hiện tại. Tài liệu tổng hợp các thay đổi từ bản `audit_chutro.md` cũ (xem lịch sử Git). Phạm vi gồm backend `phong-tro-backend`, SPA `phong-tro-frontend/src`, dữ liệu `data2.md` và bộ kiểm thử. Trạng thái hiện tại được theo dõi trong `chutro.md` ở thư mục gốc.
 
 | Giai đoạn | Lỗi xử lý | Thay đổi nghiệp vụ và backend | Thay đổi SPA / dữ liệu / CI | Kiểm thử và kết quả | Commit |
 |---:|---|---|---|---|---|

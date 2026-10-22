@@ -93,11 +93,10 @@ test("C.2 frontend consumes settlement, debt and cashflow response contracts", (
   assert.match(debts, /row\.isOverdue/);
   assert.match(debts, /row\.debtAgeDays/);
   const reports = frontend("modules/finance/reports.tab.js");
-  const legacyForms = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/assets/js/pages/mvpForms.page.js"), "utf8");
   assert.match(moveOut, /name="finalElectricityReading"/);
   assert.match(debts, /loai_thanh_toan === "SAU_THANH_LY"/);
   assert.match(reports, /data\.totalRevenue \?\? data\.totalCollected/);
   assert.match(reports, /data\.depositDeductions/);
-  assert.match(legacyForms, /values\.assetsChecked = values\.assetsChecked === "on"/);
-  assert.doesNotMatch(legacyForms, /name="waterAmount"|name="rentRefund"/);
+  assert.match(moveOut, /assetsChecked: raw\.assetsChecked === "on"/);
+  assert.doesNotMatch(moveOut, /name="waterAmount"|name="rentRefund"/);
 });

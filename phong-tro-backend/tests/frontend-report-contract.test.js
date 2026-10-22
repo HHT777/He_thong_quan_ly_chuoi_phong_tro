@@ -9,13 +9,10 @@ test("FR-133 report consumers use net, gross, discount, deposit and snapshot det
   const reports = read("modules/finance/reports.tab.js");
   const dashboard = read("modules/overview/dashboard.tab.js");
   const dashboardMetrics = read("modules/overview/dashboard.metrics.mjs");
-  const connected = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/assets/js/pages/connectedPages.page.js"), "utf8");
-  for (const source of [reports, connected]) {
-    assert.match(source, /totalRevenue/);
-    assert.match(source, /grossRevenue/);
-    assert.match(source, /discounts/);
-    assert.match(source, /depositDeductions/);
-  }
+  assert.match(reports, /totalRevenue/);
+  assert.match(reports, /grossRevenue/);
+  assert.match(reports, /discounts/);
+  assert.match(reports, /depositDeductions/);
   assert.match(dashboard, /readCashflow\(/);
   assert.match(dashboardMetrics, /response\?\.data\?\.totalRevenue/);
   assert.match(dashboardMetrics, /Number\.isSafeInteger\(value\)/);

@@ -1,5 +1,12 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Cập nhật dọn repo (22/10/2026; ưu tiên cho đường dẫn hiện hành)
+
+- Frontend đang dùng duy nhất `phong-tro-frontend/index.html` và `src/` qua Vite SPA. Bộ nguyên mẫu `pages/`, `assets/`, `components/`, cây thư mục cũ, favicon rỗng và logo giả đã được bỏ. Các test còn tham chiếu nguyên mẫu đã chuyển sang kiểm tra SPA hiện hành. `member.html` là trang giới thiệu độc lập.
+- Backend giữ `data2.md` làm nguồn schema 37 bảng, migrations 004–016, toàn bộ `src/`, `scripts/`, `tests/`; migration 001–003 nguyên mẫu và tài liệu trạng thái cũ chỉ còn trong lịch sử Git. Tài liệu chạy hiện hành: `README.md` gốc, README của từng ứng dụng, `docs/OCR_SETUP.md`, `docs/AUTHZ_MATRIX.md`.
+- Sau dọn: frontend build xanh; test frontend 14 đạt, 1 live-DB bỏ qua; backend unit 153/153. Integration và kiểm chứng giao diện thực tế chưa chạy trong lượt dọn này. Một test dashboard cũ được cập nhật theo `warningDays` runtime vì đã đỏ trước khi sửa.
+- File `.env`, upload, `OCR/`, CSS hộp thoại in đang sửa dở và các file untracked có chủ ý không thuộc lượt dọn. Không merge hoặc push.
+
 ## Bổ sung kiểm chứng UI-2a-1 (21/10/2026)
 
 - Commit `f8a4d8f` tăng kiểm chứng `contractWarningDays` đọc từ cấu hình runtime: hợp đồng kết thúc sau 50 ngày không nằm trong mốc 30 nhưng nằm trong mốc 60. Phép thử phủ định cố định ngưỡng 30 làm test đỏ; khôi phục mã nguồn và chạy lại test xanh.

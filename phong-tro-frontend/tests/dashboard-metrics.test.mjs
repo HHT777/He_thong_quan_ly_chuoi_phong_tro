@@ -42,8 +42,11 @@ test("UI-1a incidents group every state and retain only three most recent", () =
 });
 
 test("UI-1a expiring contracts read owner-scoped response and do not invent 60/90-day buckets", () => {
-  assert.deepEqual(readExpiring({ data: [{ ma_hop_dong: "a", ngay_ket_thuc: "2026-10-30", phongTro: { so_phong: "101" } }] }), [{ id: "a", room: "101", endDate: "2026-10-30" }]);
-  assert.throws(() => readExpiring({ data: { total: 1 } }), /Invalid/);
+  assert.deepEqual(readExpiring({ warningDays: 60, data: [{ ma_hop_dong: "a", ngay_ket_thuc: "2026-10-30", phongTro: { so_phong: "101" } }] }), {
+    rows: [{ id: "a", room: "101", endDate: "2026-10-30" }], warningDays: 60,
+  });
+  assert.throws(() => readExpiring({ warningDays: 60, data: { total: 1 } }), /Invalid/);
+  assert.throws(() => readExpiring({ data: [] }), /Invalid contract warning days/);
 });
 
 test("UI-1a 401, 403, 404, schema 503, 5xx and network errors are distinct and safe", () => {

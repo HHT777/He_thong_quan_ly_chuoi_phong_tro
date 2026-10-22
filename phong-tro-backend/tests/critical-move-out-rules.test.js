@@ -24,10 +24,6 @@ const ownerRequestSource = fs.readFileSync(
   path.join(frontendRoot, "src/modules/residents-contracts/requests.tab.js"),
   "utf8",
 );
-const legacyOwnerSource = fs.readFileSync(
-  path.join(frontendRoot, "assets/js/pages/connectedPages.page.js"),
-  "utf8",
-);
 
 function frontendSources(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -99,5 +95,4 @@ test("FR-186 frontend exposes owner revoke with a reason and no tenant withdraw 
   assert.match(ownerRequestSource, /data-revoke/);
   assert.match(ownerRequestSource, /\/v1\/requests\/\$\{encodeURIComponent\(row\.ma_yeu_cau\)\}\/revoke/);
   assert.match(ownerRequestSource, /requiredText\(raw\.reason/);
-  assert.match(legacyOwnerSource, /\/v1\/requests\/\$\{item\.ma_yeu_cau\}\/revoke/);
 });
