@@ -25,6 +25,8 @@ test("kỳ và tiền Việt Nam được định dạng theo dữ liệu API", 
   assert.equal(revenueLabel("TIEN_PHONG"), "Tiền phòng");
   assert.equal(periodLabel({ mode: "quarter", quarter: "4", quarterYear: "2026" }), "Quý 4/2026");
   assert.equal(reportQuery({ mode: "month", month: "2026-10", buildingId: "a" }).toString(), "buildingId=a&periodType=month&periodValue=2026-10");
+  assert.equal(reportQuery({ mode: "quarter", quarterYear: "2026", quarter: "4", buildingId: "a" }).toString(), "buildingId=a&periodType=quarter&periodValue=2026-4");
+  assert.equal(reportQuery({ mode: "year", year: "2025" }).toString(), "periodType=year&periodValue=2025");
   assert.equal(reportQuery({ mode: "range", from: "2026-10-01", to: "2026-10-31" }).toString(), "from=2026-10-01&to=2026-10-31");
   assert.throws(() => reportQuery({ mode: "range", from: "2026-11-01", to: "2026-10-31" }));
   assert.equal(reportMoney(null), "—");

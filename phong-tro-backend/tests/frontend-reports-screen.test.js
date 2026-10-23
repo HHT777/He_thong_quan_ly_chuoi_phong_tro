@@ -8,13 +8,16 @@ const tab = read("modules/finance/reports.tab.js");
 const model = read("modules/finance/report.model.mjs");
 const view = read("modules/finance/report.view.mjs");
 
-test("FR-132..143 report filters apply month, quarter, year, range and building only on submit", () => {
+test("FR-132..143 report filters apply month, quarter, year, range and building on change or submit", () => {
   for (const field of ["periodType", "periodValue", "from", "to", "buildingId"]) {
     assert.match(model, new RegExp(`query\\.set\\("${field}"`));
   }
   assert.match(model, /fields\.from > fields\.to/);
   assert.match(tab, /form\.addEventListener\("submit"/);
-  assert.match(tab, /load\(Object\.fromEntries\(new FormData\(form\)\)\)/);
+  assert.match(tab, /form\.addEventListener\("change"/);
+  assert.match(tab, /form\.elements\.mode\.value = mode\.dataset\.reportMode;[\s\S]*?syncFields\(\);[\s\S]*?applyCurrent\(\)/);
+  assert.match(tab, /load\(fields\)/);
+  assert.match(tab, /version !== loadVersion/);
   assert.ok(tab.includes('context.api.get(`/v1/reports/cashflow?${query}`)'));
   assert.match(tab, /error\.status === 400/);
 });

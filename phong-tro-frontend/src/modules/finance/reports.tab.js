@@ -15,10 +15,11 @@ const stored = (key, allowed, fallback) => {
   try { const value = sessionStorage.getItem(key); return allowed.includes(value) ? value : fallback; } catch { return fallback; }
 };
 const remember = (key, value) => { try { sessionStorage.setItem(key, value); } catch { /* Session storage can be unavailable. */ } };
-const option = (value, label) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+const option = (value, label, selected = false) => `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
 
 function filterMarkup(buildings, month) {
   const year = month.slice(0, 4);
+  const quarter = Math.ceil(Number(month.slice(5)) / 3);
   return `<form class="report-filter" data-report-filter>
     <input type="hidden" name="mode" value="month">
     <div class="report-segment report-periods" role="group" aria-label="Loại kỳ báo cáo">
@@ -26,7 +27,7 @@ function filterMarkup(buildings, month) {
     </div>
     <div class="report-period-inputs">
       <label data-filter-mode="month"><span class="report-sr-only">Tháng báo cáo</span><input name="month" type="month" value="${month}" required></label>
-      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Quý báo cáo</span><select name="quarter" disabled>${[1, 2, 3, 4].map((value) => option(value, `Quý ${value}`)).join("")}</select></label>
+      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Quý báo cáo</span><select name="quarter" disabled>${[1, 2, 3, 4].map((value) => option(value, `Quý ${value}`, value === quarter)).join("")}</select></label>
       <label data-filter-mode="quarter" hidden><span class="report-sr-only">Năm của quý</span><input name="quarterYear" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
       <label data-filter-mode="year" hidden><span class="report-sr-only">Năm báo cáo</span><input name="year" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
       <label data-filter-mode="range" hidden><span>Từ ngày</span><input name="from" type="date" disabled></label>
@@ -79,6 +80,7 @@ async function render(context) {
     applied: null, appliedQuery: null, data: null, trend: null,
     buildingId: "", selectedType: "", search: "", estimatedOnly: false,
   };
+  let loadVersion = 0;
   const syncFields = () => {
     const mode = form.elements.mode.value;
     form.querySelectorAll("[data-report-mode]").forEach((button) => {
@@ -102,11 +104,27 @@ async function render(context) {
     appliedChip.textContent = appliedLabel(state, buildingNames);
     result.innerHTML = reportBody(state.data, buildingNames, state, state.trend);
   };
+  const restoreCurrent = () => {
+    applyButton.disabled = false;
+    exportButton.disabled = !state.appliedQuery;
+    if (state.data) paint();
+    else {
+      appliedChip.textContent = "Chưa có báo cáo";
+      result.innerHTML = "";
+    }
+  };
   const load = async (fields) => {
+    const version = ++loadVersion;
     let query;
-    try { query = reportQuery(fields); } catch (error) { message.textContent = error.message; return; }
+    try { query = reportQuery(fields); } catch (error) {
+      message.textContent = error.message;
+      restoreCurrent();
+      return;
+    }
     applyButton.disabled = true;
+    exportButton.disabled = true;
     message.textContent = "";
+    appliedChip.textContent = "Đang áp dụng bộ lọc...";
     result.innerHTML = loadingMarkup();
     try {
       const trendQuery = new URLSearchParams({ period: fields.month || month });
@@ -115,7 +133,7 @@ async function render(context) {
         context.api.get(`/v1/reports/cashflow?${query}`),
         fields.mode === "month" ? context.api.get(`/v1/dashboard/insights?${trendQuery}`) : Promise.resolve(null),
       ]);
-      if (signal.aborted) return;
+      if (signal.aborted || version !== loadVersion) return;
       state.data = readCashflow(cashflow);
       state.trend = insights?.data?.cashflow6m || null;
       state.applied = fields;
@@ -127,21 +145,37 @@ async function render(context) {
       exportButton.disabled = false;
       paint();
     } catch (error) {
-      if (signal.aborted) return;
+      if (signal.aborted || version !== loadVersion) return;
+      appliedChip.textContent = state.applied ? appliedLabel(state, buildingNames) : "Chưa có báo cáo";
       const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
       result.innerHTML = `<div class="report-state" role="alert"><h2>Không tải được báo cáo</h2><p>${escapeHtml(friendly)}</p><button type="button" data-report-retry>Thử lại</button></div>`;
       result.querySelector("[data-report-retry]").addEventListener("click", () => load(fields), { signal });
-    } finally { applyButton.disabled = false; }
+    } finally { if (version === loadVersion) applyButton.disabled = false; }
+  };
+  const applyCurrent = () => {
+    const fields = Object.fromEntries(new FormData(form));
+    if (fields.mode === "range" && (!fields.from || !fields.to)) {
+      ++loadVersion;
+      message.textContent = "Chọn đủ ngày bắt đầu và kết thúc để lọc báo cáo.";
+      restoreCurrent();
+      return;
+    }
+    load(fields);
   };
   form.addEventListener("click", (event) => {
     const mode = event.target.closest("[data-report-mode]");
     if (!mode) return;
     form.elements.mode.value = mode.dataset.reportMode;
     syncFields();
+    applyCurrent();
+  }, { signal });
+  form.addEventListener("change", (event) => {
+    if (event.target.matches("[name=mode]")) return;
+    applyCurrent();
   }, { signal });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    load(Object.fromEntries(new FormData(form)));
+    applyCurrent();
   }, { signal });
   content.addEventListener("click", (event) => {
     const view = event.target.closest("[data-report-view]");
