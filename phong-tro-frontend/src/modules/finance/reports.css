@@ -1,6 +1,5 @@
 .report-page { color: var(--ui2-ink); }
-.report-page .module-page__heading { align-items: center; margin-bottom: 14px; }
-.report-page .module-page__heading h1 { margin: 0; font-size: 28px; font-weight: 750; }
+.report-page .module-page__heading { align-items: center; justify-content: flex-end; margin-bottom: 14px; }
 .report-page button { cursor: pointer; }
 .report-page button:disabled { cursor: wait; opacity: .55; }
 .report-export { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; padding: 0 20px; border: 1px solid var(--ui2-navy); border-radius: 9px; background: #fff; color: var(--ui2-navy); font-weight: 700; }

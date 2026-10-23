@@ -50,7 +50,7 @@ async function render(context) {
   const page = context.main.querySelector(".module-page");
   page.classList.add("report-page");
   const heading = page.querySelector(".module-page__heading");
-  heading.innerHTML = `<h1>Báo cáo</h1><button type="button" class="report-export" data-export-report disabled>${icons.download(18)} Xuất Excel</button>`;
+  heading.innerHTML = `<button type="button" class="report-export" data-export-report disabled>${icons.download(18)} Xuất Excel</button>`;
   const content = page.querySelector("[data-content]");
   content.innerHTML = loadingMarkup();
 
