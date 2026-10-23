@@ -65,9 +65,9 @@ export function buildingCompareMarkup(data, names) {
   return card(`So sánh các căn ${info}`, `<div class="report-legend"><span><i class="report-dot report-dot--revenue"></i> Thực nhận</span><span><i class="report-dot report-dot--expense"></i> Chi phí</span></div>
     <div class="report-building-list">${rows.map((row) => `<button type="button" class="report-building-row" data-building="${safe(row.buildingId)}" title="Xem giao dịch của ${safe(nameOf(row.buildingId, names))}">
       <span class="report-building-name">${safe(nameOf(row.buildingId, names))}</span><span class="report-building-bars"><i class="report-building-revenue" style="width:${barWidth(row.revenue, max)}%"></i><i class="report-building-expense" style="width:${barWidth(row.expenses, max)}%"></i></span>
-      <span class="report-building-amounts">${reportMoney(row.revenue)}<small>${reportMoney(row.expenses)}</small></span><strong class="${Number(row.profit) < 0 ? "is-negative" : ""}">${reportMoney(row.profit)}</strong></button>`).join("")}
-      ${unassigned ? `<div class="report-building-row report-building-row--unassigned"><span class="report-building-name">Chưa phân căn</span><span class="report-building-bars"><i style="width:${barWidth(unassigned.expenses, max)}%"></i></span><span class="report-building-amounts">${reportMoney(unassigned.expenses)}<small>Đã tính trong tổng chi phí</small></span><strong>—</strong></div>` : ""}
-    </div><p class="report-hint">Chọn một căn hoặc loại doanh thu để xem bảng chi tiết.</p>`);
+      <span class="report-building-amounts"><span>Thu ${reportMoney(row.revenue)}</span><small>Chi ${reportMoney(row.expenses)}</small></span><strong class="${Number(row.profit) < 0 ? "is-negative" : ""}">${reportMoney(row.profit)}</strong></button>`).join("")}
+      ${unassigned ? `<div class="report-building-row report-building-row--unassigned"><span class="report-building-name">Chưa phân căn</span><span class="report-building-bars"><i style="width:${barWidth(unassigned.expenses, max)}%"></i></span><span class="report-building-amounts"><span>Chi ${reportMoney(unassigned.expenses)}</span><small>Đã tính trong tổng chi phí</small></span><strong>—</strong></div>` : ""}
+    </div><p class="report-hint">Chi phí từng căn nằm ở dòng “Chi”. Chọn căn để xem giao dịch, hoặc mở Bảng chi tiết → Theo căn.</p>`);
 }
 
 const th = (label, numeric = false) => `<th scope="col" class="${numeric ? "report-number" : ""}">${label}</th>`;
