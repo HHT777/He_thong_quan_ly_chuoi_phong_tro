@@ -30,6 +30,7 @@
 .report-kpi__icon { display: grid; place-items: center; flex: 0 0 54px; width: 54px; height: 54px; border-radius: 50%; color: var(--ui2-navy); background: #e9f0ff; font-size: 29px; font-weight: 700; }
 .report-kpi h2 { margin: 0 0 4px; color: var(--ui2-ink); font-size: 14px; font-weight: 700; }
 .report-kpi strong { display: block; white-space: nowrap; font-size: clamp(19px, 2vw, 27px); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.report-kpi:nth-child(2) strong { color: #cf5663; }
 .report-kpi p { margin: 4px 0 0; color: var(--ui2-subtext); font-size: 11px; line-height: 1.45; }
 .report-kpi .is-positive { color: #007f66; }
 .report-kpi .is-negative, .report-building-row .is-negative { color: var(--ui2-red); }
