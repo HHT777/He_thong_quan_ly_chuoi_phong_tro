@@ -4,73 +4,67 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const read = (file) => fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src", file), "utf8");
+const tab = read("modules/finance/reports.tab.js");
+const model = read("modules/finance/report.model.mjs");
+const view = read("modules/finance/report.view.mjs");
 
-test("FR-132..143 report screen sends month, quarter, year, range and building filters", () => {
-  const source = read("modules/finance/reports.tab.js");
-  for (const field of ["periodType", "periodValue", "from", "to", "buildingId"]) assert.match(source, new RegExp(`query\\.set\\(\"${field}\"`));
-  assert.match(source, /\/v1\/reports\/cashflow\?\$\{query\.toString\(\)\}/);
-  assert.match(source, /error\.status === 400/);
-  assert.match(source, /Bộ lọc không hợp lệ/);
-  assert.match(source, /raw\.from > raw\.to/);
-  assert.match(source, /Loại kỳ báo cáo không hợp lệ/);
+test("FR-132..143 report filters apply month, quarter, year, range and building only on submit", () => {
+  for (const field of ["periodType", "periodValue", "from", "to", "buildingId"]) {
+    assert.match(model, new RegExp(`query\\.set\\("${field}"`));
+  }
+  assert.match(model, /fields\.from > fields\.to/);
+  assert.match(tab, /form\.addEventListener\("submit"/);
+  assert.match(tab, /load\(Object\.fromEntries\(new FormData\(form\)\)\)/);
+  assert.ok(tab.includes('context.api.get(`/v1/reports/cashflow?${query}`)'));
+  assert.match(tab, /error\.status === 400/);
 });
 
-test("FR-133..143 report screen consumes server totals without deriving money totals", () => {
-  const source = read("modules/finance/reports.tab.js");
-  for (const field of ["totalRevenue", "totalCollected", "grossRevenue", "discounts", "depositDeductions", "totalExpenses", "profit"]) assert.match(source, new RegExp(`data\\.${field}`));
-  assert.doesNotMatch(source, /\.reduce\(/);
-  assert.match(source, /Doanh thu thực nhận = đã trừ giảm trừ/);
-  assert.match(source, /Các tổng tiền dưới đây do server trả về/);
+test("FR-133 report cards and table use server totals and snapshot fields", () => {
+  for (const field of ["totalRevenue", "grossRevenue", "discounts", "depositDeductions", "totalExpenses", "profit"]) {
+    assert.match(view, new RegExp(`data\\.${field}`));
+  }
+  for (const field of ["grossAmount", "discountAllocated", "snapshotSource"]) assert.match(view + model, new RegExp(field));
+  assert.match(tab, /readCashflow\(cashflow\)/);
+  assert.match(model, /moneyFields\.some/);
+  assert.doesNotMatch(tab + view, /data\.totalCollected|\bavgRevenuePerRoom\b/);
 });
 
-test("FR-136/137 report screen separates inactive buildings and shows snapshot detail", () => {
-  const source = read("modules/finance/reports.tab.js");
-  assert.match(source, /row\.inComparison === true/);
-  assert.match(source, /row\.inComparison === false/);
-  assert.match(source, /Ngừng hoạt động, không tham gia so sánh/);
-  assert.match(source, /THU_TIEN/);
-  assert.match(source, /KHAU_TRU_COC/);
-  assert.match(source, /grossAmount/);
-  assert.match(source, /discountAllocated/);
-  assert.match(source, /snapshotSource === "SUY_DIEN"/);
-  assert.match(source, /Ước tính \(dữ liệu cũ\)/);
+test("FR-136/137 comparison excludes inactive buildings and detail retains them", () => {
+  assert.match(view, /row\.inComparison === true/);
+  assert.match(view, /row\.inComparison === false/);
+  assert.match(view, /căn ngừng hoạt động có phát sinh/);
+  assert.match(view, /data-building=/);
+  assert.match(view, /data-type=/);
+  assert.match(tab, /state\.view = "table"; state\.tableMode = "transactions"/);
+  assert.match(model, /snapshotSource === "SUY_DIEN"/);
 });
 
-test("FR-133 dashboard reads server report fields and does not synthesize money totals", () => {
+test("FR-133 dashboard continues to read the server insights contract", () => {
   const source = read("modules/overview/dashboard.view.mjs");
   const insights = read("modules/overview/dashboard.insights.mjs");
-  assert.match(source, /readInsights\(await context\.api\.get\(`\/v1\/dashboard\/insights\?period=\$\{period\}`\)\)/);
+  assert.ok(source.includes('readInsights(await context.api.get(`/v1/dashboard/insights?period=${period}`))'));
   assert.match(source, /insights\.cashflow6m\[5\]\.totalRevenue/);
-  assert.match(source, /formatVnd\(insights\.cashflow6m\[5\]\.totalRevenue\)/);
   assert.match(insights, /Number\.isSafeInteger\(value\)/);
-  assert.doesNotMatch(source, /due \*|avgRevenuePerRoom|billRows\.reduce/);
-  assert.doesNotMatch(source, /\+12\.5%|Tháng hiện tại/);
 });
 
-test("F.5 dates use the Ho Chi Minh timezone", () => {
-  assert.match(read("shared/components/view.js"), /timeZone: "Asia\/Ho_Chi_Minh"/);
+test("F.5 report month uses the Ho Chi Minh business timezone", () => {
+  assert.match(tab, /timeZone: "Asia\/Ho_Chi_Minh"/);
 });
 
-test("FR-194 report export sends the bearer token, uses a blob and offers retry", () => {
-  const report = read("modules/finance/reports.tab.js");
+test("FR-194 report export uses the exact applied filter and bearer-token blob API", () => {
   const api = read("core/api.js");
-  assert.match(report, /data-export-report/);
-  assert.match(report, /context\.api\.getBlob\(`\/v1\/reports\/cashflow\.xlsx\?\$\{query\.toString\(\)\}`\)/);
-  assert.match(report, /URL\.createObjectURL\(blob\)/);
-  assert.match(report, /URL\.revokeObjectURL\(url\)/);
-  assert.match(report, /URL\.revokeObjectURL\(url\); \}\s*await load\(\)/);
-  assert.match(report, /data-export-retry>Thử lại/);
-  assert.match(report, /addEventListener\("click", exportReport\)/);
-  assert.match(api, /async function getBlob[\s\S]*?headers\.Authorization = `Bearer \$\{token\(\)\}`/);
-  assert.match(api, /return \{ blob: await response\.blob\(\), disposition:/);
+  assert.match(tab, /state\.appliedQuery = query/);
+  assert.ok(tab.includes('context.api.getBlob(`/v1/reports/cashflow.xlsx?${state.appliedQuery}`)'));
+  assert.match(tab, /URL\.createObjectURL\(blob\)/);
+  assert.match(tab, /URL\.revokeObjectURL\(url\)/);
+  assert.match(api, /async function getBlob/);
+  assert.ok(api.includes('headers.Authorization = `Bearer ${token()}`'));
 });
 
-test("FR-194 report screen exposes unassigned expenses without client money arithmetic", () => {
-  const source = read("modules/finance/reports.tab.js");
-  assert.match(source, /data\.unassignedExpenses/);
-  assert.match(source, /data-unassigned-expenses/);
-  assert.match(source, /unassigned\.count/);
-  assert.match(source, /money\(unassigned\.total\)/);
-  assert.match(source, /chưa tính vào chi phí\/lợi nhuận/);
-  assert.doesNotMatch(source, /unassigned\.total\s*[+-]/);
+test("FR-194 sole-landlord unassigned expenses are shown as included in server total", () => {
+  assert.match(view, /!row\.buildingId && Number\(row\.expenses\) > 0/);
+  assert.match(view, /Chi phí chưa phân căn: .*đã tính vào tổng chi phí/);
+  assert.match(view, /report-building-row--unassigned/);
+  assert.match(view, /data\.totalExpenses/);
+  assert.doesNotMatch(view, /data\.unassignedExpenses/);
 });

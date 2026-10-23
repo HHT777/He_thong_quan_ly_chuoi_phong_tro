@@ -1,166 +1,198 @@
-import { shellPage, escapeHtml, money, date } from "../../shared/components/view.js";
+import "./reports.css";
+import { escapeHtml, shellPage } from "../../shared/components/view.js";
+import { icons } from "../../shared/components/icons.js";
+import { readCashflow, reportQuery } from "./report.model.mjs";
+import { appliedLabel, reportBody } from "./report.view.mjs";
 
 const meta = { id: "reports", route: "/finance/reports", title: "Báo cáo", tabLabel: "Báo cáo", group: "finance", order: 45, roles: ["CHU_TRO"] };
-const currentDate = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date());
+const viewKey = "qlpt:report-view";
+const tableKey = "qlpt:report-table";
+const currentPeriod = () => {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).formatToParts(new Date());
+  return `${parts.find((part) => part.type === "year").value}-${parts.find((part) => part.type === "month").value}`;
+};
+const stored = (key, allowed, fallback) => {
+  try { const value = sessionStorage.getItem(key); return allowed.includes(value) ? value : fallback; } catch { return fallback; }
+};
+const remember = (key, value) => { try { sessionStorage.setItem(key, value); } catch { /* Session storage can be unavailable. */ } };
+const option = (value, label) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
 
-function summaryMarkup(data) {
-  const cards = [
-    ["Doanh thu thực nhận", data.totalRevenue ?? data.totalCollected ?? 0, "Đã trừ giảm trừ"],
-    ["Doanh thu gộp", data.grossRevenue ?? 0, "Trước giảm trừ"],
-    ["Giảm trừ", data.discounts ?? 0, "Đã phân bổ theo lần thu"],
-    ["Khấu trừ cọc", data.depositDeductions ?? 0, "Ghi nhận khi quyết toán"],
-    ["Chi phí", data.totalExpenses ?? 0, "Chi phí hiệu lực trong kỳ"],
-    ["Lợi nhuận", data.profit ?? 0, "Server: thực nhận trừ chi phí"],
-  ];
-  return `<div class="stat-grid-6">${cards.map(([label, value, note]) => `<article class="stat-card"><span class="stat-card__label">${escapeHtml(label)}</span><div class="stat-card__value">${money(value)}</div><p>${escapeHtml(note)}</p></article>`).join("")}</div>`;
+function filterMarkup(buildings, month) {
+  const year = month.slice(0, 4);
+  return `<form class="report-filter" data-report-filter>
+    <input type="hidden" name="mode" value="month">
+    <div class="report-segment report-periods" role="group" aria-label="Loại kỳ báo cáo">
+      ${[["month", "Tháng"], ["quarter", "Quý"], ["year", "Năm"], ["range", "Tùy chọn"]].map(([id, label]) => `<button type="button" data-report-mode="${id}" aria-pressed="${id === "month"}" class="${id === "month" ? "is-active" : ""}">${label}</button>`).join("")}
+    </div>
+    <div class="report-period-inputs">
+      <label data-filter-mode="month"><span class="report-sr-only">Tháng báo cáo</span><input name="month" type="month" value="${month}" required></label>
+      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Quý báo cáo</span><select name="quarter" disabled>${[1, 2, 3, 4].map((value) => option(value, `Quý ${value}`)).join("")}</select></label>
+      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Năm của quý</span><input name="quarterYear" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
+      <label data-filter-mode="year" hidden><span class="report-sr-only">Năm báo cáo</span><input name="year" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
+      <label data-filter-mode="range" hidden><span>Từ ngày</span><input name="from" type="date" disabled></label>
+      <label data-filter-mode="range" hidden><span>Đến ngày</span><input name="to" type="date" disabled></label>
+    </div>
+    <label class="report-building-filter"><span class="report-sr-only">Chọn căn</span><select name="buildingId">${option("", "Tất cả căn")}${buildings.map((row) => option(row.ma_can, row.ten_can)).join("")}</select></label>
+    <button type="submit" class="report-apply">Áp dụng</button>
+  </form>`;
 }
 
-function typeTable(rows) {
-  if (!rows?.length) return `<div class="empty-state"><p class="empty-state__desc">Không có doanh thu theo loại trong kỳ.</p></div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>Loại doanh thu</th><th>Số tiền thực nhận</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(row.type)}</td><td>${money(row.amount)}</td></tr>`).join("")}</tbody></table></div>`;
-}
-
-function buildingTable(rows, buildingNames, emptyMessage) {
-  if (!rows.length) return `<div class="empty-state"><p class="empty-state__desc">${escapeHtml(emptyMessage)}</p></div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>Căn</th><th>Thực nhận</th><th>Gộp</th><th>Giảm trừ</th><th>Khấu trừ cọc</th><th>Chi phí</th><th>Lợi nhuận</th></tr></thead><tbody>${rows.map((row) => `<tr>
-    <td>${escapeHtml(buildingNames.get(row.buildingId) || row.buildingId || "Toàn chuỗi")}</td><td>${money(row.revenue)}</td><td>${money(row.grossRevenue)}</td><td>${money(row.discounts)}</td><td>${money(row.depositDeductions)}</td><td>${money(row.expenses)}</td><td>${money(row.profit)}</td>
-  </tr>`).join("")}</tbody></table></div>`;
-}
-
-function detailTable(rows, buildingNames) {
-  if (!rows?.length) return `<div class="empty-state"><p class="empty-state__desc">Không có chi tiết thu/chi trong kỳ.</p></div>`;
-  const sourceLabel = { THU_TIEN: "Thu tiền", KHAU_TRU_COC: "Khấu trừ cọc", CHI_PHI: "Chi phí" };
-  return `<div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Nguồn</th><th>Căn</th><th>Phòng</th><th>Thực nhận/chi</th><th>Số gộp</th><th>Giảm trừ</th><th>Nguồn snapshot</th></tr></thead><tbody>${rows.map((row) => `<tr>
-    <td>${escapeHtml(date(row.date))}</td><td>${escapeHtml(sourceLabel[row.source] || row.source)}</td><td>${escapeHtml(buildingNames.get(row.buildingId) || row.buildingId || "Toàn chuỗi")}</td><td>${escapeHtml(row.roomId || "—")}</td>
-    <td>${money(row.amount)}</td><td>${row.source === "THU_TIEN" || row.source === "KHAU_TRU_COC" ? money(row.grossAmount) : "—"}</td><td>${row.source === "THU_TIEN" ? money(row.discountAllocated) : "—"}</td>
-    <td>${row.source === "THU_TIEN" ? (row.snapshotSource === "SUY_DIEN" ? '<span class="badge badge--vacant">Ước tính (dữ liệu cũ)</span>' : escapeHtml(row.snapshotSource || "GHI_NHAN")) : "—"}</td>
-  </tr>`).join("")}</tbody></table></div>`;
-}
-
-function reportMarkup(data, buildingNames) {
-  const rows = Array.isArray(data.byBuilding) ? data.byBuilding : [];
-  const compared = rows.filter((row) => row.buildingId && row.inComparison === true);
-  const inactive = rows.filter((row) => row.buildingId && row.inComparison === false);
-  const chainWide = rows.filter((row) => !row.buildingId);
-  const unassigned = data.unassignedExpenses || { count: 0, total: 0 };
-  return `<section class="module-stack">
-    <aside class="panel"><strong>Chú giải:</strong> Doanh thu thực nhận = đã trừ giảm trừ. Các tổng tiền dưới đây do server trả về; trình duyệt không tự cộng/trừ.</aside>
-    ${summaryMarkup(data)}
-    <aside class="panel" data-unassigned-expenses><strong>Chi phí chưa phân căn:</strong> ${escapeHtml(unassigned.count)} khoản, ${money(unassigned.total)}. Nếu có nhiều Chủ trọ, khoản này chưa tính vào chi phí/lợi nhuận của từng Chủ trọ; cần phân căn trước khi đối chiếu toàn hệ thống.</aside>
-    <section class="panel"><h3>Doanh thu theo loại</h3>${typeTable(data.revenueByType)}</section>
-    <section class="panel"><h3>So sánh các căn đang hoạt động</h3>${buildingTable(compared, buildingNames, "Không có căn hoạt động phát sinh trong kỳ.")}</section>
-    <section class="panel"><h3>Căn không tham gia so sánh</h3><p>Ngừng hoạt động, không tham gia so sánh.</p>${buildingTable(inactive, buildingNames, "Không có căn ngừng hoạt động phát sinh trong kỳ.")}</section>
-    ${chainWide.length ? `<section class="panel"><h3>Phát sinh toàn chuỗi/không gắn căn</h3>${buildingTable(chainWide, buildingNames, "")}</section>` : ""}
-    <section class="panel"><h3>Chi tiết thu/chi</h3>${detailTable(data.receiptDetails, buildingNames)}</section>
-  </section>`;
-}
-
-function filterQuery(form) {
-  const raw = Object.fromEntries(new FormData(form));
-  const query = new URLSearchParams();
-  if (raw.buildingId) query.set("buildingId", raw.buildingId);
-  if (raw.mode === "range") {
-    if (!raw.from || !raw.to || raw.from > raw.to) throw new Error("Cần chọn khoảng ngày hợp lệ, có đủ ngày bắt đầu và kết thúc.");
-    query.set("from", raw.from);
-    query.set("to", raw.to);
-  } else {
-    if (!["month", "quarter", "year"].includes(raw.mode)) throw new Error("Loại kỳ báo cáo không hợp lệ.");
-    if (raw.mode === "month" && !/^\d{4}-(0[1-9]|1[0-2])$/.test(raw.month || "")) throw new Error("Tháng báo cáo không hợp lệ.");
-    if (raw.mode === "quarter" && (!/^\d{4}$/.test(raw.quarterYear || "") || !/^[1-4]$/.test(raw.quarter || ""))) throw new Error("Quý báo cáo không hợp lệ.");
-    if (raw.mode === "year" && !/^\d{4}$/.test(raw.year || "")) throw new Error("Năm báo cáo không hợp lệ.");
-    query.set("periodType", raw.mode);
-    if (raw.mode === "month") query.set("periodValue", raw.month);
-    if (raw.mode === "quarter") query.set("periodValue", `${raw.quarterYear}-${raw.quarter}`);
-    if (raw.mode === "year") query.set("periodValue", raw.year);
-  }
-  return query;
+function loadingMarkup() {
+  return `<div class="report-skeleton-grid" role="status" aria-label="Đang tải báo cáo"><div class="report-skeleton"></div><div class="report-skeleton"></div><div class="report-skeleton"></div></div><div class="report-skeleton report-skeleton--chart"></div>`;
 }
 
 async function render(context) {
-  context.main.innerHTML = shellPage("Báo cáo tài chính", "Doanh thu, chi phí và lợi nhuận theo kỳ và căn trọ.");
-  const content = context.main.querySelector("[data-content]");
-  const now = currentDate();
-  const year = now.slice(0, 4);
-  const month = now.slice(0, 7);
-  let buildingNames = new Map();
-  content.innerHTML = `<div class="panel">Đang tải bộ lọc báo cáo...</div>`;
+  this.listeners?.abort();
+  this.listeners = new AbortController();
+  const signal = this.listeners.signal;
+  context.main.innerHTML = shellPage("", "");
+  const page = context.main.querySelector(".module-page");
+  page.classList.add("report-page");
+  const heading = page.querySelector(".module-page__heading");
+  heading.innerHTML = `<h1>Báo cáo</h1><button type="button" class="report-export" data-export-report disabled>${icons.download(18)} Xuất Excel</button>`;
+  const content = page.querySelector("[data-content]");
+  content.innerHTML = loadingMarkup();
 
+  let buildings;
   try {
-    const buildingResponse = await context.api.get("/management/can-tro");
-    const buildings = Array.isArray(buildingResponse.data) ? buildingResponse.data : [];
-    buildingNames = new Map(buildings.map((row) => [row.ma_can, row.ten_can]));
-    content.innerHTML = `<form class="panel form-grid" data-report-filter>
-      <label>Loại kỳ<select name="mode"><option value="month">Tháng</option><option value="quarter">Quý</option><option value="year">Năm</option><option value="range">Khoảng ngày</option></select></label>
-      <label data-filter-mode="month">Tháng<input name="month" type="month" value="${month}" required></label>
-      <label data-filter-mode="quarter">Năm quý<input name="quarterYear" type="number" min="2000" max="2100" step="1" value="${year}"></label>
-      <label data-filter-mode="quarter">Quý<select name="quarter"><option value="1">Quý 1</option><option value="2">Quý 2</option><option value="3">Quý 3</option><option value="4">Quý 4</option></select></label>
-      <label data-filter-mode="year">Năm<input name="year" type="number" min="2000" max="2100" step="1" value="${year}"></label>
-      <label data-filter-mode="range">Từ ngày<input name="from" type="date"></label><label data-filter-mode="range">Đến ngày<input name="to" type="date"></label>
-      <label>Căn<select name="buildingId"><option value="">Toàn chuỗi</option>${buildings.map((row) => `<option value="${escapeHtml(row.ma_can)}">${escapeHtml(row.ten_can)}</option>`).join("")}</select></label>
-      <button class="btn btn--primary">Xem báo cáo</button><button class="btn btn--secondary" type="button" data-export-report>Xuất Excel</button><span data-filter-message></span>
-    </form><div data-report-result><div class="panel">Đang tải báo cáo...</div></div>`;
-    const form = content.querySelector("[data-report-filter]");
-    const result = content.querySelector("[data-report-result]");
-    const message = form.querySelector("[data-filter-message]");
-    const exportButton = form.querySelector("[data-export-report]");
-
-    const syncFields = () => {
-      const mode = form.elements.mode.value;
-      form.querySelectorAll("[data-filter-mode]").forEach((label) => {
-        const enabled = label.dataset.filterMode === mode;
-        label.hidden = !enabled;
-        label.querySelectorAll("input,select").forEach((field) => { field.disabled = !enabled; });
-      });
-    };
-    const load = async () => {
-      const submit = form.querySelector("button");
-      submit.disabled = true;
-      message.textContent = "";
-      result.innerHTML = `<div class="panel">Đang tải báo cáo...</div>`;
-      try {
-        const query = filterQuery(form);
-        const response = await context.api.get(`/v1/reports/cashflow?${query.toString()}`);
-        result.innerHTML = reportMarkup(response.data || {}, buildingNames);
-      } catch (error) {
-        const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
-        message.textContent = friendly;
-        result.innerHTML = `<div class="empty-state empty-state--error"><h4 class="empty-state__title">Không tải được báo cáo</h4><p class="empty-state__desc">${escapeHtml(friendly)}</p></div>`;
-      } finally {
-        submit.disabled = false;
-      }
-    };
-    form.elements.mode.addEventListener("change", syncFields);
-    form.addEventListener("submit", (event) => { event.preventDefault(); load(); });
-    const exportReport = async () => {
-      exportButton.disabled = true;
-      message.textContent = "";
-      try {
-        const query = filterQuery(form);
-        const { blob, disposition } = await context.api.getBlob(`/v1/reports/cashflow.xlsx?${query.toString()}`);
-        const filename = /filename="(bao-cao-thu-chi_[A-Za-z0-9_-]+\.xlsx)"/.exec(disposition)?.[1] || "bao-cao-thu-chi.xlsx";
-        const url = URL.createObjectURL(blob);
-        try {
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-        } finally { URL.revokeObjectURL(url); }
-        await load();
-      } catch (error) {
-        const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
-        message.textContent = friendly;
-        result.innerHTML = `<div class="empty-state empty-state--error"><h4 class="empty-state__title">Không xuất được Excel</h4><p class="empty-state__desc">${escapeHtml(friendly)}</p><button class="btn btn--secondary" type="button" data-export-retry>Thử lại</button></div>`;
-        result.querySelector("[data-export-retry]").addEventListener("click", exportReport);
-      } finally { exportButton.disabled = false; }
-    };
-    exportButton.addEventListener("click", exportReport);
-    syncFields();
-    await load();
+    const response = await context.api.get("/management/can-tro");
+    buildings = Array.isArray(response.data) ? response.data : [];
   } catch (error) {
-    content.innerHTML = `<div class="empty-state empty-state--error"><h4 class="empty-state__title">Không tải được danh sách căn</h4><p class="empty-state__desc">${escapeHtml(error.message)}</p></div>`;
+    content.innerHTML = `<div class="report-state" role="alert"><h2>Không tải được danh sách căn</h2><p>${escapeHtml(error.message)}</p><button type="button" data-retry-buildings>Thử lại</button></div>`;
+    content.querySelector("[data-retry-buildings]").addEventListener("click", () => render.call(this, context), { signal });
+    return;
   }
+  const buildingNames = new Map(buildings.map((row) => [row.ma_can, row.ten_can]));
+  const month = currentPeriod();
+  content.innerHTML = `${filterMarkup(buildings, month)}<div class="report-toolbar"><span class="report-applied" data-applied-filter>Đang tải báo cáo...</span>
+    <div class="report-segment report-view-toggle" role="group" aria-label="Kiểu xem"><button type="button" data-report-view="chart">Biểu đồ</button><button type="button" data-report-view="table">Bảng chi tiết</button></div></div>
+    <p class="report-message" data-report-message role="alert"></p><div data-report-result>${loadingMarkup()}</div>`;
+  const form = content.querySelector("[data-report-filter]");
+  const result = content.querySelector("[data-report-result]");
+  const message = content.querySelector("[data-report-message]");
+  const appliedChip = content.querySelector("[data-applied-filter]");
+  const exportButton = heading.querySelector("[data-export-report]");
+  const applyButton = form.querySelector("[type=submit]");
+  const state = {
+    view: stored(viewKey, ["chart", "table"], "chart"),
+    tableMode: stored(tableKey, ["building", "type", "transactions"], "transactions"),
+    applied: null, appliedQuery: null, data: null, trend: null,
+    buildingId: "", selectedType: "", search: "", estimatedOnly: false,
+  };
+  const syncFields = () => {
+    const mode = form.elements.mode.value;
+    form.querySelectorAll("[data-report-mode]").forEach((button) => {
+      const active = button.dataset.reportMode === mode;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    form.querySelectorAll("[data-filter-mode]").forEach((label) => {
+      const enabled = label.dataset.filterMode === mode;
+      label.hidden = !enabled;
+      label.querySelectorAll("input,select").forEach((field) => { field.disabled = !enabled; });
+    });
+  };
+  const paint = () => {
+    content.querySelectorAll("[data-report-view]").forEach((button) => {
+      const active = button.dataset.reportView === state.view;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    if (!state.data) return;
+    appliedChip.textContent = appliedLabel(state, buildingNames);
+    result.innerHTML = reportBody(state.data, buildingNames, state, state.trend);
+  };
+  const load = async (fields) => {
+    let query;
+    try { query = reportQuery(fields); } catch (error) { message.textContent = error.message; return; }
+    applyButton.disabled = true;
+    message.textContent = "";
+    result.innerHTML = loadingMarkup();
+    try {
+      const trendQuery = new URLSearchParams({ period: fields.month || month });
+      if (fields.buildingId) trendQuery.set("buildingId", fields.buildingId);
+      const [cashflow, insights] = await Promise.all([
+        context.api.get(`/v1/reports/cashflow?${query}`),
+        fields.mode === "month" ? context.api.get(`/v1/dashboard/insights?${trendQuery}`) : Promise.resolve(null),
+      ]);
+      if (signal.aborted) return;
+      state.data = readCashflow(cashflow);
+      state.trend = insights?.data?.cashflow6m || null;
+      state.applied = fields;
+      state.appliedQuery = query;
+      state.buildingId = "";
+      state.selectedType = "";
+      state.search = "";
+      state.estimatedOnly = false;
+      exportButton.disabled = false;
+      paint();
+    } catch (error) {
+      if (signal.aborted) return;
+      const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
+      result.innerHTML = `<div class="report-state" role="alert"><h2>Không tải được báo cáo</h2><p>${escapeHtml(friendly)}</p><button type="button" data-report-retry>Thử lại</button></div>`;
+      result.querySelector("[data-report-retry]").addEventListener("click", () => load(fields), { signal });
+    } finally { applyButton.disabled = false; }
+  };
+  form.addEventListener("click", (event) => {
+    const mode = event.target.closest("[data-report-mode]");
+    if (!mode) return;
+    form.elements.mode.value = mode.dataset.reportMode;
+    syncFields();
+  }, { signal });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    load(Object.fromEntries(new FormData(form)));
+  }, { signal });
+  content.addEventListener("click", (event) => {
+    const view = event.target.closest("[data-report-view]");
+    if (view) { state.view = view.dataset.reportView; remember(viewKey, state.view); paint(); return; }
+    const detail = event.target.closest("[data-detail-mode]");
+    if (detail) { state.tableMode = detail.dataset.detailMode; state.selectedType = ""; state.buildingId = ""; remember(tableKey, state.tableMode); paint(); return; }
+    const type = event.target.closest("[data-type]");
+    if (type) { state.view = "table"; state.tableMode = "type"; state.selectedType = type.dataset.type; state.buildingId = ""; remember(viewKey, state.view); remember(tableKey, state.tableMode); paint(); return; }
+    const building = event.target.closest("[data-building]");
+    if (building) { state.view = "table"; state.tableMode = "transactions"; state.buildingId = building.dataset.building; state.selectedType = ""; remember(viewKey, state.view); remember(tableKey, state.tableMode); paint(); return; }
+    if (event.target.closest("[data-clear-selection]")) { state.buildingId = ""; state.selectedType = ""; paint(); return; }
+    if (event.target.closest("[data-estimated-only]")) { state.estimatedOnly = !state.estimatedOnly; paint(); }
+  }, { signal });
+  content.addEventListener("input", (event) => {
+    if (!event.target.matches("[data-report-search]")) return;
+    state.search = event.target.value;
+    const position = event.target.selectionStart;
+    paint();
+    const input = result.querySelector("[data-report-search]");
+    input?.focus();
+    input?.setSelectionRange(position, position);
+  }, { signal });
+  const readout = (event) => {
+    const target = event.target.closest?.("[data-chart-detail]");
+    if (!target) return;
+    const element = result.querySelector("[data-chart-readout]");
+    if (element) element.textContent = target.dataset.chartDetail;
+  };
+  content.addEventListener("mouseover", readout, { signal });
+  content.addEventListener("focusin", readout, { signal });
+  exportButton.addEventListener("click", async () => {
+    if (!state.appliedQuery) return;
+    exportButton.disabled = true;
+    message.textContent = "";
+    try {
+      const { blob, disposition } = await context.api.getBlob(`/v1/reports/cashflow.xlsx?${state.appliedQuery}`);
+      const filename = /filename="(bao-cao-thu-chi_[A-Za-z0-9_-]+\.xlsx)"/.exec(disposition)?.[1] || "bao-cao-thu-chi.xlsx";
+      const url = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } finally { URL.revokeObjectURL(url); }
+    } catch (error) { message.textContent = `Không xuất được Excel: ${error.message}`; }
+    finally { exportButton.disabled = false; }
+  }, { signal });
+  syncFields();
+  await load({ mode: "month", month, buildingId: "" });
 }
 
 export default { ...meta, render };

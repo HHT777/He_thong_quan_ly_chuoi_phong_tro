@@ -14,7 +14,10 @@ const reviewedModules = [
 
 // Approved HTML-producing helpers. Their implementations escape untrusted text before returning markup.
 const safeMarkup = new Map([
-  ["shellPage(", "Static application shell"], ["reportMarkup(", "Report renderer escapes data fields"],
+  ["shellPage(", "Static application shell"], ["reportBody(", "Report renderer escapes data fields"],
+  ["filterMarkup(", "Report filter escapes building names and IDs; period comes from Vietnam business date"],
+  ["loadingMarkup(", "Static report loading skeleton"],
+  ["icons.download(", "Static SVG icon from shared icon library"],
   ["contextMarkup(", "Move-out renderer escapes data fields"], ["resultMarkup(", "Move-out renderer escapes data fields"],
   ["lineTable(", "Bill-line renderer escapes fields"], ["billRows(", "Bill-row renderer escapes fields"],
   ["definitionForm(", "Definition-form renderer escapes fields"],
@@ -67,9 +70,6 @@ const reviewedExceptions = new Map([
   ["finance/bills.tab.js:42", "periodNow() returns a fixed YYYY-MM string"],
   ["finance/bills.tab.js:58", "Conditional chooses only static button labels"],
   ["finance/debts.tab.js:92", "today() returns a fixed YYYY-MM-DD string"],
-  ["finance/reports.tab.js:94", "month is YYYY-MM from the Vietnam business date"],
-  ["finance/reports.tab.js:95", "year is YYYY from the Vietnam business date"],
-  ["finance/reports.tab.js:97", "year is YYYY from the Vietnam business date"],
   ["residents-contracts/co-tenants.tab.js:45", "Conditional emits a static disabled attribute"],
   ["residents-contracts/reservations.tab.js:29", "Conditional emits a static overdue badge"],
 ]);

@@ -92,11 +92,12 @@ test("C.2 frontend consumes settlement, debt and cashflow response contracts", (
   const debts = frontend("modules/finance/debts.tab.js");
   assert.match(debts, /row\.isOverdue/);
   assert.match(debts, /row\.debtAgeDays/);
-  const reports = frontend("modules/finance/reports.tab.js");
+  const reports = frontend("modules/finance/reports.tab.js") + frontend("modules/finance/report.view.mjs") + frontend("modules/finance/report.model.mjs");
   assert.match(moveOut, /name="finalElectricityReading"/);
   assert.match(debts, /loai_thanh_toan === "SAU_THANH_LY"/);
-  assert.match(reports, /data\.totalRevenue \?\? data\.totalCollected/);
+  assert.match(reports, /data\.totalRevenue/);
   assert.match(reports, /data\.depositDeductions/);
+  assert.match(reports, /readCashflow\(cashflow\)/);
   assert.match(moveOut, /assetsChecked: raw\.assetsChecked === "on"/);
   assert.doesNotMatch(moveOut, /name="waterAmount"|name="rentRefund"/);
 });

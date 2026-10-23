@@ -6,7 +6,7 @@ const path = require("node:path");
 const read = (file) => fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src", file), "utf8");
 
 test("FR-133 report consumers use net, gross, discount, deposit and snapshot detail fields", () => {
-  const reports = read("modules/finance/reports.tab.js");
+  const reports = read("modules/finance/reports.tab.js") + read("modules/finance/report.view.mjs") + read("modules/finance/report.model.mjs");
   const dashboard = read("modules/overview/dashboard.view.mjs");
   const dashboardMetrics = read("modules/overview/dashboard.insights.mjs");
   assert.match(reports, /totalRevenue/);
