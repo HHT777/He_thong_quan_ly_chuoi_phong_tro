@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { HopDong, ChiSoDien, PhongTro } = require("../models");
+const { HopDong, ChiSoDien, PhongTro, KhachThue, CanTro, ThanhToan } = require("../models");
 const { assertOwned, getOwnedBuildingIds } = require("./ownership.service");
 const billService = require("./khoanPhaiThu.service");
 const meterReadingService = require("./meterReading.service");
@@ -13,16 +13,19 @@ function calculateWater(unitPrice, occupantCount) { return calculateWaterCharge(
 
 async function buildPreview(contract, period) {
   const { year, month } = parsePeriod(period);
-  const meter = await ChiSoDien.findOne({
-    where: { ma_phong: contract.ma_phong, nam: year, thang: month, loai_chi_so: "DINH_KY", da_xoa: false, trang_thai_xac_nhan: "DA_XAC_NHAN" },
+  const firstPeriod = String(contract.ngay_bat_dau).slice(0, 7) === period;
+  const previousDate = new Date(Date.UTC(year, month - 2, 1));
+  const meterPeriod = `${previousDate.getUTCFullYear()}-${String(previousDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const meter = firstPeriod ? null : await ChiSoDien.findOne({
+    where: { ma_phong: contract.ma_phong, nam: previousDate.getUTCFullYear(), thang: previousDate.getUTCMonth() + 1, loai_chi_so: "DINH_KY", da_xoa: false, trang_thai_xac_nhan: "DA_XAC_NHAN" },
   });
-  if (!meter) throw Object.assign(new Error("Phòng chưa có chỉ số điện đã xác nhận"), { status: 422, code: "MISSING_CONFIRMED_METER" });
+  if (!firstPeriod && !meter) throw Object.assign(new Error("Phòng chưa có chỉ số điện kỳ trước đã xác nhận"), { status: 422, code: "MISSING_CONFIRMED_METER" });
   const [previous, occupantCount, definitions] = await Promise.all([
-    meterReadingService.previousReading(contract.ma_phong, period, undefined, meter.ngay_ghi_nhan),
+    firstPeriod ? Promise.resolve(0) : meterReadingService.previousReading(contract.ma_phong, meterPeriod, undefined, meter.ngay_ghi_nhan),
     countBillableOccupants(contract.ma_hop_dong, { atDate: `${period}-${String(daysInMonth(year, month)).padStart(2, "0")}` }),
     adjustmentDefinitionService.applicable(contract.ma_hop_dong, period),
   ]);
-  const electricity = Math.round((Number(meter.chi_so_moi) - previous) * Number(meter.don_gia_ap_dung));
+  const electricity = firstPeriod ? 0 : Math.round((Number(meter.chi_so_moi) - previous) * Number(meter.don_gia_ap_dung));
   if (!Number.isFinite(electricity) || electricity < 0) throw Object.assign(new Error("Sản lượng điện của kỳ không hợp lệ"), { status: 422, code: "INVALID_ELECTRICITY_AMOUNT" });
   const ratio = firstPeriodRatio(contract.ngay_bat_dau, period);
   const rent = prorateMonthlyAmount(contract.gia_thue, ratio);
@@ -46,7 +49,7 @@ async function buildPreview(contract, period) {
   };
 }
 
-async function eligibleContracts(period, contractIds, actorId) {
+async function eligibleContracts(period, contractIds, actorId, buildingIds) {
   const { year, month } = parsePeriod(period);
   const start = `${year}-${String(month).padStart(2, "0")}-01`;
   const end = `${year}-${String(month).padStart(2, "0")}-${String(daysInMonth(year, month)).padStart(2, "0")}`;
@@ -60,21 +63,33 @@ async function eligibleContracts(period, contractIds, actorId) {
     for (const id of new Set(contractIds)) await assertOwned(actor, "contract", id);
   }
   const ownedBuildings = actor ? await getOwnedBuildingIds(actor) : null;
+  if (Array.isArray(buildingIds) && buildingIds.some((id) => ownedBuildings && !ownedBuildings.includes(id))) throw Object.assign(new Error("Không tìm thấy căn"), { status: 404, code: "RESOURCE_NOT_FOUND" });
+  const scope = Array.isArray(buildingIds) && buildingIds.length ? buildingIds : ownedBuildings;
   return HopDong.findAll({ where, order: [["ma_phong", "ASC"]],
-    ...(ownedBuildings ? { include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: ownedBuildings } } }] } : {}) });
+    include: [
+      { model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] },
+      { model: PhongTro, as: "phongTro", required: Boolean(scope), ...(scope ? { where: { ma_can: { [Op.in]: scope } } } : {}) },
+    ] });
 }
 
-async function preview(period, contractIds, actorId) {
-  const contracts = await eligibleContracts(period, contractIds, actorId); const previews = []; const skipped = [];
+async function preview(period, contractIds, actorId, buildingIds) {
+  const contracts = await eligibleContracts(period, contractIds, actorId, buildingIds); const previews = []; const skipped = [];
   for (const contract of contracts) {
+    const { year, month } = parsePeriod(period);
+    const existing = await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, nam: year, thang: month, loai_thanh_toan: "DINH_KY" } });
+    if (existing) { skipped.push({ contractId: contract.ma_hop_dong, roomId: contract.ma_phong, reason: "BILL_ALREADY_EXISTS" }); continue; }
     try { previews.push(await buildPreview(contract, period)); }
-    catch (error) { skipped.push({ contractId: contract.ma_hop_dong, roomId: contract.ma_phong, reason: error.code || error.message || "BILL_PREVIEW_FAILED" }); }
+    catch (error) { skipped.push({ contractId: contract.ma_hop_dong, roomId: contract.ma_phong, reason: String(error.code || "BILL_PREVIEW_FAILED").slice(0, 60) }); }
   }
-  return { previews, skipped };
+  const rooms = await PhongTro.findAll({ where: { ...(buildingIds?.length ? { ma_can: { [Op.in]: buildingIds } } : actorId ? { ma_can: { [Op.in]: await getOwnedBuildingIds({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }) } } : {}) }, include: [{ model: CanTro, as: "canTro" }], order: [["so_phong", "ASC"]] });
+  const contractByRoom = new Map(contracts.map((item) => [item.ma_phong, item]));
+  const readyByRoom = new Map(previews.map((item) => [item.roomId, item]));
+  const skippedByRoom = new Map(skipped.map((item) => [item.roomId, item]));
+  return { previews, skipped, rooms: rooms.filter((room) => !contractIds?.length || contractByRoom.has(room.ma_phong)).map((room) => { const contract = contractByRoom.get(room.ma_phong); const ready = readyByRoom.get(room.ma_phong); return { roomId: room.ma_phong, roomName: room.so_phong, buildingId: room.ma_can, buildingName: room.canTro?.ten_can || null, tenantName: contract?.khachThue?.ho_ten || null, contractId: contract?.ma_hop_dong || null, eligible: Boolean(ready), reasonCode: ready ? null : skippedByRoom.get(room.ma_phong)?.reason || "NO_ACTIVE_CONTRACT", estimatedTotal: ready?.total ?? null }; }) };
 }
 
-async function generate(period, actorId, contractIds) {
-  const result = await preview(period, contractIds, actorId); const created = []; const skipped = [...result.skipped];
+async function generate(period, actorId, contractIds, buildingIds) {
+  const result = await preview(period, contractIds, actorId, buildingIds); const created = []; const skipped = [...result.skipped];
   for (const item of result.previews) {
     try {
       created.push(await billService.createKhoanPhaiThu({
@@ -85,10 +100,10 @@ async function generate(period, actorId, contractIds) {
         tong_phai_thanh_toan: item.total,
       }, actorId));
     } catch (error) {
-      skipped.push({ contractId: item.contractId, roomId: item.roomId, reason: error.code || error.message || "BILL_GENERATION_FAILED" });
+      skipped.push({ contractId: item.contractId, roomId: item.roomId, reason: String(error.code || "BILL_GENERATION_FAILED").slice(0, 60), stage: "GENERATE" });
     }
   }
-  return { created, skipped };
+  return { created, skipped, rooms: result.rooms };
 }
 
 module.exports = { calculateWater, buildPreview, eligibleContracts, preview, generate };

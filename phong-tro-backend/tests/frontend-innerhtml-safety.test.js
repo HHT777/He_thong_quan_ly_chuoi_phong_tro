@@ -5,7 +5,7 @@ const path = require("node:path");
 
 const modulesRoot = path.resolve(__dirname, "../../phong-tro-frontend/src/modules");
 const reviewedModules = [
-  "finance/bills.tab.js", "finance/debts.tab.js", "finance/reports.tab.js",
+  "finance/bills-v2.js", "finance/debts.tab.js", "finance/reports.tab.js",
   "operations/meter-readings.tab.js", "operations/move-outs.tab.js", "overview/dashboard.tab.js", "overview/dashboard.view.mjs",
   "residents-contracts/contracts.tab.js", "residents-contracts/co-tenants.tab.js",
   "residents-contracts/requests.tab.js", "residents-contracts/reservations.tab.js",
@@ -19,8 +19,6 @@ const safeMarkup = new Map([
   ["loadingMarkup(", "Static report loading skeleton"],
   ["icons.download(", "Static SVG icon from shared icon library"],
   ["contextMarkup(", "Move-out renderer escapes data fields"], ["resultMarkup(", "Move-out renderer escapes data fields"],
-  ["lineTable(", "Bill-line renderer escapes fields"], ["billRows(", "Bill-row renderer escapes fields"],
-  ["definitionForm(", "Definition-form renderer escapes fields"],
   ["groupedPeriodicMarkup(", "Debt renderer escapes data fields"],
 ]);
 
@@ -67,8 +65,16 @@ function scan(source, file) {
 
 // Every approved line is constrained to a reviewed static or numeric expression.
 const reviewedExceptions = new Map([
-  ["finance/bills.tab.js:42", "periodNow() returns a fixed YYYY-MM string"],
-  ["finance/bills.tab.js:58", "Conditional chooses only static button labels"],
+  ["finance/bills-v2.js:32", "Dialog body is built by reviewed templates that escape data fields"],
+  ["finance/bills-v2.js:69", "Period options escape period values and labels"],
+  ["finance/bills-v2.js:125", "Bill rows escape names and use formatted numbers"],
+  ["finance/bills-v2.js:130", "Pagination values are numbers or static attributes"],
+  ["finance/bills-v2.js:172", "Eligibility conditions select static attributes; amounts are formatted and reasons escaped"],
+  ["finance/bills-v2.js:200", "Schedule switch inserts only a static checked attribute"],
+  ["finance/bills-v2.js:201", "Building options escape building names and IDs"],
+  ["finance/bills-v2.js:206", "Run outcomes escape room names and reasons"],
+  ["finance/bills-v2.js:252", "Recipient conditions select static classes and labels; names are escaped and amounts formatted"],
+  ["finance/bills-v2.js:298", "Adjustment toggle selects only static Vietnamese labels"],
   ["finance/debts.tab.js:92", "today() returns a fixed YYYY-MM-DD string"],
   ["residents-contracts/co-tenants.tab.js:45", "Conditional emits a static disabled attribute"],
   ["residents-contracts/reservations.tab.js:29", "Conditional emits a static overdue badge"],

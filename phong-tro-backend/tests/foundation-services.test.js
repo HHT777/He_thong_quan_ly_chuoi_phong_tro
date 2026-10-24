@@ -42,7 +42,7 @@ test("FR-200 validates database-backed configuration domains", () => {
 
 test("FR-200 validates every public configuration key from the single catalog", () => {
   const entries = Object.entries(config.CONFIG_CATALOG);
-  assert.equal(entries.length, 14);
+  assert.equal(entries.length, 16);
   assert.equal(entries.filter(([, entry]) => entry.type === "integer").length, 13);
   assert.equal(config.CONFIG_CATALOG.contractStatusJobCron, undefined);
   for (const [key, entry] of entries) {
@@ -51,6 +51,12 @@ test("FR-200 validates every public configuration key from the single catalog", 
     if (entry.type === "timezone") {
       for (const zone of entry.options) assert.equal(config.validateSystemConfigValue(key, zone), zone);
       assert.throws(() => config.validateSystemConfigValue(key, "UTC"), (error) => error.status === 400 && error.details.key === key);
+    } else if (entry.type === "boolean") {
+      assert.equal(config.validateSystemConfigValue(key, true), true);
+      assert.throws(() => config.validateSystemConfigValue(key, "true"), (error) => error.code === "INVALID_SYSTEM_CONFIG");
+    } else if (entry.type === "buildingIds") {
+      assert.deepEqual(config.validateSystemConfigValue(key, []), []);
+      assert.throws(() => config.validateSystemConfigValue(key, ["bad-id"]), (error) => error.code === "INVALID_SYSTEM_CONFIG");
     } else {
       assert.equal(config.validateSystemConfigValue(key, entry.min), entry.min, key);
       assert.equal(config.validateSystemConfigValue(key, entry.max), entry.max, key);

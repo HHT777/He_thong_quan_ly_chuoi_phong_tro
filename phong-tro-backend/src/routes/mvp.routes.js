@@ -168,12 +168,28 @@ router.post("/billing-adjustments/:id/toggle", landlord, async (req, res, next) 
 });
 
 router.post("/bills/preview", landlord, async (req, res, next) => {
-  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds, req.user.ma_tai_khoan)); } catch (e) { next(e); }
+  try { return data(res, await billGenerationService.preview(req.body.period, req.body.contractIds, req.user.ma_tai_khoan, req.body.buildingIds)); } catch (e) { next(e); }
+});
+
+router.get("/bills/summary", landlord, async (req, res, next) => {
+  try { validateQuery(req.query, { strings: ["ma_can", "issuance", "search"], periods: ["ky"] }); return data(res, await require("../services/khoanPhaiThu.service").getSummary(req.query, req.user)); } catch (e) { next(e); }
+});
+router.post("/bills/send-preview", landlord, async (req, res, next) => {
+  try { return data(res, await billingCronService.sendPreview(req.body.billIds, req.user.ma_tai_khoan)); } catch (e) { next(e); }
+});
+router.post("/bills/send", landlord, async (req, res, next) => {
+  try { return data(res, await billingCronService.sendBatch(req.body.billIds, req.user.ma_tai_khoan, new Date(), { resend: req.body.resend === true, key: req.get("Idempotency-Key") })); } catch (e) { next(e); }
+});
+router.get("/bills/schedule", landlord, async (req, res, next) => {
+  try { return data(res, await billingCronService.scheduleStatus(new Date(), req.user.ma_tai_khoan)); } catch (e) { next(e); }
+});
+router.put("/bills/schedule", landlord, async (req, res, next) => {
+  try { await require("../services/systemConfig.service").saveBillingSchedule(req.body, req.user.ma_tai_khoan); return data(res, await billingCronService.scheduleStatus(new Date(), req.user.ma_tai_khoan)); } catch (e) { next(e); }
 });
 
 router.post("/bills/generate", landlord, async (req, res, next) => {
   try {
-    return data(res, await billGenerationService.generate(req.body.period, req.user.ma_tai_khoan, req.body.contractIds), 201);
+    return data(res, await billGenerationService.generate(req.body.period, req.user.ma_tai_khoan, req.body.contractIds, req.body.buildingIds), 201);
   } catch (e) { next(e); }
 });
 router.get("/debt", async (req, res, next) => {
@@ -188,7 +204,7 @@ router.post("/payments/:id/cancel", landlord, async (req, res, next) => { try { 
 router.post("/jobs/debt-lifecycle", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
 router.post("/jobs/close-overdue-debt", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
 router.post("/jobs/remind-due-bills", landlord, async (req, res, next) => { try { return data(res, await debtLifecycleService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan })); } catch (e) { next(e); } });
-router.post("/jobs/billing", landlord, async (req, res, next) => { try { return data(res, await billingCronService.run({ now: req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan, force: req.body.force === true })); } catch (e) { next(e); } });
+router.post("/jobs/billing", landlord, async (req, res, next) => { try { return data(res, await billingCronService.run({ now: process.env.NODE_ENV === "test" && req.body.now ? new Date(req.body.now) : new Date(), actorId: req.user.ma_tai_khoan, force: process.env.NODE_ENV === "test" && req.body.force === true })); } catch (e) { next(e); } });
 
 // Tài sản được quản lý theo thứ bậc Căn trọ → Phòng → Tài sản.
 router.get("/assets", landlord, async (req, res, next) => {

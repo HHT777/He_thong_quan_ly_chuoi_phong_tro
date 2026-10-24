@@ -36,7 +36,7 @@ function baseline() {
 }
 async function checkSchema(connection) {
   const [tables] = await connection.query("SELECT TABLE_NAME,TABLE_COLLATION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE'");
-  assert.equal(tables.length, 37);
+  assert.equal(tables.length, 39);
   for (const row of tables) assert.equal(row.TABLE_COLLATION, "utf8mb4_unicode_ci", row.TABLE_NAME);
   const [columns] = await connection.query("SELECT COLUMN_NAME,CHARACTER_SET_NAME,COLLATION_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='SuCo' AND COLUMN_NAME IN ('maSuCo','maSuCoTruoc')");
   assert.equal(columns.length, 2);
@@ -80,7 +80,7 @@ async function run() {
       for (let pass = 1; pass <= 2; pass += 1) {
         for (const name of names) await connection.query(fs.readFileSync(path.resolve(__dirname, "../migrations", name), "utf8"));
         await checkSchema(connection);
-        console.log(`${label()} version=${version[0].version} baseline=${key === "mysql8" ? "MÔ PHỎNG" : "dump thật 25 bảng"} 004-016 pass ${pass}/2 tables=37`);
+        console.log(`${label()} version=${version[0].version} baseline=${key === "mysql8" ? "MÔ PHỎNG" : "dump thật 25 bảng"} 004-017 pass ${pass}/2 tables=39`);
       }
     } finally { await connection.end(); }
   } finally {

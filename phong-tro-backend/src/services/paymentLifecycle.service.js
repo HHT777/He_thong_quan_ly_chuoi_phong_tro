@@ -10,6 +10,7 @@ const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 const fail = (status, message, code) => Object.assign(new Error(message), { status, code });
 function deterministicUuid(value) { const hex = crypto.createHash("sha256").update(value).digest("hex").slice(0, 32).split(""); hex[12] = "4"; hex[16] = ((parseInt(hex[16], 16) & 3) | 8).toString(16); return `${hex.slice(0, 8).join("")}-${hex.slice(8, 12).join("")}-${hex.slice(12, 16).join("")}-${hex.slice(16, 20).join("")}-${hex.slice(20).join("")}`; }
 async function recordRemaining(bill, key, actorId, transaction, now = new Date()) {
+  if (bill.loai_thanh_toan === "DINH_KY" && !bill.da_gui) throw fail(409, "Phiếu Nháp chưa thể ghi nhận thu", "BILL_NOT_SENT");
   if (bill.loai_thanh_toan === "SAU_THANH_LY" || Number(bill.so_tien_con_no) <= 0) return null;
   const id = deterministicUuid(`mark-paid:${key}:${bill.ma_thanh_toan}`);
   const existing = await GiaoDichThanhToan.findByPk(id, { transaction }); if (existing) return existing;
@@ -30,7 +31,7 @@ async function markAllPaid({ buildingId, period, key, actorId, failAfter }) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(period || ""); if (!buildingId || !match) throw fail(422, "Căn và kỳ YYYY-MM là bắt buộc", "INVALID_MARK_ALL_SCOPE");
   return sequelize.transaction(async (transaction) => {
     await assertOwned(ownerUser(actorId), "building", buildingId, { transaction });
-    const bills = await ThanhToan.findAll({ where: { nam: Number(match[1]), thang: Number(match[2]), loai_thanh_toan: "DINH_KY" }, include: [{ model: HopDong, as: "hopDong", required: true, include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: buildingId } }] }], transaction, lock: transaction.LOCK.UPDATE, order: [["ma_thanh_toan", "ASC"]] });
+    const bills = await ThanhToan.findAll({ where: { nam: Number(match[1]), thang: Number(match[2]), loai_thanh_toan: "DINH_KY", da_gui: true }, include: [{ model: HopDong, as: "hopDong", required: true, include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: buildingId } }] }], transaction, lock: transaction.LOCK.UPDATE, order: [["ma_thanh_toan", "ASC"]] });
     const payments = []; for (const bill of bills) { const row = await recordRemaining(bill, key, actorId, transaction); if (row) payments.push(row); if (failAfter && payments.length >= failAfter) throw fail(500, "Lỗi mô phỏng giữa giao dịch", "INJECTED_FAILURE"); }
     return { processed: payments.length, payments };
   });

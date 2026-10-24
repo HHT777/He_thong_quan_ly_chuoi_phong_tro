@@ -8,7 +8,7 @@ const {
   TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc,
   ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo,
   GiaoDichThanhToan, KhoanDieuChinh, ChiTietThanhToan, KhoanChi, ThongBao,
-  BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo,
+  BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo, NhatKyLapPhieu, ChiTietNhatKyLapPhieu,
 } = models;
 
 function ensureMeterBusinessKey(reading) {
@@ -75,6 +75,11 @@ KhachThue.hasMany(YeuCau, { foreignKey: "ma_khach_thue", as: "yeuCaus" });
 YeuCau.belongsTo(KhachThue, { foreignKey: "ma_khach_thue", as: "khachThue" });
 HopDong.hasMany(ThanhToan, { foreignKey: "ma_hop_dong", as: "thanhToans" });
 ThanhToan.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
+ThanhToan.belongsTo(TaiKhoan, { foreignKey: "nguoi_gui_id", as: "nguoiGui" });
+NhatKyLapPhieu.hasMany(ChiTietNhatKyLapPhieu, { foreignKey: "ma_lan_chay", as: "chiTiets" });
+ChiTietNhatKyLapPhieu.belongsTo(NhatKyLapPhieu, { foreignKey: "ma_lan_chay", as: "nhatKy" });
+ChiTietNhatKyLapPhieu.belongsTo(PhongTro, { foreignKey: "ma_phong", as: "phongTro" });
+ChiTietNhatKyLapPhieu.belongsTo(HopDong, { foreignKey: "ma_hop_dong", as: "hopDong" });
 ThanhToan.belongsTo(BienBanTraPhong, { foreignKey: "ma_bien_ban_tra_phong", as: "bienBanTraPhong" });
 ThanhToan.hasMany(GiaoDichThanhToan, { foreignKey: "ma_thanh_toan", as: "giaoDichs" });
 GiaoDichThanhToan.belongsTo(ThanhToan, { foreignKey: "ma_thanh_toan", as: "thanhToan" });

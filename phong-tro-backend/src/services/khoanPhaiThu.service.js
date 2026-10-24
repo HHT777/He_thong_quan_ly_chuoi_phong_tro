@@ -20,6 +20,15 @@ const billInclude = [
   { model: GiaoDichThanhToan, as: "giaoDichs" },
 ];
 
+async function searchContractIds(search) {
+  const term = `%${search}%`;
+  const matches = await HopDong.findAll({ attributes: ["ma_hop_dong"], include: [
+    { model: PhongTro, as: "phongTro", required: false, where: { so_phong: { [Op.like]: term } }, attributes: [] },
+    { model: KhachThue, as: "khachThue", required: false, where: { ho_ten: { [Op.like]: term } }, attributes: [] },
+  ], where: { [Op.or]: [ { "$phongTro.ma_phong$": { [Op.ne]: null } }, { "$khachThue.ma_khach_thue$": { [Op.ne]: null } } ] } });
+  return matches.map((row) => row.ma_hop_dong);
+}
+
 class KhoanPhaiThuService {
   async createKhoanPhaiThu(data, actorId) {
     const { nam, thang } = splitPeriod(data.ky);
@@ -67,9 +76,12 @@ class KhoanPhaiThuService {
   }
 
   buildWhere(filters = {}) {
+    if (filters.issuance && !["DRAFT", "SENT"].includes(filters.issuance)) throw Object.assign(new Error("Trạng thái gửi phiếu không hợp lệ"), { status: 400, code: "INVALID_ISSUANCE_FILTER" });
     const where = { loai_thanh_toan: "DINH_KY" };
     if (filters.ky) Object.assign(where, splitPeriod(filters.ky));
     if (filters.trang_thai_thanh_toan) where.trang_thai = filters.trang_thai_thanh_toan;
+    if (filters.issuance === "DRAFT") where.da_gui = false;
+    if (filters.issuance === "SENT") where.da_gui = true;
     const contractWhere = {};
     if (filters.ma_phong) contractWhere.ma_phong = filters.ma_phong;
     if (filters.ma_khach_thue) contractWhere.ma_khach_thue = filters.ma_khach_thue;
@@ -89,20 +101,36 @@ class KhoanPhaiThuService {
           ? { [Op.in]: buildingId ? (ownedBuildings.includes(buildingId) ? [buildingId] : []) : ownedBuildings }
           : buildingId } } : nested),
     } : item);
-    const { count, rows } = await ThanhToan.findAndCountAll({ where, include, distinct: true, limit: pagination.limit, offset: pagination.offset, order: [["nam", "DESC"], ["thang", "DESC"]] });
+    if (requester?.vai_tro === "KHACH_THUE") where.da_gui = true;
+    if (filters.search) where.ma_hop_dong = { [Op.in]: await searchContractIds(filters.search) };
+    const { count, rows } = await ThanhToan.findAndCountAll({ where, include, distinct: true, limit: pagination.limit, offset: pagination.offset, order: [["nam", "DESC"], ["thang", "DESC"], ["ma_thanh_toan", "DESC"]] });
     return { count, total: count, data: rows };
+  }
+
+  async getSummary(filters, requester) {
+    const { where, contractWhere, buildingId } = this.buildWhere(filters);
+    if (filters.search) where.ma_hop_dong = { [Op.in]: await searchContractIds(filters.search) };
+    const owned = await getOwnedBuildingIds(requester);
+    const scope = buildingId ? (owned.includes(buildingId) ? [buildingId] : []) : owned;
+    const rows = await ThanhToan.findAll({ where, attributes: ["tong_phai_tra", "tong_da_thanh_toan", "so_tien_con_no", "da_gui"], include: [{ model: HopDong, as: "hopDong", required: true, where: contractWhere, attributes: [], include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: scope } }, attributes: [] }] }] });
+    return rows.reduce((result, bill) => {
+      result.totalDue += Number(bill.tong_phai_tra); result.totalPaid += Number(bill.tong_da_thanh_toan);
+      if (bill.da_gui) result.totalDebt += Number(bill.so_tien_con_no); else result.unsent += 1;
+      return result;
+    }, { totalDue: 0, totalPaid: 0, totalDebt: 0, unsent: 0 });
   }
 
   async getKhoanPhaiThuById(id, requester) {
     if (requester) await assertOwned(requester, "bill", id);
     const row = await ThanhToan.findByPk(id, { include: billInclude });
     if (!row) throw { status: 404, message: "Không tìm thấy khoản phải thu" };
+    if (requester?.vai_tro === "KHACH_THUE" && !row.da_gui) throw notFoundError();
     return row;
   }
 
   async getOutstandingBills(tenantId, requester) {
     if (requester) await assertOwned(requester, "tenant", tenantId);
-    return ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 } }, include: [{ model: HopDong, as: "hopDong", required: true, where: { ma_khach_thue: tenantId }, include: [{ model: PhongTro, as: "phongTro" }] }], order: [["nam", "ASC"], ["thang", "ASC"]] });
+    return ThanhToan.findAll({ where: { so_tien_con_no: { [Op.gt]: 0 }, da_gui: true }, include: [{ model: HopDong, as: "hopDong", required: true, where: { ma_khach_thue: tenantId }, include: [{ model: PhongTro, as: "phongTro" }] }], order: [["nam", "ASC"], ["thang", "ASC"]] });
   }
 
   async updateBillStatus(id, transaction) {
@@ -126,7 +154,7 @@ class KhoanPhaiThuService {
       { nam: year, thang: { [Op.lte]: currentPeriodDue ? month : month - 1 } },
     ] };
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
-    const rows = await ThanhToan.findAll({ where: { ...periodWhere, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" },
+    const rows = await ThanhToan.findAll({ where: { ...periodWhere, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY", da_gui: true },
       include: billInclude.map((item) => item.as === "hopDong" ? { ...item, required: true,
         ...(requester?.vai_tro === "KHACH_THUE" ? { where: { ma_khach_thue: requester.ma_khach_thue } } : {}),
         include: item.include.map((nested) => nested.as === "phongTro" && ownedBuildings

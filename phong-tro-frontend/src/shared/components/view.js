@@ -21,6 +21,7 @@ export const escapeHtml = (value) =>
 
 export const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
 export const date = (value) => (value ? new Date(value).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—");
+export const datePadded = (value) => (value ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value)) : "—");
 
 // Format status values into SaaS badges
 export function formatStatusBadge(status) {

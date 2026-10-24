@@ -21,6 +21,7 @@ async function confirm(id, actorId) {
       lock: transaction.LOCK.UPDATE,
     });
     if (!bill) throw { status: 404, code: "BILL_NOT_FOUND", message: "Khoản phải thu không tồn tại" };
+    if (bill.loai_thanh_toan === "DINH_KY" && !bill.da_gui) throw { status: 409, code: "BILL_NOT_SENT", message: "Phiếu Nháp chưa thể xác nhận thanh toán" };
     const amount = Number(payment.so_tien);
     if (!Number.isFinite(amount) || amount <= 0 || amount > Number(bill.so_tien_con_no)) {
       throw { status: 422, code: "INVALID_PAYMENT_AMOUNT", message: "Số tiền minh chứng không hợp lệ với công nợ hiện tại" };

@@ -118,6 +118,8 @@ const ThanhToan = sequelize.define("ThanhToan", {
   ngay_lap: { type: DataTypes.DATE, field: "ngayLap", allowNull: false, defaultValue: DataTypes.NOW },
   da_gui: { type: DataTypes.BOOLEAN, field: "daGui", allowNull: false, defaultValue: false },
   ngay_gui: { type: DataTypes.DATE, field: "ngayGui", allowNull: true },
+  nguoi_gui_id: ref("nguoiGuiId", true),
+  so_lan_gui: { type: DataTypes.INTEGER, field: "soLanGui", allowNull: false, defaultValue: 0 },
   da_nhac_han: { type: DataTypes.BOOLEAN, field: "daNhacHan", allowNull: false, defaultValue: false },
   ngay_nhac_han: { type: DataTypes.DATE, field: "ngayNhacHan", allowNull: true },
   qua_han: { type: DataTypes.BOOLEAN, field: "quaHan", allowNull: false, defaultValue: false },
@@ -234,6 +236,23 @@ const LichSuGiaHanGiuPhong = sequelize.define("LichSuGiaHanGiuPhong", {
   ly_do: { type: DataTypes.STRING(1000), field: "lyDo", allowNull: true }, thoi_diem_tao: { type: DataTypes.DATE, field: "thoiDiemTao", allowNull: false, defaultValue: DataTypes.NOW }, nguoi_thuc_hien_id: ref("nguoiThucHienId"), ma_dat_giu: ref("maDatGiu"),
 }, opts("LichSuGiaHanGiuPhong"));
 const CauHinhHeThong = sequelize.define("CauHinhHeThong", { ma_cau_hinh: id("maCauHinh"), khoa: { type: DataTypes.STRING(100), field: "khoa", allowNull: false, unique: true }, gia_tri: { type: DataTypes.JSON, field: "giaTri", allowNull: false }, mo_ta: { type: DataTypes.STRING(500), field: "moTa", allowNull: true }, ngay_cap_nhat: { type: DataTypes.DATE, field: "ngayCapNhat", allowNull: false, defaultValue: DataTypes.NOW }, nguoi_cap_nhat_id: ref("nguoiCapNhatId") }, opts("CauHinhHeThong"));
+const NhatKyLapPhieu = sequelize.define("NhatKyLapPhieu", {
+  ma_lan_chay: id("maLanChay"), ky: { type: DataTypes.CHAR(7), allowNull: false, unique: true },
+  thoi_diem_hen: { type: DataTypes.DATE, field: "thoiDiemHen", allowNull: false },
+  bat_dau: { type: DataTypes.DATE, field: "batDau", allowNull: false },
+  ket_thuc: { type: DataTypes.DATE, field: "ketThuc", allowNull: true },
+  trang_thai: { type: DataTypes.STRING(20), field: "trangThai", allowNull: false },
+  so_phieu_lap: { type: DataTypes.INTEGER, field: "soPhieuLap", allowNull: false, defaultValue: 0 },
+  so_phong_bo_qua: { type: DataTypes.INTEGER, field: "soPhongBoQua", allowNull: false, defaultValue: 0 },
+  so_phong_loi: { type: DataTypes.INTEGER, field: "soPhongLoi", allowNull: false, defaultValue: 0 },
+  pham_vi_json: { type: DataTypes.JSON, field: "phamViJson", allowNull: false },
+}, opts("NhatKyLapPhieu"));
+const ChiTietNhatKyLapPhieu = sequelize.define("ChiTietNhatKyLapPhieu", {
+  ma_chi_tiet: id("maChiTiet"), ma_lan_chay: ref("maLanChay"), ma_phong: ref("maPhong"),
+  ma_hop_dong: ref("maHopDong", true), ket_qua: { type: DataTypes.STRING(20), field: "ketQua", allowNull: false },
+  ma_ly_do: { type: DataTypes.STRING(60), field: "maLyDo", allowNull: true },
+  dien_giai: { type: DataTypes.STRING(255), field: "dienGiai", allowNull: true },
+}, opts("ChiTietNhatKyLapPhieu"));
 const DanhMucSuCo = sequelize.define("DanhMucSuCo", { ma_danh_muc: id("maDanhMuc"), ma: { type: DataTypes.STRING(50), field: "ma", allowNull: false, unique: true }, ten: { type: DataTypes.STRING(100), field: "ten", allowNull: false }, dang_hoat_dong: { type: DataTypes.BOOLEAN, field: "dangHoatDong", allowNull: false, defaultValue: true }, thu_tu: { type: DataTypes.INTEGER, field: "thuTu", allowNull: false, defaultValue: 0 } }, opts("DanhMucSuCo"));
 const ChiPhiSuCoKhachThue = sequelize.define("ChiPhiSuCoKhachThue", {
   ma_chi_phi_su_co: id("maChiPhiSuCo"), ma_su_co: { ...ref("maSuCo"), unique: true }, ma_hop_dong: ref("maHopDong"),
@@ -242,4 +261,4 @@ const ChiPhiSuCoKhachThue = sequelize.define("ChiPhiSuCoKhachThue", {
   ngay_ghi_nhan: { type: DataTypes.DATE, field: "ngayGhiNhan", allowNull: false, defaultValue: DataTypes.NOW }, ngay_khau_tru: { type: DataTypes.DATE, field: "ngayKhauTru", allowNull: true },
 }, opts("ChiPhiSuCoKhachThue"));
 
-module.exports = { TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc, ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo, YeuCauGiaHan, YeuCauTraPhong, DeXuatBanCungPhong, GiaoDichThanhToan, KhoanDieuChinh, ChiTietThanhToan, KhoanChi, ThongBao, SuCoTaiSan, BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo };
+module.exports = { TaiKhoan, ChuTro, KhachThue, CanTro, PhongTro, TaiSan, HopDong, LichSuGiaHanHopDong, LichSuSuaHopDong, LichSuChuyenPhong, TienCoc, ThanhVienPhong, ViPhamHopDong, ChiSoDien, LichSuChinhSuaChiSoDien, YeuCau, ThanhToan, SuCo, YeuCauGiaHan, YeuCauTraPhong, DeXuatBanCungPhong, GiaoDichThanhToan, KhoanDieuChinh, ChiTietThanhToan, KhoanChi, ThongBao, SuCoTaiSan, BienBanTraPhong, KhoanThu, KhoanKhauTru, GiaoDichHoanCoc, ChiPhiSuCoKhachThue, DatGiuPhong, LichSuGiaHanGiuPhong, CauHinhHeThong, DanhMucSuCo, NhatKyLapPhieu, ChiTietNhatKyLapPhieu };

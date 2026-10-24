@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao, GiaoDichThanhToan, KhoanThu, AuditLog } = require("../src/models");
+const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToan, ThongBao, GiaoDichThanhToan, KhoanThu, AuditLog, NhatKyLapPhieu, ChiTietNhatKyLapPhieu } = require("../src/models");
 const billingCronService = require("../src/services/billingCron.service");
 const paymentLifecycleService = require("../src/services/paymentLifecycle.service");
 const { sumSignedLineAmounts } = require("../src/utils/billLine.util");
@@ -34,7 +34,8 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
   assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } }), before, "preview must not write a bill");
   const item = preview.body.data.previews[0]; assert.equal(item.occupantCount, 2); assert.equal(item.components.water, 200000); assert.equal(item.components.serviceFee, 120000);
-  assert.equal(item.total, 2500000 + 130 * 3500 + 200000 + 120000 + 50000 - 100000);
+  assert.equal(item.components.electricity, 0, "first contract month has no prior electricity");
+  assert.equal(item.total, 2500000 + 200000 + 120000 + 50000 - 100000);
   const generated = await request("/api/v1/bills/generate", { method: "POST", headers: headers(landlord), body: JSON.stringify({ period: "2026-10", contractIds: [fresh.contract.ma_hop_dong] }) });
   assert.equal(generated.response.status, 201, JSON.stringify(generated.body)); assert.equal(generated.body.data.created.length, 1);
   const bill = await ThanhToan.findByPk(generated.body.data.created[0].ma_thanh_toan, { include: [{ model: ChiTietThanhToan, as: "chiTiets" }] });
@@ -52,15 +53,64 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 11, loai_thanh_toan: "DINH_KY" } }), 1);
 });
 
-test("FR-151/153/155/156 billing cron sends each persisted bill once", async () => {
-  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "billing-cron"); await confirmedReading(fresh, "2026-12", 80);
+test("FR-151/153/155/156 billing cron creates drafts once and landlord sends separately", async () => {
+  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "billing-cron"); await confirmedReading(fresh, "2026-11", 80);
   const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
   const first = await billingCronService.run({ now: new Date("2026-12-02T08:00:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
   const second = await billingCronService.run({ now: new Date("2026-12-02T08:05:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
   const bill = await ThanhToan.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 12, loai_thanh_toan: "DINH_KY" } });
-  assert.ok(bill?.da_gui); assert.ok(bill.ngay_gui); assert.ok(first.sent >= 1); assert.equal(second.sent, 0);
+  assert.ok(bill); assert.equal(bill.da_gui, false); assert.equal(first.sent, 0); assert.equal(second.sent, 0);
+  const runLog = await NhatKyLapPhieu.findOne({ where: { ky: "2026-12" } });
+  assert.equal(runLog.trang_thai, "HOAN_TAT");
+  assert.equal(await ChiTietNhatKyLapPhieu.count({ where: { ma_lan_chay: runLog.ma_lan_chay, ma_phong: fresh.room.ma_phong, ket_qua: "DA_LAP" } }), 1);
+  const sent = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan] }) });
+  assert.equal(sent.response.status, 200); assert.equal(sent.body.data.sent, 1);
+  await bill.reload(); assert.equal(bill.da_gui, true); assert.ok(bill.ngay_gui); assert.equal(bill.so_lan_gui, 1);
   assert.equal(await ThongBao.count({ where: { ma_tai_khoan: fresh.account.ma_tai_khoan, loai_thong_bao: "PHIEU_THU" } }), 1);
+  const missingKey = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan], resend: true }) });
+  assert.equal(missingKey.body.data.results[0].reason, "IDEMPOTENCY_KEY_REQUIRED");
+  const resendKey = `resend-${Date.now()}`;
+  const resendOptions = { method: "POST", headers: headers(landlord, { "Idempotency-Key": resendKey }), body: JSON.stringify({ billIds: [bill.ma_thanh_toan], resend: true }) };
+  const resent = await request("/api/v1/bills/send", resendOptions);
+  const replay = await request("/api/v1/bills/send", resendOptions);
+  assert.equal(resent.body.data.sent, 1);
+  assert.equal(replay.body.data.results[0].reason, "ALREADY_PROCESSED");
+  await bill.reload(); assert.equal(bill.so_lan_gui, 2);
+  assert.equal(await ThongBao.count({ where: { ma_tai_khoan: fresh.account.ma_tai_khoan, loai_thong_bao: "PHIEU_THU" } }), 2);
   const forbidden = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(fresh.tenantToken), body: JSON.stringify({ force: true }) }); assert.equal(forbidden.response.status, 403);
+});
+
+test("FR-153 sending a draft without a tenant account leaves bill and notification unchanged", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "bill-no-recipient", { createAccount: false });
+  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2027, thang: 2, loai_thanh_toan: "DINH_KY", tong_phai_tra: 2500000, tong_da_thanh_toan: 0, so_tien_con_no: 2500000, trang_thai: "CHUA_THANH_TOAN", da_gui: false });
+  const sent = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan] }) });
+  assert.equal(sent.response.status, 200);
+  assert.equal(sent.body.data.sent, 0);
+  assert.equal(sent.body.data.results[0].reason, "RECIPIENT_UNAVAILABLE");
+  await bill.reload(); assert.equal(bill.da_gui, false); assert.equal(bill.so_lan_gui, 0);
+  assert.equal(await ThongBao.count({ where: { khoa_su_kien: `PHIEU_THU:${bill.ma_thanh_toan}` } }), 0);
+});
+
+test("FR-152 a draft stays out of tenant bills and debt until landlord sends it", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "bill-draft-debt");
+  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY", tong_phai_tra: 2500000, tong_da_thanh_toan: 0, so_tien_con_no: 2500000, trang_thai: "CHUA_THANH_TOAN", da_gui: false });
+  const debtBefore = await request("/api/v1/debt", { headers: headers(landlord) });
+  assert.equal(debtBefore.body.data.some((item) => item.ma_thanh_toan === bill.ma_thanh_toan), false);
+  const tenantBillsBefore = await request("/api/khoan-phai-thu?ky=2026-10", { headers: headers(fresh.tenantToken) });
+  assert.equal(tenantBillsBefore.body.data.some((item) => item.ma_thanh_toan === bill.ma_thanh_toan), false);
+  const tenantDetailBefore = await request(`/api/khoan-phai-thu/${bill.ma_thanh_toan}`, { headers: headers(fresh.tenantToken) });
+  assert.equal(tenantDetailBefore.response.status, 404);
+  const payment = await request("/api/khoan-phai-thu/payment/create", { method: "POST", headers: headers(landlord, { "Idempotency-Key": `draft-${Date.now()}` }), body: JSON.stringify({ ma_khoan_phai_thu: bill.ma_thanh_toan, ngay_thanh_toan: "2026-10-17", so_tien: 100000, phuong_thuc: "CHUYEN_KHOAN" }) });
+  assert.equal(payment.response.status, 409);
+  assert.equal(payment.body.code, "BILL_NOT_SENT");
+  const sent = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan] }) });
+  assert.equal(sent.body.data.sent, 1);
+  const debtAfter = await request("/api/v1/debt", { headers: headers(landlord) });
+  assert.equal(debtAfter.body.data.some((item) => item.ma_thanh_toan === bill.ma_thanh_toan), true);
+  const tenantBillsAfter = await request("/api/khoan-phai-thu?ky=2026-10", { headers: headers(fresh.tenantToken) });
+  assert.equal(tenantBillsAfter.body.data.some((item) => item.ma_thanh_toan === bill.ma_thanh_toan), true);
 });
 
 test("FR-151/153 migration backfill keeps legacy bills inert across all cron workers", async () => {
@@ -101,7 +151,7 @@ test("FR-078/172/173 debt milestones catch up once and expose derived overdue st
 
 test("FR-074/075/079 mark paid and cancellation are idempotent, reversible and audited", async () => {
   const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "payment-lifecycle");
-  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 12, loai_thanh_toan: "DINH_KY", tong_phai_tra: 700000, tong_da_thanh_toan: 0, so_tien_con_no: 700000, trang_thai: "CHUA_THANH_TOAN", qua_han: true, ngay_qua_han: new Date() });
+  const bill = await ThanhToan.create({ ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 12, loai_thanh_toan: "DINH_KY", tong_phai_tra: 700000, tong_da_thanh_toan: 0, so_tien_con_no: 700000, trang_thai: "CHUA_THANH_TOAN", da_gui: true, ngay_gui: new Date(), qua_han: true, ngay_qua_han: new Date() });
   const key = `mark-paid-${Date.now()}`; const first = await request(`/api/v1/bills/${bill.ma_thanh_toan}/mark-paid`, { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: "{}" });
   const again = await request(`/api/v1/bills/${bill.ma_thanh_toan}/mark-paid`, { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: "{}" });
   assert.equal(first.response.status, 201, JSON.stringify(first.body)); assert.equal(again.response.status, 201); assert.equal(await GiaoDichThanhToan.count({ where: { ma_thanh_toan: bill.ma_thanh_toan } }), 1);
@@ -132,7 +182,7 @@ test("FR-075 marks every periodic bill in one building/period atomically", async
   const room = await request("/api/phong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ma_can: first.building.ma_can, so_phong: `ALL-${unique.suffix}`, dien_tich: 20, gia_thue: 2200000, so_nguoi_toi_da: 2, trang_thai: "TRONG" }) }); assert.equal(room.response.status, 201, JSON.stringify(room.body));
   const tenant = await request("/api/management/khach-thue", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ho_ten: `All ${unique.suffix}`, so_dien_thoai: unique.phone, cccd_giay_to: unique.identity }) }); assert.equal(tenant.response.status, 201, JSON.stringify(tenant.body));
   const contract = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ma_khach_thue: tenant.body.data.ma_khach_thue, ma_phong: room.body.data.ma_phong, ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30", gia_thue: 2200000, tien_coc: 2200000, don_gia_dien: 3500, don_gia_nuoc: 100000, chi_so_dien_ban_dau: 0, dieu_khoan: "Mark all", ngay_nhan_coc: "2026-10-01", da_co_ban_giay_ky: true }) }); assert.equal(contract.response.status, 201, JSON.stringify(contract.body));
-  const bills = await Promise.all([first.contract.ma_hop_dong, contract.body.data.ma_hop_dong].map((contractId) => ThanhToan.create({ ma_hop_dong: contractId, nam: 2027, thang: 1, loai_thanh_toan: "DINH_KY", tong_phai_tra: 500000, tong_da_thanh_toan: 0, so_tien_con_no: 500000, trang_thai: "CHUA_THANH_TOAN" })));
+  const bills = await Promise.all([first.contract.ma_hop_dong, contract.body.data.ma_hop_dong].map((contractId) => ThanhToan.create({ ma_hop_dong: contractId, nam: 2027, thang: 1, loai_thanh_toan: "DINH_KY", tong_phai_tra: 500000, tong_da_thanh_toan: 0, so_tien_con_no: 500000, trang_thai: "CHUA_THANH_TOAN", da_gui: true, ngay_gui: new Date() })));
   const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
   await assert.rejects(() => paymentLifecycleService.markAllPaid({ buildingId: first.building.ma_can, period: "2027-01", key: `rollback-${Date.now()}`, actorId: actor.ma_tai_khoan, failAfter: 1 }), (error) => error.code === "INJECTED_FAILURE");
   for (const bill of bills) { await bill.reload(); assert.equal(Number(bill.so_tien_con_no), 500000); assert.equal(await GiaoDichThanhToan.count({ where: { ma_thanh_toan: bill.ma_thanh_toan } }), 0); }
@@ -145,6 +195,8 @@ test("FR-200 configuration changes apply without restart and named lock admits o
   const landlord = await login(integration.landlord);
   const changed = await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 9 }) });
   assert.equal(changed.response.status, 200, JSON.stringify(changed.body));
+  const enabled = await request("/api/v1/system-config/billScheduleEnabled", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: true }) });
+  assert.equal(enabled.response.status, 200);
   const beforeHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T08:00:00+07:00" }) });
   assert.equal(beforeHour.body.data.due, false);
   const configuredHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T09:00:00+07:00" }) });
@@ -161,4 +213,5 @@ test("FR-200 configuration changes apply without restart and named lock admits o
   assert.equal(second.lockAcquired, false);
   assert.equal((await first).worker, 1);
   await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 8 }) });
+  await request("/api/v1/system-config/billScheduleEnabled", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: false }) });
 });

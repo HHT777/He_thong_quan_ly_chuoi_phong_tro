@@ -5,21 +5,22 @@ const path = require("node:path");
 
 const read = (file) => fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src", file), "utf8");
 
-test("FR-144..157/164/175/176 bill screen uses canonical routes, payloads and retry keys", () => {
-  const source = read("modules/finance/bills.tab.js");
-  assert.match(source, /post\("\/v1\/bills\/preview", \{ period: .* contractIds:/s);
+test("FR-144..157/164/175/176 bill screen uses preview, manual sending and server totals", () => {
+  const source = read("modules/finance/bills-v2.js");
+  assert.match(source, /post\("\/v1\/bills\/preview", \{ period, buildingIds:/);
   assert.match(source, /post\("\/v1\/bills\/generate", \{ period: .* contractIds:/s);
+  assert.match(source, /post\("\/v1\/bills\/send-preview", \{ billIds:/);
+  assert.match(source, /post\("\/v1\/bills\/send", payload/);
+  assert.match(source, /get\(`\/v1\/bills\/summary\?/);
+  assert.match(source, /get\("\/v1\/bills\/schedule"\)/);
+  assert.match(source, /put\("\/v1\/bills\/schedule"/);
   assert.match(source, /\/v1\/bills\/\$\{row\.ma_thanh_toan\}\/adjustments/);
   assert.match(source, /reason: requiredText\(raw\.reason/);
-  assert.match(source, /\/mark-paid/);
-  assert.match(source, /\/v1\/bills\/mark-all-paid/);
-  assert.match(source, /"Idempotency-Key": requestKeys\.keyFor\(scope, payload\)/);
-  for (const scope of ["all:", "pay:", "paid:", "cancel:"]) assert.ok(source.includes(`scope = \`${scope}`));
-  assert.match(source, /requestKeys\.complete\(scope\)/);
-  assert.match(source, /IDEMPOTENCY_CONFLICT/);
-  assert.match(source, /Tạo yêu cầu mới/);
-  assert.match(source, /\/v1\/payments\/\$\{payment\.ma_giao_dich\}\/cancel/);
-  assert.match(source, /payment\.nguon_thanh_toan === "KHAU_TRU_COC"/);
+  assert.match(source, /"Idempotency-Key": keys\.keyFor\(scope, payload\)/);
+  for (const scope of ["resend:", "pay:", "cancel:"]) assert.ok(source.includes(`scope = \`${scope}`));
+  assert.match(source, /keys\.complete\(scope\)/);
+  assert.match(source, /\/v1\/payments\/\$\{row\.ma_giao_dich\}\/cancel/);
+  assert.match(source, /row\.nguon_thanh_toan !== "KHAU_TRU_COC"/);
   assert.match(source, /\/v1\/billing-adjustments/);
   assert.match(source, /escapeHtml/);
   assert.match(source, /button\.disabled = true/);

@@ -65,7 +65,7 @@ async function getDashboardInsights(requester, query = {}, now = new Date()) {
       COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 0),0) AS outstanding,
       COALESCE(SUM(t.soTienConNo > 0 AND :overdue = 1),0) AS overdue
       FROM ThanhToan t JOIN HopDong h ON h.maHopDong=t.maHopDong JOIN PhongTro p ON p.maPhong=h.maPhong
-      WHERE p.maCan IN (:ids) AND t.loaiThanhToan='DINH_KY' AND t.nam=:year AND t.thang=:part`, { ids, overdue: Number(overdue), year, part });
+      WHERE p.maCan IN (:ids) AND t.loaiThanhToan='DINH_KY' AND t.daGui=1 AND t.nam=:year AND t.thang=:part`, { ids, overdue: Number(overdue), year, part });
     bills = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, number(value)]));
   }
   if (bills.paid + bills.outstanding + bills.overdue !== bills.total) throw new Error("Dashboard bill partition mismatch");

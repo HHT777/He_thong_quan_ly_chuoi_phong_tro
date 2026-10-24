@@ -26,17 +26,17 @@ test("authz route manifest: inventory changes require explicit review", () => {
     .flatMap((file) => [...fs.readFileSync(path.join(routesDir, file), "utf8")
       .matchAll(/router\.(get|post|put|patch|delete)\(\s*"([^"]+)"/g)]
       .map((match) => `${file} ${match[1].toUpperCase()} ${match[2]}`));
-  assert.equal(signatures.length, 123, "A new or removed route must be classified in AUTHZ_MATRIX.md");
+  assert.equal(signatures.length, 128, "A new or removed route must be classified in AUTHZ_MATRIX.md");
   assert.equal(new Set(signatures).size, signatures.length, "Duplicate method/path registration in a route file");
   assert.equal(phase1.length, 26);
   for (const route of phase1) assert.ok(signatures.includes(route), `Phase 1 route missing: ${route}`);
   const digest = crypto.createHash("sha256").update(signatures.sort().join("\n")).digest("hex");
-  assert.equal(digest, "701e82357c89cfd40836723c64e4beec8c7a6cdfc87ce21f8374e139e276264e",
+  assert.equal(digest, "74182ad4640ea8a80e267a3d7e60c22116f4f6ddc0390065197edf0c8e68019e",
     "Route signature changed: review ownership scope and update the manifest deliberately");
   const matrix = fs.readFileSync(path.resolve(__dirname, "../../docs/AUTHZ_MATRIX.md"), "utf8");
   const documented = [...matrix.matchAll(/^\| ([A-Za-z]+\.routes\.js) \| (GET|POST|PUT|PATCH|DELETE) \| (\/[^| ]*) \|/gm)]
     .map((match) => `${match[1]} ${match[2]} ${match[3]}`);
-  assert.equal(documented.length, 123, "Each route requires one explicit matrix row");
+  assert.equal(documented.length, 128, "Each route requires one explicit matrix row");
   assert.match(matrix, /^\| mvp\.routes\.js \| GET \| \/dashboard\/insights \| UI-2a FR-132\/158:/m);
   assert.match(matrix, /^\| mvp\.routes\.js \| POST \| \/system-config\/:key\/reset \| FR-200:/m);
   assert.match(matrix, /^\| mvp\.routes\.js \| GET \| \/dashboard\/summary \| BE-1 FR-024\/144:/m);

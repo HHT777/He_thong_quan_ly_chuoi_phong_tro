@@ -6,12 +6,11 @@ const front = path.resolve(__dirname, "../../phong-tro-frontend");
 const read = (relative) => fs.readFileSync(path.join(front, relative), "utf8");
 
 test("FR-144 bill loading errors replace the spinner and offer retry", () => {
-  const source = read("src/modules/finance/bills.tab.js");
-  assert.match(source, /try\s*\{\s*const \[contractsResponse, buildingsResponse\]/);
-  assert.match(source, /await refresh\(\);\s*\} catch \(error\)/);
+  const source = read("src/modules/finance/bills-v2.js");
+  assert.match(source, /const \[billResponse, summaryResponse\] = await Promise\.all/);
   assert.match(source, /Không tải được phiếu thu/);
-  assert.match(source, /data-retry-load/);
-  assert.match(source, /addEventListener\("click", \(\) => render\(context\)\)/);
+  assert.match(source, /data-retry/);
+  assert.match(source, /querySelector\("\[data-retry\]"\)\.onclick = refresh/);
 });
 
 test("dashboard does not convert failed API calls into zero-valued data", () => {
@@ -34,5 +33,5 @@ test("Vietnamese heading uses a Vietnamese-capable font and source text is valid
   assert.match(read("src/shared/styles/design-system.css"), /--font-sans: "Noto Sans"/);
   assert.match(read("src/main.js"), /styles\/vietnamese\.css/);
   assert.match(read("src/shared/styles/vietnamese.css"), /\.module-page h1,[\s\S]*font-family: "Noto Sans"/);
-  assert.match(read("src/modules/finance/bills.tab.js"), /title: "Phiếu thu", tabLabel: "Phiếu thu"/);
+  assert.match(read("src/modules/finance/bills.tab.js"), /title: "Phiếu thu",\s*tabLabel: "Phiếu thu"/);
 });

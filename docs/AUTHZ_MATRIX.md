@@ -133,6 +133,11 @@ Giai đoạn 2/3 là tồn đọng, **không** được coi là đã an toàn ch
 | mvp.routes.js | PATCH | /billing-adjustments/:id | G1 `71ee3fe` |
 | mvp.routes.js | POST | /billing-adjustments/:id/toggle | G1 `71ee3fe` |
 | mvp.routes.js | POST | /bills/preview | G1 `3bf4ae6` |
+| mvp.routes.js | GET | /bills/summary | G1: chỉ tổng hợp phiếu trên căn sở hữu |
+| mvp.routes.js | POST | /bills/send-preview | G1: kiểm tra sở hữu từng phiếu trước khi xem người nhận |
+| mvp.routes.js | POST | /bills/send | G1: kiểm tra sở hữu từng phiếu trong transaction |
+| mvp.routes.js | GET | /bills/schedule | G1: chỉ Chủ trọ; lịch chung toàn chuỗi |
+| mvp.routes.js | PUT | /bills/schedule | G1: kiểm tra căn sở hữu và audit trong transaction |
 | mvp.routes.js | POST | /bills/generate | G1 `3bf4ae6` |
 | mvp.routes.js | GET | /debt | G1 `aa0acf6` |
 | mvp.routes.js | GET | /dashboard/summary | BE-1 FR-024/144: Chủ trọ; tổng hợp phòng và phiếu DINH_KY chỉ trong căn sở hữu |

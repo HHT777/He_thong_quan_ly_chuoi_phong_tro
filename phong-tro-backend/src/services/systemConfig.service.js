@@ -8,8 +8,10 @@ const CONFIG_CATALOG = Object.freeze({
   dueReminderDay: { type: "integer", defaultValue: 5, min: 1, max: 28, group: "Công nợ", description: "Ngày nhắc thanh toán trong tháng", env: "DUE_REMINDER_DAY", affectsMoney: true, affectsCron: true },
   overdueDay: { type: "integer", defaultValue: 6, min: 1, max: 28, group: "Công nợ", description: "Ngày bắt đầu hiển thị quá hạn", env: "OVERDUE_DAY", affectsMoney: true, affectsCron: true },
   debtCloseDay: { type: "integer", defaultValue: 10, min: 1, max: 28, group: "Công nợ", description: "Hết ngày này sẽ ghi công nợ còn lại", env: "DEBT_CLOSE_DAY", affectsMoney: true, affectsCron: true },
-  billScheduleDay: { type: "integer", defaultValue: 2, min: 1, max: 28, group: "Phiếu thu", description: "Ngày chạy tác vụ lập và gửi phiếu tự động", env: "BILL_SCHEDULE_DAY", affectsMoney: true, affectsCron: true },
-  billScheduleHour: { type: "integer", defaultValue: 8, min: 0, max: 23, group: "Phiếu thu", description: "Giờ chạy tác vụ phiếu tự động (giờ Việt Nam)", env: "BILL_SCHEDULE_HOUR", affectsMoney: true, affectsCron: true },
+  billScheduleDay: { type: "integer", defaultValue: 2, min: 1, max: 28, group: "Phiếu thu", description: "Ngày chạy tác vụ lập phiếu Nháp tự động", env: "BILL_SCHEDULE_DAY", affectsMoney: true, affectsCron: true },
+  billScheduleHour: { type: "integer", defaultValue: 8, min: 0, max: 23, group: "Phiếu thu", description: "Giờ chạy tác vụ lập phiếu Nháp (giờ Việt Nam)", env: "BILL_SCHEDULE_HOUR", affectsMoney: true, affectsCron: true },
+  billScheduleEnabled: { type: "boolean", defaultValue: false, group: "Phiếu thu", description: "Bật lịch tự lập phiếu Nháp", affectsCron: true },
+  billScheduleBuildingIds: { type: "buildingIds", defaultValue: [], group: "Phiếu thu", description: "Căn áp dụng lịch lập phiếu; rỗng là tất cả", affectsCron: true },
   billingCronLookbackMonths: { type: "integer", defaultValue: 3, min: 1, max: 24, group: "Công nợ", description: "Số tháng kỳ cũ được tác vụ công nợ rà soát", env: "BILLING_CRON_LOOKBACK_MONTHS", affectsMoney: true, affectsCron: true },
   contractJobHour: { type: "integer", defaultValue: 8, min: 0, max: 23, group: "Lịch tự động", description: "Giờ chạy tác vụ trạng thái hợp đồng", env: "CONTRACT_JOB_HOUR", affectsCron: true },
   reservationJobHour: { type: "integer", defaultValue: 8, min: 0, max: 23, group: "Lịch tự động", description: "Giờ nhắc giữ phòng quá hạn", env: "RESERVATION_JOB_HOUR", affectsCron: true },
@@ -38,7 +40,7 @@ function readPositiveInteger(name, fallback, { min = 1, max = Number.MAX_SAFE_IN
 function getSystemConfig() {
   const values = Object.fromEntries(Object.entries(CONFIG_CATALOG).map(([key, item]) => [key,
     item.type === "integer" ? readPositiveInteger(item.env, item.defaultValue, { min: item.min, max: item.max })
-      : String(process.env[item.env] || process.env.TZ || item.defaultValue),
+      : item.type === "timezone" ? String(process.env[item.env] || process.env.TZ || item.defaultValue) : item.defaultValue,
   ]));
   return Object.freeze({ ...values, contractStatusJobCron: String(process.env.CONTRACT_STATUS_JOB_CRON || DEFAULTS.contractStatusJobCron) });
 }
@@ -76,6 +78,14 @@ function validateSystemConfigValue(key, value) {
     if (typeof value === "string" && item.options.includes(value)) return value;
     throw Object.assign(new Error(`Cấu hình ${key} phải là múi giờ Việt Nam được hỗ trợ`), { status: 400, code: "INVALID_SYSTEM_CONFIG", details: { key, options: item.options } });
   }
+  if (item.type === "boolean") {
+    if (typeof value === "boolean") return value;
+    throw Object.assign(new Error(`Cấu hình ${key} phải là true hoặc false`), { status: 400, code: "INVALID_SYSTEM_CONFIG", details: { key } });
+  }
+  if (item.type === "buildingIds") {
+    if (Array.isArray(value) && value.length <= 1000 && value.every((id) => typeof id === "string" && /^[a-f0-9-]{36}$/i.test(id)) && new Set(value).size === value.length) return value;
+    throw Object.assign(new Error(`Cấu hình ${key} phải là mảng mã căn không trùng`), { status: 400, code: "INVALID_SYSTEM_CONFIG", details: { key } });
+  }
   const validShape = typeof value === "number" || (typeof value === "string" && /^(0|[1-9]\d*)$/.test(value));
   const parsed = validShape ? Number(value) : NaN;
   if (!Number.isInteger(parsed) || parsed < item.min || parsed > item.max) throw Object.assign(new Error(`Cấu hình ${key} phải là số nguyên từ ${item.min} đến ${item.max}`), { status: 400, code: "INVALID_SYSTEM_CONFIG", details: { key, min: item.min, max: item.max } });
@@ -100,7 +110,7 @@ async function listSystemConfig() {
     const row = byKey.get(key);
     const value = row ? decodeScalar(row.gia_tri) : fallback[key];
     return {
-      key, value, type: item.type, domain: item.type === "integer" ? { min: item.min, max: item.max } : { options: item.options },
+      key, value, type: item.type, domain: item.type === "integer" ? { min: item.min, max: item.max } : item.type === "timezone" ? { options: item.options } : {},
       defaultValue: item.defaultValue, description: item.description, group: item.group,
       affectsMoney: Boolean(item.affectsMoney), affectsCron: Boolean(item.affectsCron),
       updatedBy: row ? { id: row.nguoi_cap_nhat_id, username: actorNames.get(row.nguoi_cap_nhat_id) || null } : null,
@@ -117,6 +127,11 @@ async function saveSystemConfig(key, rawValue, actorId, { restore = false } = {}
   const { CauHinhHeThong } = require("../models");
   const { writeAuditLog } = require("./auditLog.service");
   const saved = await sequelize.transaction(async (transaction) => {
+    if (key === "billScheduleBuildingIds") {
+      const { getOwnedBuildingIds } = require("./ownership.service");
+      const owned = await getOwnedBuildingIds({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, transaction);
+      if (value.some((id) => !owned.includes(id))) throw Object.assign(new Error("Căn không thuộc Chủ trọ"), { status: 404, code: "RESOURCE_NOT_FOUND" });
+    }
     const existing = await CauHinhHeThong.findOne({ where: { khoa: key }, transaction, lock: transaction.LOCK.UPDATE });
     const before = existing ? { key, value: decodeScalar(existing.gia_tri) } : null;
     const fields = { gia_tri: value, mo_ta: CONFIG_CATALOG[key].description, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: actorId };
@@ -128,4 +143,27 @@ async function saveSystemConfig(key, rawValue, actorId, { restore = false } = {}
   return saved;
 }
 
-module.exports = { CONFIG_CATALOG, DEFAULTS, RANGES, readPositiveInteger, getSystemConfig, getPersistedSystemConfig, validateSystemConfigValue, invalidateSystemConfigCache, listSystemConfig, saveSystemConfig };
+async function saveBillingSchedule(input, actorId) {
+  const keys = { billScheduleEnabled: input.enabled, billScheduleDay: input.day, billScheduleHour: input.hour, billScheduleBuildingIds: input.buildingIds };
+  const values = Object.fromEntries(Object.entries(keys).map(([key, value]) => [key, validateSystemConfigValue(key, value)]));
+  const { getOwnedBuildingIds } = require("./ownership.service");
+  const sequelize = require("../config/database");
+  const { CauHinhHeThong } = require("../models");
+  const { writeAuditLog } = require("./auditLog.service");
+  await sequelize.transaction(async (transaction) => {
+    const owned = await getOwnedBuildingIds({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, transaction);
+    if (values.billScheduleBuildingIds.some((id) => !owned.includes(id))) throw Object.assign(new Error("Không tìm thấy căn"), { status: 404, code: "RESOURCE_NOT_FOUND" });
+    const before = {};
+    for (const [key, value] of Object.entries(values)) {
+      const row = await CauHinhHeThong.findOne({ where: { khoa: key }, transaction, lock: transaction.LOCK.UPDATE });
+      before[key] = row ? decodeScalar(row.gia_tri) : CONFIG_CATALOG[key].defaultValue;
+      const fields = { gia_tri: value, mo_ta: CONFIG_CATALOG[key].description, ngay_cap_nhat: new Date(), nguoi_cap_nhat_id: actorId };
+      if (row) await row.update(fields, { transaction }); else await CauHinhHeThong.create({ khoa: key, ...fields }, { transaction });
+    }
+    await writeAuditLog({ transaction, actorId, action: "BILL_SCHEDULE_UPDATED", entityType: "CauHinhHeThong", entityId: actorId, before, after: values });
+  });
+  invalidateSystemConfigCache();
+  return values;
+}
+
+module.exports = { CONFIG_CATALOG, DEFAULTS, RANGES, readPositiveInteger, getSystemConfig, getPersistedSystemConfig, validateSystemConfigValue, invalidateSystemConfigCache, listSystemConfig, saveSystemConfig, saveBillingSchedule };

@@ -69,7 +69,7 @@ test("FR-180 prorates the first contract period with the shared day formula", ()
 test("CT-012 bill generation ignores client-provided monetary overrides", () => {
   const route = fs.readFileSync(path.resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
   const generationRoute = route.slice(route.indexOf('router.post("/bills/generate"'), route.indexOf('router.get("/debt"'));
-  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan, req\.body\.contractIds\)/);
+  assert.match(generationRoute, /billGenerationService\.generate\(req\.body\.period, req\.user\.ma_tai_khoan, req\.body\.contractIds, req\.body\.buildingIds\)/);
   assert.doesNotMatch(generationRoute, /waterAmount|serviceFee/);
   const service = fs.readFileSync(path.resolve(__dirname, "../src/services/billGeneration.service.js"), "utf8");
   assert.match(service, /contract\.phi_dich_vu/);

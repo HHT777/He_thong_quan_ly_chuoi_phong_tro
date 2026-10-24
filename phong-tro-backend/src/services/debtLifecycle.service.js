@@ -41,7 +41,7 @@ async function notify(bill, type, content, now, transaction) {
 async function processOne(id, local, config, now, userId) {
   return sequelize.transaction(async (transaction) => {
     const bill = await ThanhToan.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
-    if (!bill || bill.loai_thanh_toan !== "DINH_KY") return { skipped: true };
+    if (!bill || bill.loai_thanh_toan !== "DINH_KY" || !bill.da_gui) return { skipped: true };
     const due = actionDue(bill, local, config); const remaining = Number(bill.so_tien_con_no); const changes = {}; const events = [];
     if (due.remind && !bill.da_nhac_han) {
       changes.da_nhac_han = true; changes.ngay_nhac_han = now; events.push("REMINDER");
@@ -62,7 +62,7 @@ async function run({ now = new Date(), actorId: explicitActor } = {}) {
   const config = await getPersistedSystemConfig(); const local = localParts(now, config.timezone); const userId = await actorId(explicitActor);
   if (!userId) throw Object.assign(new Error("Không có tài khoản chủ trọ cho tác vụ"), { status: 409, code: "CRON_ACTOR_NOT_FOUND" });
   return withNamedLock(`qlpt:debt:${local.year}-${local.month}-${local.day}`, async () => {
-    const rows = await ThanhToan.findAll({ where: { loai_thanh_toan: "DINH_KY" }, attributes: ["ma_thanh_toan", "nam", "thang"] });
+    const rows = await ThanhToan.findAll({ where: { loai_thanh_toan: "DINH_KY", da_gui: true }, attributes: ["ma_thanh_toan", "nam", "thang"] });
     const minimum = earliestPeriod(local, config.billingCronLookbackMonths); const eligible = rows.filter((row) => periodKey(row.nam, row.thang) >= minimum && periodKey(row.nam, row.thang) <= periodKey(local.year, local.month));
     const processed = []; const errors = [];
     for (const row of eligible) {
@@ -74,7 +74,7 @@ async function run({ now = new Date(), actorId: explicitActor } = {}) {
 }
 
 async function listDebt({ tenantId, requester, now = new Date() } = {}) {
-  const where = { so_tien_con_no: { [Op.gt]: 0 } };
+  const where = { so_tien_con_no: { [Op.gt]: 0 }, [Op.or]: [{ loai_thanh_toan: { [Op.ne]: "DINH_KY" } }, { da_gui: true }] };
   const config = await getPersistedSystemConfig();
   const [year, month, day] = businessDate(now).split("-").map(Number);
   const local = { year, month, day };

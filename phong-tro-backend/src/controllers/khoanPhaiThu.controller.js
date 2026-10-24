@@ -31,7 +31,7 @@ class KhoanPhaiThuController {
 
   async getKhoanPhaiThuList(req, res, next) {
     try {
-      validateQuery(req.query, { strings: ["ma_phong", "ma_khach_thue", "trang_thai_thanh_toan", "ma_can", "buildingId"], periods: ["ky"], positiveIntegers: ["page", "limit"] });
+      validateQuery(req.query, { strings: ["ma_phong", "ma_khach_thue", "trang_thai_thanh_toan", "ma_can", "buildingId", "issuance", "search"], periods: ["ky"], positiveIntegers: ["page", "limit"] });
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;

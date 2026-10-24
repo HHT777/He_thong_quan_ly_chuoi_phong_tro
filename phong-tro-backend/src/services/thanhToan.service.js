@@ -34,6 +34,7 @@ class ThanhToanService {
       const bill = await ThanhToan.findByPk(billId, { include: [{ model: HopDong, as: "hopDong", include: [{ model: PhongTro, as: "phongTro" }, { model: KhachThue, as: "khachThue" }] }], transaction, lock: transaction.LOCK.UPDATE });
       if (actorId) await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "bill", billId, { transaction });
       if (!bill) throw { status: 404, message: "Khoản phải thu không tồn tại" };
+      if (bill.loai_thanh_toan === "DINH_KY" && !bill.da_gui) throw { status: 409, code: "BILL_NOT_SENT", message: "Phiếu Nháp chưa thể ghi nhận thu" };
       if (!Number.isFinite(amount) || amount <= 0) throw { status: 422, code: "INVALID_PAYMENT_AMOUNT", message: "Số tiền thanh toán phải lớn hơn 0" };
       if (amount > Number(bill.so_tien_con_no)) throw { status: 409, code: "PAYMENT_EXCEEDS_OUTSTANDING", message: "Số tiền thu không được vượt quá số còn thiếu", details: { remaining: Number(bill.so_tien_con_no) } };
       const row = await GiaoDichThanhToan.create({

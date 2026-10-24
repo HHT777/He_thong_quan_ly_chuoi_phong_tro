@@ -36,7 +36,7 @@ async function getContext(contractId, actorId) {
     TienCoc.findOne({ where: { ma_hop_dong: contractId } }),
     ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, da_xoa: false, trang_thai_xac_nhan: "DA_XAC_NHAN" }, order: [["ngay_ghi_nhan", "DESC"], ["ma_chi_so", "DESC"]] }),
     TaiSan.findAll({ where: { ma_phong: contract.ma_phong } }),
-    ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 } } }),
+    ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 }, [Op.or]: [{ loai_thanh_toan: { [Op.ne]: "DINH_KY" } }, { da_gui: true }] } }),
     ChiPhiSuCoKhachThue.findAll({ where: { ma_hop_dong: contractId, trang_thai: "CHO_KHAU_TRU" } }),
     ViPhamHopDong.findAll({ where: { ma_hop_dong: contractId } }), approvedRequest(contractId),
     countBillableOccupants(contractId),
@@ -66,10 +66,10 @@ async function settle(contractId, payload, actorId, { now = new Date() } = {}) {
     const occupants = await countBillableOccupants(contractId, { transaction });
     const water = calculateWaterCharge(contract.don_gia_nuoc, occupants, period.ratio);
     const currentBill = await ThanhToan.findOne({ where: { ma_hop_dong: contractId, nam: period.year, thang: period.month, loai_thanh_toan: "DINH_KY" }, include: [{ model: ChiTietThanhToan, as: "chiTiets" }], transaction, lock: transaction.LOCK.UPDATE });
-    const prepaid = currentBill?.trang_thai === "DA_THANH_TOAN" && currentBill.chiTiets.some((x) => x.loai_khoan === BILL_LINE_TYPES.RENT);
+    const prepaid = currentBill?.da_gui && currentBill.trang_thai === "DA_THANH_TOAN" && currentBill.chiTiets.some((x) => x.loai_khoan === BILL_LINE_TYPES.RENT);
     const prepaidRefund = prepaid ? money(Number(contract.gia_thue) * (1 - period.ratio)) : 0;
     const rent = prepaid ? 0 : money(Number(contract.gia_thue) * period.ratio);
-    const debts = await ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY" }, transaction, lock: transaction.LOCK.UPDATE });
+    const debts = await ThanhToan.findAll({ where: { ma_hop_dong: contractId, so_tien_con_no: { [Op.gt]: 0 }, loai_thanh_toan: "DINH_KY", da_gui: true }, transaction, lock: transaction.LOCK.UPDATE });
     const debtTotal = money(debts.reduce((s, x) => s + Number(x.so_tien_con_no), 0));
     const incidents = await ChiPhiSuCoKhachThue.findAll({ where: { ma_hop_dong: contractId, trang_thai: "CHO_KHAU_TRU" }, transaction, lock: transaction.LOCK.UPDATE });
     const violationInput = Array.isArray(payload.violationDeductions) ? payload.violationDeductions : [];

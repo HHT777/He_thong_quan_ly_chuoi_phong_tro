@@ -267,6 +267,8 @@ constraint `fk_ThanhToan_maHopDong` foreign key (`maHopDong`) references `HopDon
 `ngayLap` timestamp not null default current_timestamp,
 `daGui` boolean not null default false,
 `ngayGui` timestamp null default null,
+`nguoiGuiId` varchar(36) null,
+`soLanGui` integer not null default 0,
 `daNhacHan` boolean not null default false,
 `ngayNhacHan` timestamp null default null,
 `quaHan` boolean not null default false,
@@ -279,6 +281,9 @@ unique key `uq_ThanhToan_ky_loai` (`maHopDong`, `thang`, `nam`, `loaiThanhToan`)
 unique key `uq_ThanhToan_maBienBanTraPhong` (`maBienBanTraPhong`),
 key `ix_ThanhToan_1` (`trangThai`, `nam`, `thang`),
 key `ix_ThanhToan_tac_vu` (`loaiThanhToan`, `nam`, `thang`, `soTienConNo`, `daGui`, `daNhacHan`, `quaHan`, `daChotCongNo`),
+key `ix_ThanhToan_nguoiGuiId` (`nguoiGuiId`),
+constraint `fk_ThanhToan_nguoiGuiId` foreign key (`nguoiGuiId`) references `TaiKhoan` (`maTaiKhoan`),
+constraint `ck_ThanhToan_017_lan_gui` check (`soLanGui` >= 0),
 constraint `ck_ThanhToan_1` check (`thang` between 1 and 12),
 constraint `ck_ThanhToan_2` check (`soTienConNo` >= 0),
 constraint `ck_ThanhToan_3` check (`trangThai` in ('CHUA_THANH_TOAN', 'THANH_TOAN_MOT_PHAN', 'DA_THANH_TOAN')),
@@ -740,6 +745,41 @@ create table `DanhMucSuCo` (
 `thuTu` integer not null default 0,
 primary key (`maDanhMuc`),
 unique key `uq_DanhMucSuCo_ma` (`ma`)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table `NhatKyLapPhieu` (
+`maLanChay` varchar(36) not null,
+`ky` char(7) not null,
+`thoiDiemHen` datetime not null,
+`batDau` datetime not null,
+`ketThuc` datetime null,
+`trangThai` varchar(20) not null,
+`soPhieuLap` integer not null default 0,
+`soPhongBoQua` integer not null default 0,
+`soPhongLoi` integer not null default 0,
+`phamViJson` json not null,
+primary key (`maLanChay`),
+unique key `uq_NhatKyLapPhieu_ky` (`ky`),
+constraint `ck_NhatKyLapPhieu_trangThai` check (`trangThai` in ('DANG_CHAY','HOAN_TAT','LOI')),
+constraint `ck_NhatKyLapPhieu_soLuong` check (`soPhieuLap` >= 0 and `soPhongBoQua` >= 0 and `soPhongLoi` >= 0)
+) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
+
+create table `ChiTietNhatKyLapPhieu` (
+`maChiTiet` varchar(36) not null,
+`maLanChay` varchar(36) not null,
+`maPhong` varchar(36) not null,
+`maHopDong` varchar(36) null,
+`ketQua` varchar(20) not null,
+`maLyDo` varchar(60) null,
+`dienGiai` varchar(255) null,
+primary key (`maChiTiet`),
+unique key `uq_ChiTietNhatKyLapPhieu_lan_phong` (`maLanChay`,`maPhong`),
+key `ix_ChiTietNhatKyLapPhieu_phong` (`maPhong`),
+key `ix_ChiTietNhatKyLapPhieu_hopDong` (`maHopDong`),
+constraint `fk_ChiTietNhatKyLapPhieu_lan` foreign key (`maLanChay`) references `NhatKyLapPhieu` (`maLanChay`),
+constraint `fk_ChiTietNhatKyLapPhieu_phong` foreign key (`maPhong`) references `PhongTro` (`maPhong`),
+constraint `fk_ChiTietNhatKyLapPhieu_hopDong` foreign key (`maHopDong`) references `HopDong` (`maHopDong`),
+constraint `ck_ChiTietNhatKyLapPhieu_ketQua` check (`ketQua` in ('DA_LAP','BO_QUA','LOI'))
 ) engine=InnoDB default charset=utf8mb4 collate=utf8mb4_unicode_ci;
 
 start transaction;

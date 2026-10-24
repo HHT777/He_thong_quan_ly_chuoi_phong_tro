@@ -55,7 +55,7 @@ async function getDashboardSummary(requester, periodValue, now = new Date()) {
     INNER JOIN HopDong h ON h.maHopDong = t.maHopDong
     INNER JOIN PhongTro p ON p.maPhong = h.maPhong
     INNER JOIN CanTro c ON c.maCan = p.maCan
-    WHERE c.maChuTro = :ownerId AND t.loaiThanhToan = 'DINH_KY'
+    WHERE c.maChuTro = :ownerId AND t.loaiThanhToan = 'DINH_KY' AND t.daGui = 1
       AND t.nam = :year AND t.thang = :month
   `, { replacements, type: QueryTypes.SELECT });
   const bill = billRows[0];
