@@ -1,4 +1,4 @@
-const { PhongTro, CanTro } = require("../models");
+const { PhongTro, CanTro, ThanhVienPhong, HopDong, KhachThue } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { writeAuditLog } = require("./auditLog.service");
@@ -66,6 +66,21 @@ class PhongService {
           model: CanTro,
           as: "canTro",
         },
+        {
+          model: ThanhVienPhong,
+          as: "thanhVienPhongs",
+          attributes: ["ho_ten", "so_dien_thoai"],
+          where: { trang_thai_cu_tru: "DANG_O" },
+          required: false,
+        },
+        {
+          model: HopDong,
+          as: "hopDongs",
+          attributes: ["ma_hop_dong"],
+          where: { trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } },
+          required: false,
+          include: [{ model: KhachThue, as: "khachThue", attributes: ["ho_ten", "so_dien_thoai"] }],
+        },
       ],
     });
 
@@ -75,6 +90,14 @@ class PhongService {
         message: "Phòng trọ không tồn tại",
       };
     }
+
+    const namedTenants = (phong.hopDongs || []).map((contract) => contract.khachThue).filter(Boolean);
+    const currentResidents = [...namedTenants, ...(phong.thanhVienPhongs || [])];
+    const uniqueResidents = [...new Map(currentResidents.map((person) => [`${person.ho_ten}|${person.so_dien_thoai}`, {
+      ho_ten: person.ho_ten,
+      so_dien_thoai: person.so_dien_thoai,
+    }])).values()];
+    phong.setDataValue("nguoi_dang_o", uniqueResidents);
 
     return phong;
   }

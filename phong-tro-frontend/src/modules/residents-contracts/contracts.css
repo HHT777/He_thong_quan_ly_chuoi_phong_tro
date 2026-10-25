@@ -1,0 +1,29 @@
+.contract-default-terms {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 20px;
+}
+
+.contract-default-terms summary {
+  color: var(--text-primary);
+  cursor: pointer;
+  font-weight: 600;
+  list-style-position: inside;
+}
+
+.contract-default-terms[open] summary {
+  margin-bottom: 14px;
+}
+
+.contract-default-terms ol {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.contract-default-terms li + li {
+  margin-top: 12px;
+}
+
+.contract-default-terms p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}

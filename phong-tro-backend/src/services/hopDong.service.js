@@ -1,6 +1,7 @@
 const {
   HopDong,
   KhachThue,
+  CanTro,
   PhongTro,
   TienCoc,
   DatGiuPhong,
@@ -150,7 +151,8 @@ class HopDongService {
         {
           model: PhongTro,
           as: "phongTro",
-          attributes: ["ma_phong", "so_phong", "gia_thue"],
+          attributes: ["ma_phong", "ma_can", "so_phong", "gia_thue"],
+          include: [{ model: CanTro, as: "canTro", attributes: ["ma_can", "ten_can"] }],
           ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}),
         },
       ],

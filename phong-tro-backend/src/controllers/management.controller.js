@@ -1,7 +1,9 @@
-const { CanTro, PhongTro, KhachThue, HopDong, KhoanChi, ChuTro, TaiKhoan } = require("../models");
+const { CanTro, PhongTro, KhachThue, HopDong, ThanhVienPhong, KhoanChi, ChuTro, TaiKhoan } = require("../models");
 const sequelize = require("../config/database");
 const schemas = require("../validations/management.validation");
 const { writeAuditLog } = require("../services/auditLog.service");
+const { getOwnedBuildingIds } = require("../services/ownership.service");
+const { Op } = require("sequelize");
 
 function notFound(message) {
   return { status: 404, message };
@@ -78,10 +80,26 @@ class ManagementController {
   async listKhachThue(req, res, next) {
     try {
       require("../utils/queryValidation").validateQuery(req.query, { strings: ["q"] });
-      const where = {}; if (req.query.q) { const { Op } = require("sequelize"); const escaped = String(req.query.q).replace(/[\\%_]/g, (char) => `\\${char}`); where[Op.or] = [{ ho_ten: { [Op.like]: `%${escaped}%` } }, { so_dien_thoai: { [Op.like]: `%${escaped}%` } }, { cccd_giay_to: { [Op.like]: `%${escaped}%` } }]; }
+      const where = {};
+      if (req.query.q) { const escaped = String(req.query.q).replace(/[\\%_]/g, (char) => `\\${char}`); where[Op.or] = [{ ho_ten: { [Op.like]: `%${escaped}%` } }, { so_dien_thoai: { [Op.like]: `%${escaped}%` } }, { cccd_giay_to: { [Op.like]: `%${escaped}%` } }]; }
+      let ownedRoomIds = null;
+      if (req.user?.vai_tro === "CHU_TRO") {
+        const buildingIds = await getOwnedBuildingIds(req.user);
+        const rooms = buildingIds.length ? await PhongTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } }, attributes: ["ma_phong"], raw: true }) : [];
+        ownedRoomIds = rooms.map((room) => room.ma_phong);
+        const contracts = ownedRoomIds.length ? await HopDong.findAll({ where: { ma_phong: { [Op.in]: ownedRoomIds } }, attributes: ["ma_khach_thue"], raw: true }) : [];
+        const tenantIds = [...new Set(contracts.map((contract) => contract.ma_khach_thue))];
+        const ownershipFilter = { ma_khach_thue: { [Op.in]: tenantIds } };
+        if (where[Op.or]) where[Op.and] = [ownershipFilter, { [Op.or]: where[Op.or] }];
+        else Object.assign(where, ownershipFilter);
+        delete where[Op.or];
+      }
       const data = await KhachThue.findAll({ where,
         include: [
-          { model: HopDong, as: "hopDongs" },
+          { model: HopDong, as: "hopDongs", ...(ownedRoomIds ? { where: { ma_phong: { [Op.in]: ownedRoomIds } }, required: false } : {}), include: [
+            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "ma_can", "so_phong"], include: [{ model: CanTro, as: "canTro", attributes: ["ma_can", "ten_can"] }] },
+            { model: ThanhVienPhong, as: "thanhVienPhongs", attributes: ["ma_thanh_vien_phong", "ho_ten", "so_dien_thoai", "cccd_giay_to", "trang_thai_cu_tru", "ma_phong", "ma_hop_dong"] },
+          ] },
           { model: TaiKhoan, as: "taiKhoan", attributes: ["ma_tai_khoan", "ten_dang_nhap", "vai_tro", "trang_thai", "bat_buoc_doi_mat_khau"] },
         ],
         order: [["ma_khach_thue", "ASC"]],

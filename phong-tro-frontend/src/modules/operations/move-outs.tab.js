@@ -1,6 +1,7 @@
 import { shellPage, escapeHtml, money, date, confirmAction } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
+import "./move-outs.css";
 
 const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "move-outs", order: 52, roles: ["CHU_TRO"] };
 const requestKeys = createRequestKeyStore();
@@ -11,42 +12,46 @@ function contextMarkup(data) {
   const incidents = data.pendingIncidentCharges || [];
   const violations = data.violations || [];
   return `
-    <div class="panel" data-settlement-context>
-      <h3>Thông tin quyết toán</h3>
-      <div class="summary-grid">
-        <p><strong>Khách:</strong> ${escapeHtml(data.tenant?.ho_ten)}</p>
-        <p><strong>Phòng:</strong> ${escapeHtml(data.room?.so_phong || data.room?.ma_phong)}</p>
-        <p><strong>Tiền cọc:</strong> ${money(data.deposit?.so_tien_coc)}</p>
-        <p><strong>Công nợ:</strong> ${money(data.outstandingDebt)}</p>
-        <p><strong>Chỉ số điện gần nhất:</strong> ${escapeHtml(data.latestElectricityReading?.chi_so_moi)}</p>
-        <p><strong>Ngày trả đã duyệt:</strong> ${date(data.approvedMoveOutDate)}</p>
+    <section class="panel settlement-card" data-settlement-context>
+      <header class="settlement-card__heading"><div><span class="settlement-eyebrow">ĐANG XỬ LÝ</span><h2>Thông tin quyết toán</h2></div><span class="settlement-room">Phòng ${escapeHtml(data.room?.so_phong || "—")}</span></header>
+      <div class="settlement-summary">
+        <div><span>Khách thuê</span><strong>${escapeHtml(data.tenant?.ho_ten || "—")}</strong></div>
+        <div><span>Tiền cọc</span><strong>${money(data.deposit?.so_tien_coc)}</strong></div>
+        <div><span>Công nợ hiện tại</span><strong>${money(data.outstandingDebt)}</strong></div>
+        <div><span>Chỉ số điện gần nhất</span><strong>${escapeHtml(data.latestElectricityReading?.chi_so_moi ?? "—")}</strong></div>
+        <div><span>Ngày trả đã duyệt</span><strong>${date(data.approvedMoveOutDate)}</strong></div>
       </div>
-      <p class="form-hint">Điện cuối kỳ, tiền phòng tháng lẻ, tiền trả trước được hoàn và kết quả cọc/nợ do server tính khi quyết toán.</p>
-      <form class="form-grid" data-settlement-form>
-        <label>Ngày kiểm tra<input name="inspectionDate" type="date" value="${localToday()}" required></label>
-        <label>Chỉ số điện cuối<input name="finalElectricityReading" type="number" min="0" step="1" required></label>
-        <label>Tình trạng phòng<textarea name="roomCondition" required></textarea></label>
-        <label>Khấu trừ khác (VND)<input name="deduction" type="number" min="0" step="1" value="0" required></label>
-        <label>Lý do khấu trừ khác<textarea name="reason"></textarea></label>
-        <label><input name="assetsChecked" type="checkbox" required> Đã kiểm tra đầy đủ tài sản</label>
-        <label><input name="debtReviewed" type="checkbox" required> Đã đối chiếu công nợ</label>
-        <div class="table-wrap"><table><thead><tr><th>Tài sản</th><th>Hỏng/mất</th><th>Số lượng</th><th>Bồi thường</th><th>Lý do</th></tr></thead><tbody>
-          ${assets.map((asset) => `<tr data-asset-row data-asset-id="${escapeHtml(asset.ma_tai_san)}"><td>${escapeHtml(asset.ten_tai_san)}</td><td><input data-asset-selected type="checkbox"></td><td><input data-asset-quantity type="number" min="1" step="1" value="1"></td><td><input data-asset-amount type="number" min="0" step="1" value="0"></td><td><input data-asset-reason value=""></td></tr>`).join("") || "<tr><td colspan='5'>Không có tài sản</td></tr>"}
-        </tbody></table></div>
-        <div class="panel"><h4>Khoản khách chịu đang chờ</h4>
-          <p>Sự cố: ${incidents.length}; vi phạm: ${violations.length}. Các khoản sự cố do server tự đưa vào quyết toán.</p>
-          ${violations.map((item) => `<label data-violation-row data-violation-id="${escapeHtml(item.ma_vi_pham)}"><input data-violation-selected type="checkbox"> ${escapeHtml(item.noi_dung)} — <input data-violation-amount type="number" min="0" step="1" value="${escapeHtml(item.muc_phat || 0)}"> VND</label>`).join("")}
-        </div>
-        <div class="form-grid__actions"><button class="btn btn--primary" type="submit">Quyết toán</button><span data-settlement-message></span></div>
+      <div class="settlement-note"><strong>Lưu ý:</strong> Tiền điện cuối kỳ, tiền phòng tháng lẻ, khoản trả trước và kết quả cọc/công nợ sẽ do hệ thống tính khi quyết toán.</div>
+      <form data-settlement-form>
+        <section class="settlement-section"><div class="settlement-section__heading"><span>01</span><div><h3>Kiểm tra phòng</h3><p>Ghi nhận hiện trạng và chốt chỉ số điện trước khi trả phòng.</p></div></div>
+          <div class="settlement-fields">
+            <label>Ngày kiểm tra<input name="inspectionDate" type="date" value="${localToday()}" required></label>
+            <label>Chỉ số điện cuối<input name="finalElectricityReading" type="number" min="0" step="1" placeholder="Nhập chỉ số cuối" required></label>
+            <label class="settlement-fields__wide">Tình trạng phòng<textarea name="roomCondition" rows="3" placeholder="Mô tả tình trạng phòng khi bàn giao" required></textarea></label>
+          </div>
+        </section>
+        <section class="settlement-section"><div class="settlement-section__heading"><span>02</span><div><h3>Kiểm kê tài sản</h3><p>Chọn tài sản hỏng hoặc mất, nhập số lượng và mức bồi thường.</p></div></div>
+          <div class="settlement-table-wrap"><table class="settlement-table"><thead><tr><th>Tài sản</th><th>Hỏng / mất</th><th>Số lượng</th><th>Bồi thường (VND)</th><th>Lý do</th></tr></thead><tbody>
+            ${assets.map((asset) => `<tr data-asset-row data-asset-id="${escapeHtml(asset.ma_tai_san)}"><td><strong>${escapeHtml(asset.ten_tai_san)}</strong></td><td><input data-asset-selected type="checkbox" aria-label="Đánh dấu ${escapeHtml(asset.ten_tai_san)} hỏng hoặc mất"></td><td><input data-asset-quantity type="number" min="1" step="1" value="1" aria-label="Số lượng ${escapeHtml(asset.ten_tai_san)}"></td><td><input data-asset-amount type="number" min="0" step="1" value="0" aria-label="Tiền bồi thường ${escapeHtml(asset.ten_tai_san)}"></td><td><input data-asset-reason placeholder="Lý do" aria-label="Lý do ${escapeHtml(asset.ten_tai_san)}"></td></tr>`).join("") || "<tr><td colspan='5' class='settlement-empty'>Phòng chưa có tài sản cần kiểm kê.</td></tr>"}
+          </tbody></table></div>
+        </section>
+        <section class="settlement-section"><div class="settlement-section__heading"><span>03</span><div><h3>Khoản khấu trừ</h3><p>Khoản sự cố được hệ thống tính tự động; có thể ghi thêm khấu trừ khác.</p></div></div>
+          <div class="settlement-pending"><strong>Khoản khách chịu đang chờ</strong><span>${incidents.length} sự cố · ${violations.length} vi phạm</span><p>Các khoản sự cố đủ điều kiện sẽ tự được đưa vào quyết toán.</p>
+            ${violations.map((item) => `<label class="settlement-violation" data-violation-row data-violation-id="${escapeHtml(item.ma_vi_pham)}"><input data-violation-selected type="checkbox"><span>${escapeHtml(item.noi_dung)}</span><input data-violation-amount type="number" min="0" step="1" value="${escapeHtml(item.muc_phat || 0)}" aria-label="Mức phạt"><small>VND</small></label>`).join("") || "<p>Không có vi phạm chờ quyết toán.</p>"}
+          </div>
+          <div class="settlement-fields settlement-fields--deduction"><label>Khấu trừ khác (VND)<input name="deduction" type="number" min="0" step="1" value="0" required></label><label>Lý do khấu trừ<textarea name="reason" rows="2" placeholder="Bắt buộc ghi lý do nếu có khấu trừ"></textarea></label></div>
+        </section>
+        <section class="settlement-confirmations"><label><input name="assetsChecked" type="checkbox" required><span>Đã kiểm tra đầy đủ tài sản</span></label><label><input name="debtReviewed" type="checkbox" required><span>Đã đối chiếu công nợ</span></label></section>
+        <div class="settlement-actions"><p>Vui lòng rà soát thông tin trước khi xác nhận. Quyết toán sẽ thanh lý hợp đồng và cập nhật trạng thái phòng.</p><div><span data-settlement-message role="status"></span><button class="btn btn--primary" type="submit">Xác nhận quyết toán</button></div></div>
       </form>
-    </div>`;
+    </section>`;
 }
 
 function resultMarkup(result) {
   const report = result.report || {};
   const lines = result.snapshot?.lines || [];
-  return `<div class="panel" data-settlement-result>
-    <h3>Biên bản quyết toán</h3>
+  return `<section class="panel settlement-result" data-settlement-result>
+    <header><span class="settlement-eyebrow">HOÀN TẤT</span><h2>Biên bản quyết toán</h2></header>
     <p>Mã biên bản: <strong>${escapeHtml(report.ma_bien_ban)}</strong></p>
     <p>Tổng khấu trừ: <strong>${money(result.totalDeduction)}</strong> · Cọc được hoàn: <strong>${money(result.refund)}</strong> · Nợ sau thanh lý: <strong>${money(result.postDebt)}</strong></p>
     <div class="table-wrap"><table><thead><tr><th>Khoản</th><th>Lý do</th><th>Số tiền</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${escapeHtml(line.type)}</td><td>${escapeHtml(line.reason)}</td><td>${money(line.amount)}</td></tr>`).join("")}</tbody></table></div>
@@ -56,7 +61,7 @@ function resultMarkup(result) {
       <label>Số tiền hoàn lần này<input name="soTien" type="number" min="1" step="1" required></label>
       <div class="form-grid__actions"><button class="btn btn--secondary" type="submit">Ghi nhận hoàn cọc</button><span data-refund-message></span></div>
     </form>
-  </div>`;
+  </section>`;
 }
 
 async function render(context) {
@@ -65,15 +70,16 @@ async function render(context) {
   try {
     const response = await context.api.get("/v1/move-outs");
     const rows = (response.data || []).filter((row) => row.trang_thai === "DA_PHE_DUYET" && row.ma_hop_dong);
-    if (!rows.length) { content.innerHTML = '<div class="empty-state"><h4>Không có yêu cầu trả phòng đã duyệt</h4></div>'; return; }
-    content.innerHTML = `<div class="table-wrap"><table><thead><tr><th>Hợp đồng</th><th>Nội dung</th><th>Ngày gửi</th><th></th></tr></thead><tbody>${rows.map((row, index) => `<tr><td>${escapeHtml(row.ma_hop_dong)}</td><td>${escapeHtml(row.noi_dung)}</td><td>${date(row.ngay_gui)}</td><td><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></td></tr>`).join("")}</tbody></table></div><div data-workspace></div>`;
+    if (!rows.length) { content.innerHTML = '<div class="empty-state moveout-empty"><h3>Không có yêu cầu trả phòng đã duyệt</h3><p>Các yêu cầu đã được duyệt sẽ xuất hiện tại đây để tiếp tục kiểm tra và quyết toán.</p></div>'; return; }
+    content.innerHTML = `<section class="moveout-requests panel"><header><div><span class="settlement-eyebrow">CẦN XỬ LÝ</span><h2>Yêu cầu trả phòng đã duyệt</h2></div><span class="moveout-count">${rows.length} yêu cầu</span></header><div class="moveout-request-list">${rows.map((row, index) => `<article class="moveout-request"><div class="moveout-request__contract"><span>Hợp đồng</span><strong title="${escapeHtml(row.ma_hop_dong)}">${escapeHtml(row.ma_hop_dong.slice(0, 8))}…</strong></div><div><span>Nội dung</span><strong>${escapeHtml(row.noi_dung || "Đề nghị trả phòng")}</strong></div><div><span>Ngày gửi</span><strong>${escapeHtml(date(row.ngay_gui))}</strong></div><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></article>`).join("")}</div></section><div class="moveout-workspace" data-workspace></div>`;
     const workspace = content.querySelector("[data-workspace]");
     content.querySelectorAll("[data-open-context]").forEach((button) => button.addEventListener("click", async () => {
-      button.disabled = true; workspace.textContent = "Đang tải dữ liệu quyết toán...";
+      button.disabled = true; workspace.innerHTML = '<div class="panel moveout-loading" role="status">Đang tải dữ liệu quyết toán…</div>';
       try {
         const row = rows[Number(button.dataset.openContext)];
         const details = (await context.api.get(`/v1/move-outs/${row.ma_hop_dong}/context`)).data;
         workspace.innerHTML = contextMarkup(details);
+        workspace.scrollIntoView({ behavior: "smooth", block: "start" });
         const form = workspace.querySelector("[data-settlement-form]");
         form.addEventListener("submit", async (event) => {
           event.preventDefault();

@@ -84,7 +84,7 @@ function fieldControl(field, value = "") {
   if (field.type === "textarea") {
     return `<textarea class="form-control" name="${field.name}" ${field.required ? "required" : ""}>${escapeHtml(value)}</textarea>`;
   }
-  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.required ? "required" : ""}>`;
+  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>`;
 }
 
 export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit }) {
@@ -140,6 +140,7 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
     message.textContent = "Đang lưu...";
     try {
       const raw = Object.fromEntries(new FormData(form));
+      for (const field of fields) if (field.readOnly) delete raw[field.name];
       const result = await submit(raw);
       if (result === false) return;
       showToast("Đã lưu thành công!", "success");
@@ -349,9 +350,9 @@ export async function renderList(context, config) {
 
   try {
     const response = await context.api.get(config.endpoint);
-    const buildingScope = config.buildingScope ? await config.buildingScope(context.api) : null;
+    const buildingScope = config.buildingScope ? await config.buildingScope(context.api, config.buildingScopeOptions) : null;
     buildingScope?.mount(actions, () => renderList(context, config));
-    let data = config.transform ? config.transform(response.data) : response.data;
+    let data = config.transform ? config.transform(response.data, buildingScope) : response.data;
     if (config.loadAllPages && response.pagination?.hasNext) {
       data = [...(data || [])];
       for (let page = 2; ; page += 1) {
@@ -362,6 +363,7 @@ export async function renderList(context, config) {
       }
     }
     const allRows = Array.isArray(data) ? data : [];
+    if (config.sortRows) allRows.sort(config.sortRows);
 
     // Check if this is the "Phòng" module
     const isRoomsModule = config.endpoint.includes("/phong") || config.title === "Phòng";
@@ -472,9 +474,7 @@ export async function renderList(context, config) {
               <!-- Status Filter Select -->
               <select class="mgmt-filter-select" id="mgmtStatusFilter">
                 <option value="ALL">Tất cả trạng thái</option>
-                <option value="DANG_THUE" ${statusFilter === "DANG_THUE" ? "selected" : ""}>Đang thuê</option>
-                <option value="TRONG" ${statusFilter === "TRONG" ? "selected" : ""}>Trống</option>
-                <option value="DANG_XU_LY_TRA_PHONG" ${statusFilter === "DANG_XU_LY_TRA_PHONG" ? "selected" : ""}>Đang xử lý trả</option>
+                ${(config.statusOptions || [{ value: "DANG_THUE", label: "Đang thuê" }, { value: "TRONG", label: "Trống" }, { value: "DANG_XU_LY_TRA_PHONG", label: "Đang xử lý trả" }]).map((option) => `<option value="${escapeHtml(option.value)}" ${statusFilter === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
               </select>
 
               ${
@@ -504,6 +504,10 @@ export async function renderList(context, config) {
                 </div>
               `
                   : ""
+              }
+
+              ${
+                (config.toolbarActions || []).map((action) => `<button type="button" class="btn btn--secondary" data-toolbar-action="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>`).join("")
               }
 
               ${
@@ -548,6 +552,13 @@ export async function renderList(context, config) {
       } else {
         renderTable(viewContainer, config.columns, paginated, config.rowActions || []);
       }
+
+      content.querySelectorAll("[data-toolbar-action]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const action = (config.toolbarActions || []).find((item) => item.id === button.dataset.toolbarAction);
+          if (action) await action.run(context, () => renderList(context, config));
+        });
+      });
 
       viewContainer.querySelectorAll("[data-row-action]").forEach((button) => {
         button.addEventListener("click", async () => {

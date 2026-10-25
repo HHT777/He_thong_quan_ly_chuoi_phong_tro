@@ -3,6 +3,8 @@ import { date, money, openFormModal, escapeHtml, confirmAction } from "../../sha
 import { statusLabel } from "../../shared/components/status-labels.mjs";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
 import { loadBuildingScope } from "./building-scope.js";
+import { defaultContractTerms } from "./contract-terms.js";
+import "./contracts.css";
 const reservationPrefill = () => {
   try { return JSON.parse(sessionStorage.getItem("qlpt:contract-reservation") || "null"); } catch (_) { return null; }
 };
@@ -72,8 +74,11 @@ async function openContractDetail(context, row) {
         <div><dt>Trạng thái</dt><dd>${escapeHtml(statusLabel(contract.trang_thai))}</dd></div>
         <div><dt>Ngày bắt đầu</dt><dd>${escapeHtml(date(contract.ngay_bat_dau))}</dd></div>
         <div><dt>Ngày kết thúc</dt><dd>${escapeHtml(date(contract.ngay_ket_thuc))}</dd></div>
-        <div class="contract-detail-grid__wide"><dt>Điều khoản</dt><dd>${escapeHtml(contract.dieu_khoan)}</dd></div>
-      </dl>`;
+        <div class="contract-detail-grid__wide"><dt>Điều khoản bổ sung riêng</dt><dd>${escapeHtml(contract.dieu_khoan)}</dd></div>
+      </dl>
+      <details class="contract-default-terms"><summary>Điều khoản sử dụng phòng và tài sản (mặc định)</summary>
+        <ol>${defaultContractTerms.map((term) => `<li><strong>${escapeHtml(term.title)}</strong><p>${escapeHtml(term.text)}</p></li>`).join("")}</ol>
+      </details>`;
     } catch (error) {
       if (!overlay.isConnected) return;
       detail.textContent = `Không tải được chi tiết: ${error.message} `;
@@ -146,13 +151,19 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   loadAllPages: true,
   buildingScope: loadBuildingScope,
   buildingMatch: (row, scope) => scope.matchesContract(row),
+  statusOptions: [
+    { value: "DANG_HIEU_LUC", label: "Đang hiệu lực" },
+    { value: "SAP_HET_HAN", label: "Sắp hết hạn" },
+    { value: "HET_HAN", label: "Hết hạn" },
+    { value: "DA_THANH_LY", label: "Đã thanh lý" },
+  ],
   openDetail: openContractDetail,
-  columns: [{ label: "Khách thuê", format: (row) => row.khachThue?.ho_ten || "—" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Kết thúc", format: (row) => date(row.ngay_ket_thuc) }, { label: "Trạng thái", key: "trang_thai" }],
+  columns: [{ label: "Khách thuê", format: (row) => row.khachThue?.ho_ten || "—" }, { label: "Căn", format: (row) => row.phongTro?.canTro?.ten_can || "—" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Kết thúc", format: (row) => date(row.ngay_ket_thuc) }, { label: "Trạng thái", key: "trang_thai" }],
   create: {
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
     onCreated: () => sessionStorage.removeItem("qlpt:contract-reservation"),
-    initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "" }),
+    initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "", dieu_khoan: "Áp dụng 8 điều khoản mặc định về sử dụng phòng và tài sản." }),
     fields: (scope) => [
       { name: "ma_dat_giu", label: "Mã giữ phòng (nếu có)" },
       { name: "ma_khach_thue", label: "Mã khách thuê", required: true },
@@ -165,7 +176,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
       { name: "don_gia_dien", label: "Đơn giá điện", type: "number", required: true },
       { name: "chi_so_dien_ban_dau", label: "Chỉ số điện ban đầu", type: "number", required: true },
       { name: "don_gia_nuoc", label: "Đơn giá nước/người", type: "number", required: true },
-      { name: "dieu_khoan", label: "Điều khoản", type: "textarea", required: true },
+      { name: "dieu_khoan", label: "Điều khoản bổ sung riêng", type: "textarea", required: true },
       { name: "da_co_ban_giay_ky", label: "Đã có bản giấy ký", type: "checkbox", required: true },
     ],
     map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; return result; },

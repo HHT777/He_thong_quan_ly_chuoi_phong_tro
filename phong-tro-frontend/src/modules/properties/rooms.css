@@ -1,0 +1,28 @@
+﻿.room-current-occupants {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.room-current-occupants li {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.room-current-occupants__name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.room-current-occupants__phone {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
