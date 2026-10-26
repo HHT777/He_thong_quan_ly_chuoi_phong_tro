@@ -76,7 +76,10 @@ const reviewedExceptions = new Map([
   ["finance/bills-v2.js:252", "Recipient conditions select static classes and labels; names are escaped and amounts formatted"],
   ["finance/bills-v2.js:298", "Adjustment toggle selects only static Vietnamese labels"],
   ["finance/debts.tab.js:92", "today() returns a fixed YYYY-MM-DD string"],
+  ["operations/move-outs.tab.js:74", "rows.length is an array count; all request fields in the same template are escaped"],
   ["residents-contracts/co-tenants.tab.js:45", "Conditional emits a static disabled attribute"],
+  ["residents-contracts/co-tenants.tab.js:47", "pending.length is an array count; row fields in the same template are escaped"],
+  ["residents-contracts/co-tenants.tab.js:81", "Conditional emits a static disabled attribute"],
   ["residents-contracts/reservations.tab.js:29", "Conditional emits a static overdue badge"],
 ]);
 

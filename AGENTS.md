@@ -1,5 +1,13 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Điểm dừng UI-2c-1 Báo cáo (26/10/2026; ưu tiên hiện hành)
+
+- Nhánh `ui-2c-bao-cao` tạo từ `origin/main` đã chứa UI-2a; tag local `checkpoint-before-ui-2c-1`. Các commit UI-2c-1: `6a51061` (kỳ/query), `2419186` (hình học/biểu đồ), `34d92b8` (giao diện, token, test). `docs/REPORT_SCREEN.md` nối phần tử với API và ghi rõ phần để UI-2c-2.
+- Mốc trước sửa: report test 5/5, token test 4/4. Sau sửa: frontend test 44 đạt, 1 live DB bỏ qua; bộ quét `innerHTML` 2/2, 63 phép gán, 0 vi phạm. Phép thử phủ định tạm đổi `--chart-profit-line` thành màu nhạt đã làm test tương phản đỏ; sau khôi phục xanh. `node --check` cho tab Báo cáo và `git diff --check` xanh. Frontend build và xem UI thực tế **chưa chạy** theo yêu cầu người dùng; không báo đạt hai bước này.
+- UI-2c-1 có bộ lọc năm/kỳ/căn tự tải, URL lưu lựa chọn, ba chế độ xem, KPI chọn được, biểu đồ Doanh thu/Lợi nhuận và token hổ phách. So sánh căn mới có bảng cơ bản. UI-2c-2 còn biểu đồ/bảng/thao tác Chi phí, so sánh căn đầy đủ, gộp tab Thu chi; DỪNG trước UI-2c-2 chờ người dùng nhắn “build UI-2c-1 OK”. Không đổi dashboard hoặc backend API.
+- Không có endpoint liệt kê năm có dữ liệu; dùng năm hiện tại và 4 năm trước. Quý/năm tải 3/12 cashflow tháng, tối đa 3 request đồng thời. Không có API tạo khoản thu khác. Token lợi nhuận đã đặt dùng chung nhưng Tổng quan chưa áp dụng; hỏi người dùng sau khi xem giao diện nếu muốn đồng bộ.
+- Giữ nguyên sửa dở `phong-tro-frontend/src/shared/styles/management.css` và các file untracked chủ ý; không stage/commit chúng. Không truy cập DB thật, không build frontend, không merge/push.
+
 ## Điểm dừng UI-2a-2 (22/10/2026; ưu tiên hiện hành)
 
 - Người dùng xác nhận “Build UI-2a-1 OK”; nhánh vẫn là `ui-2a-giao-dien`. `f3a0eaf` thêm adapter dữ liệu, fixture API thật và test; `83cf7aa` dựng thân dashboard đủ KPI, thu–chi sáu tháng, tình trạng phòng, lấp đầy theo căn, phiếu thu, dự báo 30/60/90, sự cố và việc cần xử lý. Dashboard chỉ gọi `summary`, `insights`, `incidents`, mỗi nguồn một lần. Các trang đích chưa đọc URL lọc nên biểu đồ và việc cần xử lý không gắn điều hướng giả.
