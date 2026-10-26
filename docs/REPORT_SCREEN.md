@@ -33,4 +33,4 @@ Token `--chart-profit-line` và `--chart-profit-fill` được đặt ở `ui2-s
 
 ## Kiểm chứng tại mốc UI-2c-1
 
-`tests/report-page.test.mjs`, `tests/report-geometry.test.mjs`, `tests/report-screen-2c.test.mjs`, `tests/ui2-shell.test.mjs` kiểm kỳ, nhãn, tỷ trọng, hình học âm/0, URL/query, trạng thái rỗng/lỗi/tải, nội dung theo KPI và tương phản. Sau điều chỉnh giao diện: frontend test 47 đạt, 1 live DB bỏ qua; bộ quét `innerHTML` 2 đạt, 0 vi phạm; `npm run build` đạt. Chưa kiểm tra trực tiếp bằng trình duyệt ở kích thước màn hình trong ảnh.
+`tests/report-page.test.mjs`, `tests/report-geometry.test.mjs`, `tests/report-screen-2c.test.mjs`, `tests/ui2-shell.test.mjs` kiểm kỳ, nhãn, tỷ trọng, hình học âm/0, URL/query, trạng thái rỗng/lỗi/tải, nội dung theo KPI và tương phản. Sau sửa phần bảng ẩn của biểu đồ: frontend test 48 đạt, 1 live DB bỏ qua; bộ quét `innerHTML` 2 đạt, 0 vi phạm; `npm run build` đạt. Kiểm tra bằng Chrome headless ở khung 1857 × 998 với API giả lập: chiều cao tài liệu trước sửa 1300px, sau sửa 998px bằng chiều cao khung ứng dụng; nền thanh bên phủ hết chiều cao trang. Chưa kiểm tra giao diện với dữ liệu DB thật trong trình duyệt.

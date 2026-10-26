@@ -13,7 +13,7 @@ const shortMoney = (value) => {
   return abs >= 1_000_000 ? `${formatted(1_000_000)} tr` : abs >= 1_000 ? `${formatted(1_000)} nghìn` : `${Math.round(amount)} đ`;
 };
 const monthLabel = (month) => `${Number(month.slice(5))}/${month.slice(0, 4)}`;
-const hiddenTable = (caption, heads, rows) => `<table class="report-sr-only"><caption>${safe(caption)}</caption><thead><tr>${heads.map((label) => `<th scope="col">${safe(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell, index) => index === 0 ? `<th scope="row">${safe(cell)}</th>` : `<td>${safe(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+const hiddenTable = (caption, heads, rows) => `<div class="report-sr-only"><table><caption>${safe(caption)}</caption><thead><tr>${heads.map((label) => `<th scope="col">${safe(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell, index) => index === 0 ? `<th scope="row">${safe(cell)}</th>` : `<td>${safe(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 const readout = () => '<p class="report-chart-readout" data-chart-readout aria-live="polite"></p>';
 const legend = (items, note = "") => `<div class="report-symbol-legend" aria-label="Chú thích biểu đồ">${items.map(([symbol, label]) => `<span><i class="report-legend-symbol report-legend-symbol--${symbol}" aria-hidden="true"></i>${safe(label)}</span>`).join("")}${note ? `<small>${safe(note)}</small>` : ""}</div>`;
 

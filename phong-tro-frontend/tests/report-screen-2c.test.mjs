@@ -118,6 +118,14 @@ test("chú thích có ký hiệu và chấm lợi nhuận nhỏ", () => {
   assert.match(css, /report-focus-panel \{ min-height: 0; \}/);
 });
 
+test("bảng hỗ trợ trình đọc màn hình không kéo dài trang báo cáo", () => {
+  const chart = overviewChart(rows);
+  assert.match(chart, /<div class="report-sr-only"><table>/);
+  assert.doesNotMatch(chart, /<table class="report-sr-only">/);
+  const css = readFileSync(new URL("../src/modules/finance/reports.css", import.meta.url), "utf8");
+  assert.match(css, /\.report-sr-only \{[^}]*overflow: hidden;/);
+});
+
 test("token viền lợi nhuận có tương phản đồ họa tối thiểu 3:1; phép thử phủ định nhạt bị đỏ", () => {
   const css = readFileSync(new URL("../src/shared/styles/ui2-shell.css", import.meta.url), "utf8");
   const line = css.match(/--chart-profit-line:\s*(#[0-9a-fA-F]{6})/)?.[1];
