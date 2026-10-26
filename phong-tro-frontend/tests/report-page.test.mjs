@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { estimatedRows, filterTransactions, periodLabel, readCashflow, reportDate, reportMoney, reportQuery, revenueLabel } from "../src/modules/finance/report.model.mjs";
+import { availableYears, businessYearMonth, estimatedRows, expenseLabel, filterTransactions, filterYears, monthsForPeriod, periodLabel, periodOptions, readCashflow, reportDate, reportMoney, reportQuery, revenueLabel, selectionFields, sharesToOneDecimal, validPeriod } from "../src/modules/finance/report.model.mjs";
 import { buildingCompareMarkup, detailMarkup, kpiMarkup, revenueMixMarkup } from "../src/modules/finance/report.view.mjs";
 
 const names = new Map([["a", "Căn Hoa Sen"], ["b", "Căn Bình Minh"]]);
@@ -64,4 +64,32 @@ test("panel rỗng có hướng dẫn, không hiện số mẫu", () => {
   assert.match(revenueMixMarkup({ revenueByType: [] }), /Chưa có doanh thu theo loại/);
   assert.match(buildingCompareMarkup({ byBuilding: [] }, names), /Chưa có căn phát sinh/);
   assert.match(detailMarkup({ ...data, receiptDetails: [] }, names, { tableMode: "transactions", buildingId: "", search: "", estimatedOnly: false }), /Không có giao dịch thu\/chi/);
+});
+
+test("năm tháng Việt Nam và kỳ hợp lệ tại ranh giới tháng, năm", () => {
+  assert.equal(businessYearMonth(new Date("2026-10-31T16:30:00Z")), "2026-10");
+  assert.equal(businessYearMonth(new Date("2026-10-31T17:30:00Z")), "2026-11");
+  assert.equal(businessYearMonth(new Date("2026-12-31T16:30:00Z")), "2026-12");
+  assert.equal(businessYearMonth(new Date("2026-12-31T17:30:00Z")), "2027-01");
+  assert.deepEqual(availableYears(new Date("2026-12-31T17:30:00Z")), [2027, 2026, 2025, 2024, 2023]);
+  assert.deepEqual(filterYears([2027, 2026, 2025], "26"), [2026]);
+  assert.deepEqual(filterYears([2027, 2026], "20x"), []);
+  assert.equal(periodOptions(2026, "2026-10").find((row) => row.value === "month-11").disabled, true);
+  assert.equal(periodOptions(2025, "2026-10").find((row) => row.value === "month-11").disabled, false);
+  assert.equal(validPeriod(2026, "month-11", "2026-10"), "month-10");
+  assert.equal(validPeriod(2025, "month-11", "2026-10"), "month-11");
+  assert.equal(validPeriod(2026, "quarter-4", "2026-10"), "quarter-4");
+  assert.equal(reportQuery(selectionFields({ year: 2026, period: "quarter-2", buildingId: "a" })).toString(), "buildingId=a&periodType=quarter&periodValue=2026-2");
+  assert.deepEqual(monthsForPeriod({ year: 2026, period: "month-1" }), ["2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01"]);
+  assert.deepEqual(monthsForPeriod({ year: 2026, period: "quarter-2" }), ["2026-04", "2026-05", "2026-06"]);
+  assert.equal(monthsForPeriod({ year: 2026, period: "year" }).length, 12);
+});
+
+test("nhãn loại có dấu và phần trăm hiển thị cộng đúng 100,0", () => {
+  for (const [code, label] of Object.entries({ SUA_CHUA: "Sửa chữa", BAO_TRI: "Bảo trì", VE_SINH: "Vệ sinh", DIEN_CHUNG: "Điện chung" })) assert.equal(expenseLabel(code), label);
+  assert.equal(revenueLabel("sua chua"), "Sửa chữa");
+  assert.equal(revenueLabel("UNKNOWN_RAW_CODE"), "Khác");
+  assert.deepEqual(sharesToOneDecimal([1, 1, 1]), [33.4, 33.3, 33.3]);
+  assert.equal(sharesToOneDecimal([9999, 1]).reduce((a, b) => a + b, 0), 100);
+  assert.deepEqual(sharesToOneDecimal([0, 0]), [0, 0]);
 });
