@@ -5,7 +5,16 @@ import { billSegments, cashflowScale, donutSegments, donutStrokes, formatBusines
 const number = (value) => new Intl.NumberFormat("vi-VN").format(value);
 const percent = (part, total) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(total ? part * 100 / total : 0);
 const chartDetail = (panel, value) => `data-chart-panel="${panel}" data-chart-detail="${escapeHtml(value)}" tabindex="0" aria-label="${escapeHtml(value)}"`;
-const hoverReadout = (panel) => `<p class="ui2-hover-readout" data-hover-readout="${panel}" aria-live="polite">Rê chuột hoặc dùng Tab để xem chi tiết.</p>`;
+const hoverReadout = (panel) => `<p class="ui2-hover-readout" data-hover-readout="${panel}" aria-live="polite"></p>`;
+const taskRoutes = {
+  OVERDUE_BILLS: "/finance/debts",
+  EXPIRED_RESERVATIONS: "/residents-contracts/reservations",
+  NEW_INCIDENTS: "/operations/incidents?status=CHO_TIEP_NHAN",
+  PENDING_REQUESTS: "/residents-contracts/requests",
+  PENDING_METER_READINGS: "/operations/meter-readings",
+  EXPIRING_CONTRACTS: "/residents-contracts/contracts",
+  VACANT_ROOMS: "/properties/rooms?status=TRONG",
+};
 const currentPeriod = () => {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).formatToParts(new Date());
   return `${parts.find((part) => part.type === "year").value}-${parts.find((part) => part.type === "month").value}`;
@@ -65,12 +74,12 @@ function forecastMarkup(forecast) {
 
 function incidentsMarkup(incidents) {
   const states = ["CHO_TIEP_NHAN", "DANG_XU_LY", "DA_XU_LY", "KHAC"];
-  return `<div class="ui1-incident-layout"><div><p class="ui1-note">Tình trạng xử lý ${number(incidents.total)} sự cố</p><ul class="ui1-status-list">${states.map((status) => `<li ${chartDetail("incidents", `${INCIDENT_LABELS[status]}: ${number(incidents.byStatus[status])}/${number(incidents.total)} sự cố (${percent(incidents.byStatus[status], incidents.total)}%)`)}><span>${INCIDENT_LABELS[status]}</span><span class="ui1-status-track" role="img" aria-label="${number(incidents.byStatus[status])} sự cố ${INCIDENT_LABELS[status]}"><i class="ui1-status-fill ui1-status-fill--${status.toLowerCase()}" style="width:${incidents.total ? incidents.byStatus[status] / incidents.total * 100 : 0}%"></i></span><strong>${number(incidents.byStatus[status])}</strong></li>`).join("")}</ul><table class="ui2-sr-only"><caption>Tình trạng sự cố</caption><tbody>${states.map((status) => `<tr><th>${INCIDENT_LABELS[status]}</th><td>${incidents.byStatus[status]}</td></tr>`).join("")}</tbody></table></div><div><h3>Sự cố gần đây</h3>${incidents.recent.length ? `<ul class="ui1-recent">${incidents.recent.map((row) => `<li ${chartDetail("incidents", `${row.text}${row.room ? ` · Phòng ${row.room}` : ""} · ${INCIDENT_LABELS[row.status]} · ${formatBusinessDate(row.date)}`)}><strong>${escapeHtml(row.text)}</strong><span>${row.room ? `Phòng ${escapeHtml(row.room)} · ` : ""}${INCIDENT_LABELS[row.status]} · ${formatBusinessDate(row.date)}</span></li>`).join("")}</ul>` : `<p class="ui1-note">Chưa có sự cố.</p>`}</div></div>${hoverReadout("incidents")}`;
+  return `<div class="ui1-incident-layout"><div><p class="ui1-note">Tình trạng xử lý ${number(incidents.total)} sự cố</p><ul class="ui1-status-list">${states.map((status) => `<li ${chartDetail("incidents", `${INCIDENT_LABELS[status]}: ${number(incidents.byStatus[status])}/${number(incidents.total)} sự cố (${percent(incidents.byStatus[status], incidents.total)}%)`)}><a href="#/operations/incidents${status === "KHAC" ? "" : `?status=${encodeURIComponent(status)}`}" class="ui2-incident-link">${INCIDENT_LABELS[status]}</a><span class="ui1-status-track" role="img" aria-label="${number(incidents.byStatus[status])} sự cố ${INCIDENT_LABELS[status]}"><i class="ui1-status-fill ui1-status-fill--${status.toLowerCase()}" style="width:${incidents.total ? incidents.byStatus[status] / incidents.total * 100 : 0}%"></i></span><strong>${number(incidents.byStatus[status])}</strong></li>`).join("")}</ul><table class="ui2-sr-only"><caption>Tình trạng sự cố</caption><tbody>${states.map((status) => `<tr><th>${INCIDENT_LABELS[status]}</th><td>${incidents.byStatus[status]}</td></tr>`).join("")}</tbody></table></div><div><h3>Sự cố gần đây</h3>${incidents.recent.length ? `<ul class="ui1-recent">${incidents.recent.map((row) => `<li ${chartDetail("incidents", `${row.text}${row.room ? ` · Phòng ${row.room}` : ""} · ${INCIDENT_LABELS[row.status]} · ${formatBusinessDate(row.date)}`)}><a class="ui2-incident-link" href="#/operations/incidents?search=${encodeURIComponent(row.id)}"><strong>${escapeHtml(row.text)}</strong><span>${row.room ? `Phòng ${escapeHtml(row.room)} · ` : ""}${INCIDENT_LABELS[row.status]} · ${formatBusinessDate(row.date)}</span></a></li>`).join("")}</ul>` : `<p class="ui1-note">Chưa có sự cố.</p>`}</div></div>${hoverReadout("incidents")}`;
 }
 
 function tasksMarkup(tasks, warningDays) {
   if (!tasks.length) return `<p class="ui1-note">Không có việc cần xử lý.</p>`;
-  const rows = tasks.map((task, index) => `<li ${index >= 5 ? "data-task-extra hidden" : ""}><span class="ui2-task-icon" aria-hidden="true">!</span><span><strong>${TASK_DETAILS[task.type][0]}</strong><small>${TASK_DETAILS[task.type][1]}${task.type === "EXPIRING_CONTRACTS" ? ` · ngưỡng ${warningDays} ngày` : ""}</small></span><b>${number(task.count)}</b></li>`).join("");
+  const rows = tasks.map((task, index) => `<li ${index >= 5 ? "data-task-extra hidden" : ""}><a class="ui2-task-link" href="#${taskRoutes[task.type]}"><span class="ui2-task-icon" aria-hidden="true">!</span><span><strong>${TASK_DETAILS[task.type][0]}</strong><small>${TASK_DETAILS[task.type][1]}${task.type === "EXPIRING_CONTRACTS" ? ` · ngưỡng ${warningDays} ngày` : ""}</small></span><b>${number(task.count)}</b></a></li>`).join("");
   return `<ul class="ui2-task-list">${rows}</ul>${tasks.length > 5 ? `<button class="ui2-show-more" type="button" data-tasks-toggle aria-expanded="false">Xem thêm ${number(tasks.length - 5)} mục</button>` : ""}`;
 }
 
@@ -142,13 +151,17 @@ export default {
       const target = detailTarget(event);
       if (!target) return;
       const readout = context.main.querySelector(`[data-hover-readout="${target.dataset.chartPanel}"]`);
-      if (readout) readout.textContent = target.dataset.chartDetail;
+      if (readout) {
+        readout.textContent = target.dataset.chartDetail;
+      }
     };
     const clearDetail = (event) => {
       const target = detailTarget(event);
       if (!target || target.contains?.(event.relatedTarget)) return;
       const readout = context.main.querySelector(`[data-hover-readout="${target.dataset.chartPanel}"]`);
-      if (readout?.textContent === target.dataset.chartDetail) readout.textContent = "Rê chuột hoặc dùng Tab để xem chi tiết.";
+      if (readout?.textContent === target.dataset.chartDetail) {
+        readout.textContent = "";
+      }
     };
     context.main.addEventListener("mouseover", showDetail, { signal: this.listeners.signal });
     context.main.addEventListener("focusin", showDetail, { signal: this.listeners.signal });

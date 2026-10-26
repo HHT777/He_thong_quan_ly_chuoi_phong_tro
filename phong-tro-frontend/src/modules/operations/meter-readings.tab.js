@@ -33,7 +33,7 @@ export default {
       let historyRequest = 0;
       content.innerHTML = `<form class="panel form-grid" data-meter-filter>
         <label>Căn<select name="buildingId" required><option value="">Chọn căn</option>${buildings.map((building) => `<option value="${escapeHtml(building.id)}">${escapeHtml(building.name)}</option>`).join("")}</select></label>
-        <label>Phòng<select name="roomId" required disabled><option value="">Chọn căn trước</option></select></label>
+        <label>Phòng<select name="roomId" disabled><option value="">Chọn căn trước</option></select></label>
         <label>Kỳ xem chỉ số<input name="period" type="month" value="${escapeHtml(readingPeriod)}" required></label>
       </form><form class="panel form-grid" data-ocr-form>
         <p class="form-grid__actions">Ghi chỉ số điện kỳ ${escapeHtml(readingPeriod)} cho phòng đã chọn.</p>
@@ -57,7 +57,7 @@ export default {
         const roomId = filters.elements.roomId.value;
         const period = filters.elements.period.value;
         const buildingId = filters.elements.buildingId.value;
-        if (!roomId || !period) { history.innerHTML = '<tr><td colspan="7">Chọn căn và phòng để xem chỉ số.</td></tr>'; return; }
+        if (!buildingId || !period) { history.innerHTML = '<tr><td colspan="7">Chọn căn để xem chỉ số tất cả phòng trong kỳ.</td></tr>'; return; }
         history.innerHTML = '<tr><td colspan="7">Đang tải chỉ số...</td></tr>';
         try {
           const readings = [];
@@ -67,14 +67,16 @@ export default {
             if (page >= (result.meta?.totalPages || 1)) break;
           }
           if (request !== historyRequest) return;
-          const visible = readings.filter((row) => String(row.room?.id) === roomId);
-          history.innerHTML = visible.map((row) => `<tr><td>${escapeHtml(row.room?.code || row.room?.id)}</td><td>${escapeHtml(row.period)}</td><td>${escapeHtml(typeLabels[row.readingType] || typeLabels.DINH_KY)}</td><td>${escapeHtml(row.readingValue)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(date(row.submittedAt))}</td><td>${row.status === "CHO_XAC_NHAN" ? `<button type="button" data-confirm="${escapeHtml(row.id)}">Xác nhận</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Chưa có chỉ số cho phòng trong kỳ đã chọn.</td></tr>';
+          const visible = readings.filter((row) => !roomId || String(row.room?.id) === roomId)
+            .sort((a, b) => String(a.room?.code || "").localeCompare(String(b.room?.code || ""), "vi", { numeric: true }));
+          history.innerHTML = visible.map((row) => `<tr><td>${escapeHtml(row.room?.code || row.room?.id)}</td><td>${escapeHtml(row.period)}</td><td>${escapeHtml(typeLabels[row.readingType] || typeLabels.DINH_KY)}</td><td>${escapeHtml(row.readingValue)}</td><td>${escapeHtml(row.status)}</td><td>${escapeHtml(date(row.submittedAt))}</td><td>${row.status === "CHO_XAC_NHAN" ? `<button type="button" data-confirm="${escapeHtml(row.id)}">Xác nhận</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="7">Chưa có chỉ số phù hợp với bộ lọc trong kỳ đã chọn.</td></tr>';
         } catch (error) { if (request === historyRequest) history.innerHTML = `<tr><td colspan="7">${escapeHtml(error.message)}</td></tr>`; }
       };
       filters.elements.buildingId.addEventListener("change", () => {
         const selected = filters.elements.buildingId.value;
-        const matching = rooms.filter((room) => String(room.ma_can) === selected);
-        const placeholder = selected ? "Chọn phòng" : "Chọn căn trước";
+        const matching = rooms.filter((room) => String(room.ma_can) === selected)
+          .sort((a, b) => String(a.so_phong || "").localeCompare(String(b.so_phong || ""), "vi", { numeric: true }));
+        const placeholder = selected ? "Tất cả phòng" : "Chọn căn trước";
         filters.elements.roomId.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>${matching.map((room) => `<option value="${escapeHtml(room.ma_phong)}">${escapeHtml(room.so_phong)}</option>`).join("")}`;
         filters.elements.roomId.disabled = !selected || !matching.length;
         form.querySelector("[data-preview]").disabled = true;

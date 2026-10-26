@@ -4,7 +4,7 @@ const { HopDong, ThanhVienPhong, ChiSoDien, TaiKhoan, ThanhToan, ChiTietThanhToa
 const billingCronService = require("../src/services/billingCron.service");
 const paymentLifecycleService = require("../src/services/paymentLifecycle.service");
 const { sumSignedLineAmounts } = require("../src/utils/billLine.util");
-const { integration, request, headers, login, createFreshRental, uniqueValues } = require("./helpers/integration-api");
+const { integration, request, headers, login, createFreshRental, createBaseRental, uniqueValues } = require("./helpers/integration-api");
 const { withNamedLock } = require("../src/services/dbNamedLock.service");
 const cronJobs = require("../src/jobs/cron.jobs");
 const reservationService = require("../src/services/reservation.service");
@@ -20,6 +20,7 @@ async function confirmedReading(fresh, period, value) {
 
 test("FR-157/164/175/176/179 preview and generation snapshot contract charges atomically", async () => {
   const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "billing-definitions");
+  const ineligible = await createBaseRental(landlord, "billing-ineligible");
   await HopDong.update({ phi_dich_vu: 120000 }, { where: { ma_hop_dong: fresh.contract.ma_hop_dong } });
   await ThanhVienPhong.create({ ho_ten: "Co tenant billing", so_dien_thoai: "0912345678", ngay_vao: "2026-10-01", trang_thai_cu_tru: "DANG_O", ma_phong: fresh.room.ma_phong, ma_hop_dong: fresh.contract.ma_hop_dong });
   await confirmedReading(fresh, "2026-10", 130);
@@ -33,6 +34,11 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   const preview = await request("/api/v1/bills/preview", { method: "POST", headers: headers(landlord), body: JSON.stringify({ period: "2026-10", contractIds: [fresh.contract.ma_hop_dong] }) });
   assert.equal(preview.response.status, 200, JSON.stringify(preview.body));
   assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong } }), before, "preview must not write a bill");
+  const ineligiblePreview = await request("/api/v1/bills/preview", { method: "POST", headers: headers(landlord), body: JSON.stringify({ period: "2026-10" }) });
+  assert.equal(ineligiblePreview.response.status, 200, JSON.stringify(ineligiblePreview.body));
+  const ineligibleRoom = ineligiblePreview.body.data.rooms.find((room) => room.roomId === ineligible.room.ma_phong);
+  assert.equal(ineligibleRoom.eligible, false);
+  assert.equal(ineligibleRoom.reasonCode, "NO_ACTIVE_CONTRACT");
   const item = preview.body.data.previews[0]; assert.equal(item.occupantCount, 2); assert.equal(item.components.water, 200000); assert.equal(item.components.serviceFee, 120000);
   assert.equal(item.components.electricity, 0, "first contract month has no prior electricity");
   assert.equal(item.total, 2500000 + 200000 + 120000 + 50000 - 100000);
@@ -51,16 +57,20 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   assert.equal(raceA.response.status, 201); assert.equal(raceB.response.status, 201);
   assert.equal(raceA.body.data.created.length + raceB.body.data.created.length, 1);
   assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 11, loai_thanh_toan: "DINH_KY" } }), 1);
+  const duplicate = await request("/api/v1/bills/generate", { method: "POST", headers: headers(landlord), body: JSON.stringify({ period: "2026-10", contractIds: [fresh.contract.ma_hop_dong] }) });
+  assert.equal(duplicate.response.status, 201);
+  assert.equal(duplicate.body.data.created.length, 0);
+  assert.equal(duplicate.body.data.skipped[0].reason, "BILL_ALREADY_EXISTS");
 });
 
 test("FR-151/153/155/156 billing cron creates drafts once and landlord sends separately", async () => {
-  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "billing-cron"); await confirmedReading(fresh, "2026-11", 80);
+  const landlord = await login(integration.landlord); const fresh = await createFreshRental(landlord, "billing-cron"); await confirmedReading(fresh, "2027-05", 80);
   const actor = await TaiKhoan.findOne({ where: { ten_dang_nhap: integration.landlord.username } });
-  const first = await billingCronService.run({ now: new Date("2026-12-02T08:00:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
-  const second = await billingCronService.run({ now: new Date("2026-12-02T08:05:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
-  const bill = await ThanhToan.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2026, thang: 12, loai_thanh_toan: "DINH_KY" } });
+  const first = await billingCronService.run({ now: new Date("2027-06-02T08:00:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
+  const second = await billingCronService.run({ now: new Date("2027-06-02T08:05:00+07:00"), actorId: actor.ma_tai_khoan, force: true });
+  const bill = await ThanhToan.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2027, thang: 6, loai_thanh_toan: "DINH_KY" } });
   assert.ok(bill); assert.equal(bill.da_gui, false); assert.equal(first.sent, 0); assert.equal(second.sent, 0);
-  const runLog = await NhatKyLapPhieu.findOne({ where: { ky: "2026-12" } });
+  const runLog = await NhatKyLapPhieu.findOne({ where: { ky: "2027-06" } });
   assert.equal(runLog.trang_thai, "HOAN_TAT");
   assert.equal(await ChiTietNhatKyLapPhieu.count({ where: { ma_lan_chay: runLog.ma_lan_chay, ma_phong: fresh.room.ma_phong, ket_qua: "DA_LAP" } }), 1);
   const sent = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan] }) });
@@ -193,17 +203,23 @@ test("FR-075 marks every periodic bill in one building/period atomically", async
 
 test("FR-200 configuration changes apply without restart and named lock admits one worker", async () => {
   const landlord = await login(integration.landlord);
+  await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 8 }) });
+  const auditCountBefore = await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED" } });
   const changed = await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 9 }) });
   assert.equal(changed.response.status, 200, JSON.stringify(changed.body));
   const enabled = await request("/api/v1/system-config/billScheduleEnabled", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: true }) });
   assert.equal(enabled.response.status, 200);
+  const auditCountAfterConfig = await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED" } });
   const beforeHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T08:00:00+07:00" }) });
   assert.equal(beforeHour.body.data.due, false);
   const configuredHour = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-02T09:00:00+07:00" }) });
   assert.equal(configuredHour.body.data.due, true);
+  const missedScheduleDay = await request("/api/v1/jobs/billing", { method: "POST", headers: headers(landlord), body: JSON.stringify({ now: "2027-02-03T09:00:00+07:00" }) });
+  assert.equal(missedScheduleDay.body.data.due, false, "a missed schedule day is skipped rather than caught up later");
   const invalid = await request("/api/v1/system-config/billScheduleDay", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 29 }) });
   assert.equal(invalid.response.status, 400);
-  assert.equal(await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED", entity_id: changed.body.data.ma_cau_hinh } }), 1);
+  assert.equal(auditCountAfterConfig, auditCountBefore + 2);
+  assert.equal(await AuditLog.count({ where: { action: "SYSTEM_CONFIG_UPDATED" } }), auditCountAfterConfig, "invalid configuration must not be audited as an update");
   let release;
   const held = new Promise((resolve) => { release = resolve; });
   const first = withNamedLock("qlpt:test:exclusive", async () => { await held; return { worker: 1 }; });

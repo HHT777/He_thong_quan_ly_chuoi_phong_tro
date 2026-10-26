@@ -1,7 +1,7 @@
 import { findTab, allowedTabs } from "./module-registry.js";
 
 const clean = (value) => `/${String(value || "").replace(/^#?\/?/, "").replace(/^\/+/, "")}`.replace(/\/$/, "") || "/";
-export const currentRoute = () => clean(window.location.hash.slice(1));
+export const currentRoute = () => clean(window.location.hash.slice(1).split("?")[0]);
 export const go = (route) => { window.location.hash = `#${clean(route)}`; };
 
 export function defaultRoute(currentUser) {
