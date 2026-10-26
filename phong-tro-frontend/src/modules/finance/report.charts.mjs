@@ -6,7 +6,12 @@ const safe = escapeHtml;
 const keyFor = (metric) => ({ revenue: "totalRevenue", expenses: "totalExpenses", profit: "profit" })[metric];
 const titleFor = (metric) => ({ revenue: "Doanh thu thực nhận", expenses: "Chi phí", profit: "Lợi nhuận" })[metric];
 const graphicClass = (metric) => ({ revenue: "report-graphic--revenue", expenses: "report-graphic--expenses", profit: "report-graphic--profit" })[metric];
-const shortMoney = (value) => `${Math.round(Number(value) / 1_000_000)} tr`;
+const shortMoney = (value) => {
+  const amount = Number(value);
+  const abs = Math.abs(amount);
+  const formatted = (unit) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(amount / unit);
+  return abs >= 1_000_000 ? `${formatted(1_000_000)} tr` : abs >= 1_000 ? `${formatted(1_000)} nghìn` : `${Math.round(amount)} đ`;
+};
 const monthLabel = (month) => `${Number(month.slice(5))}/${month.slice(0, 4)}`;
 const hiddenTable = (caption, heads, rows) => `<table class="report-sr-only"><caption>${safe(caption)}</caption><thead><tr>${heads.map((label) => `<th scope="col">${safe(label)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell, index) => index === 0 ? `<th scope="row">${safe(cell)}</th>` : `<td>${safe(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
 const readout = () => '<p class="report-chart-readout" data-chart-readout aria-live="polite"></p>';
@@ -45,7 +50,7 @@ export function overviewChart(rows, selectedMonth = "") {
   const scale = moneyScale(values);
   const groups = groupBars(rows, ["totalRevenue", "totalExpenses"], { barWidth: rows.length > 6 ? 14 : 22 });
   const profit = linePoints(rows, "profit", scale);
-  const marks = groups.map((group, index) => group.bars.map((bar) => `<rect class="${bar.key === "totalRevenue" ? "report-overview-revenue" : "report-overview-expenses"}" x="${bar.x}" y="${Math.min(scale.zero, scale.y(bar.value))}" width="${bar.width}" height="${Math.max(1, Math.abs(scale.y(bar.value) - scale.zero))}"/>`).join("") + `<text class="report-x-label ${rows[index].month === selectedMonth ? "is-selected" : ""}" x="${group.center}" y="235" text-anchor="middle">${safe(monthLabel(rows[index].month))}</text>`).join("");
+  const marks = groups.map((group, index) => group.bars.map((bar) => `<rect class="${bar.key === "totalRevenue" ? "report-overview-revenue" : "report-overview-expenses"}" x="${bar.x}" y="${Math.min(scale.zero, scale.y(bar.value))}" width="${bar.width}" height="${Math.max(1, Math.abs(scale.y(bar.value) - scale.zero))}"/>${rows.length <= 6 ? `<text class="report-value-label" x="${bar.x + bar.width / 2}" y="${Math.max(15, Math.min(scale.zero, scale.y(bar.value)) - 5)}" text-anchor="middle">${shortMoney(bar.value)}</text>` : ""}`).join("") + `<text class="report-x-label ${rows[index].month === selectedMonth ? "is-selected" : ""}" x="${group.center}" y="235" text-anchor="middle">${safe(monthLabel(rows[index].month))}</text>`).join("");
   const focus = rows.map((row, index) => {
     const detail = `Tháng ${monthLabel(row.month)}: thu ${reportMoney(row.totalRevenue)}, chi ${reportMoney(row.totalExpenses)}, lợi nhuận ${reportMoney(row.profit)}`;
     return `<rect class="report-focus-target" tabindex="0" x="${profit[index].x - 30}" y="18" width="60" height="198" aria-label="${safe(detail)}" data-chart-detail="${safe(detail)}"><title>${safe(detail)}</title></rect>`;
@@ -92,5 +97,5 @@ export function profitBridgeChart(data, kind = "bar") {
   const points = linePoints(rows.map((row) => ({ value: row.value })), "value", scale);
   const bars = groupBars(rows, ["value"], { barWidth: 48 });
   const graphic = kind === "step" ? `<path class="report-bridge-step" d="${stepPath([points[0], { x: points[1].x, y: points[2].y }, points[2]])}"/>${points.map((point, index) => `<circle class="${index === 2 ? "report-overview-profit-point" : "report-bridge-point"}" cx="${point.x}" cy="${index === 1 ? points[2].y : point.y}" r="6"/>`).join("")}` : bars.map((group, index) => `<rect class="${index === 2 ? "report-bridge-profit" : index === 1 ? "report-overview-expenses" : "report-overview-revenue"}" x="${group.bars[0].x}" y="${Math.min(scale.zero, scale.y(group.bars[0].value))}" width="48" height="${Math.max(1, Math.abs(scale.zero - scale.y(group.bars[0].value)))}"/>`).join("");
-  return `${legend([kind === "step" ? "Bậc thang: từ thực nhận đến lợi nhuận" : "Cột: thực nhận, chi phí và lợi nhuận", "Đơn vị: đồng"])}<div class="report-chart-scroll"><svg class="report-graphic" viewBox="0 0 740 250" role="img" aria-label="Từ thu đến lãi; số chính xác ở bảng đi kèm">${grid(scale)}${graphic}${points.map((point, index) => `<text class="report-x-label" x="${point.x}" y="235" text-anchor="middle">${labels[index]}</text><rect class="report-focus-target" tabindex="0" x="${point.x - 30}" y="18" width="60" height="198" aria-label="${labels[index]}: ${details[index]}" data-chart-detail="${labels[index]}: ${details[index]}"/>`).join("")}</svg></div>${readout()}${table}`;
+  return `${legend([kind === "step" ? "Bậc thang: từ thực nhận đến lợi nhuận" : "Cột: thực nhận, chi phí và lợi nhuận", "Đơn vị: đồng"])}<div class="report-chart-scroll"><svg class="report-graphic" viewBox="0 0 740 250" role="img" aria-label="Từ thu đến lãi; số chính xác ở bảng đi kèm">${grid(scale)}${graphic}${points.map((point, index) => `<text class="report-value-label" x="${point.x}" y="${Math.max(15, Math.min(scale.zero, point.y) - 8)}" text-anchor="middle">${shortMoney(rows[index].value)}</text><text class="report-x-label" x="${point.x}" y="235" text-anchor="middle">${labels[index]}</text><rect class="report-focus-target" tabindex="0" x="${point.x - 30}" y="18" width="60" height="198" aria-label="${labels[index]}: ${details[index]}" data-chart-detail="${labels[index]}: ${details[index]}"/>`).join("")}</svg></div>${readout()}${table}`;
 }

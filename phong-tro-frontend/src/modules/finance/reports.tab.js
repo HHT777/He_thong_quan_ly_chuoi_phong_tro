@@ -203,6 +203,7 @@ async function render(context) {
   };
   content.addEventListener("mouseover", readout, { signal });
   content.addEventListener("focusin", readout, { signal });
+  content.addEventListener("pointerdown", readout, { signal });
   exportButton.addEventListener("click", async () => {
     if (!state.applied) return;
     exportButton.disabled = true; message.textContent = "";
