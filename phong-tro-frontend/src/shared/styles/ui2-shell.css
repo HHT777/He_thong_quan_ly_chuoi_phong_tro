@@ -1,6 +1,8 @@
 /* UI-2a-1: shared tokens and shell only; page-specific layouts remain intact. */
 :root {
   --ui2-navy: #0f2b6a;
+  --chart-profit-line: #B7791F;
+  --chart-profit-fill: #F6C26B;
   --ui2-navy-strong: #14275e;
   --ui2-navy-active: #1f4a9e;
   --ui2-blue: #2b4ba0;

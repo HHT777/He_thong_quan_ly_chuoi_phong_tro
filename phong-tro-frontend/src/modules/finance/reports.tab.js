@@ -1,232 +1,223 @@
 import "./reports.css";
 import { escapeHtml, shellPage } from "../../shared/components/view.js";
 import { icons } from "../../shared/components/icons.js";
-import { readCashflow, reportQuery } from "./report.model.mjs";
-import { appliedLabel, reportBody } from "./report.view.mjs";
+import { availableYears, businessYearMonth, periodOptions, readCashflow, reportQuery, selectionFields, validPeriod } from "./report.model.mjs";
+import { cashflowPath, loadReportTrend, reportHash, reportUrlState } from "./report.data.mjs";
+import { reportScreen } from "./report.screen.mjs";
 
 const meta = { id: "reports", route: "/finance/reports", title: "Báo cáo", tabLabel: "Báo cáo", group: "finance", order: 45, roles: ["CHU_TRO"] };
-const viewKey = "qlpt:report-view";
-const tableKey = "qlpt:report-table";
-const currentPeriod = () => {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).formatToParts(new Date());
-  return `${parts.find((part) => part.type === "year").value}-${parts.find((part) => part.type === "month").value}`;
-};
-const stored = (key, allowed, fallback) => {
-  try { const value = sessionStorage.getItem(key); return allowed.includes(value) ? value : fallback; } catch { return fallback; }
-};
-const remember = (key, value) => { try { sessionStorage.setItem(key, value); } catch { /* Session storage can be unavailable. */ } };
-const option = (value, label, selected = false) => `<option value="${escapeHtml(value)}" ${selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+const safe = escapeHtml;
+const remember = (key, value) => { try { localStorage.setItem(`qlpt:report:${key}`, value); } catch { /* Storage can be unavailable. */ } };
+const recalled = (key, allowed, fallback) => { try { const value = localStorage.getItem(`qlpt:report:${key}`); return allowed.includes(value) ? value : fallback; } catch { return fallback; } };
+const option = (value, label, selected, disabled = false) => `<option value="${safe(value)}" ${selected ? "selected" : ""} ${disabled ? "disabled" : ""}>${safe(label)}</option>`;
 
-function filterMarkup(buildings, month) {
-  const year = month.slice(0, 4);
-  const quarter = Math.ceil(Number(month.slice(5)) / 3);
-  return `<form class="report-filter" data-report-filter>
-    <input type="hidden" name="mode" value="month">
-    <div class="report-segment report-periods" role="group" aria-label="Loại kỳ báo cáo">
-      ${[["month", "Tháng"], ["quarter", "Quý"], ["year", "Năm"], ["range", "Tùy chọn"]].map(([id, label]) => `<button type="button" data-report-mode="${id}" aria-pressed="${id === "month"}" class="${id === "month" ? "is-active" : ""}">${label}</button>`).join("")}
-    </div>
-    <div class="report-period-inputs">
-      <label data-filter-mode="month"><span class="report-sr-only">Tháng báo cáo</span><input name="month" type="month" value="${month}" required></label>
-      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Quý báo cáo</span><select name="quarter" disabled>${[1, 2, 3, 4].map((value) => option(value, `Quý ${value}`, value === quarter)).join("")}</select></label>
-      <label data-filter-mode="quarter" hidden><span class="report-sr-only">Năm của quý</span><input name="quarterYear" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
-      <label data-filter-mode="year" hidden><span class="report-sr-only">Năm báo cáo</span><input name="year" type="number" min="2000" max="2100" step="1" value="${year}" disabled></label>
-      <label data-filter-mode="range" hidden><span>Từ ngày</span><input name="from" type="date" disabled></label>
-      <label data-filter-mode="range" hidden><span>Đến ngày</span><input name="to" type="date" disabled></label>
-    </div>
-    <label class="report-building-filter"><span class="report-sr-only">Chọn căn</span><select name="buildingId">${option("", "Tất cả căn")}${buildings.map((row) => option(row.ma_can, row.ten_can)).join("")}</select></label>
-    <button type="submit" class="report-apply">Áp dụng</button>
-  </form>`;
-}
-
-function loadingMarkup() {
-  return `<div class="report-skeleton-grid" role="status" aria-label="Đang tải báo cáo"><div class="report-skeleton"></div><div class="report-skeleton"></div><div class="report-skeleton"></div></div><div class="report-skeleton report-skeleton--chart"></div>`;
+export function filterMarkup(state, years) {
+  const choices = periodOptions(state.year, state.today);
+  const group = (prefix, label) => `<optgroup label="${label}">${choices.filter((row) => prefix === "year" ? row.value === "year" : row.value.startsWith(prefix)).map((row) => option(row.value, row.label, row.value === state.period, row.disabled)).join("")}</optgroup>`;
+  return `<div class="report-filter" data-report-filter>
+    <label class="report-year"><span>Năm</span><input type="text" role="combobox" aria-label="Năm báo cáo" aria-autocomplete="list" aria-expanded="false" aria-controls="report-years" inputmode="numeric" autocomplete="off" data-report-year value="${state.year}"><div id="report-years" role="listbox" hidden data-report-years>${years.map((year) => `<button type="button" role="option" aria-selected="${year === state.year}" data-report-year-option="${year}">${year}</button>`).join("")}</div><small data-report-year-error role="status"></small></label>
+    <label><span>Kỳ</span><select data-report-period>${group("year", "Năm")}${group("quarter-", "Quý")}${group("month-", "Tháng")}</select></label>
+    <label data-report-building-wrap ${state.view === "compare" ? "hidden" : ""}><span>Căn</span><select data-report-building>${option("", "Tất cả căn", !state.buildingId)}${state.buildings.map((row) => option(row.ma_can, row.ten_can, state.buildingId === row.ma_can)).join("")}</select></label>
+  </div>`;
 }
 
 async function render(context) {
   this.listeners?.abort();
+  this.requests?.summary?.abort();
+  this.requests?.trend?.abort();
   this.listeners = new AbortController();
   const signal = this.listeners.signal;
+  const today = businessYearMonth();
+  const years = availableYears();
+  const state = {
+    ...reportUrlState(window.location.hash, years, today), today, buildings: [], buildingNames: new Map(), buildingCount: 0,
+    applied: null, appliedFields: null, data: null, trend: null,
+    summaryStatus: "loading", trendStatus: "loading", summaryError: null, trendError: null,
+    perspective: { revenue: "time", expenses: "time", profit: "time" }, kinds: {}, selectedMonth: "",
+  };
+  state.period = validPeriod(state.year, state.period, today);
+  for (const metric of ["revenue", "expenses", "profit"]) {
+    state.perspective[metric] = recalled(`perspective:${metric}`, ["time", "other"], "time");
+    for (const perspective of ["time", "other"]) state.kinds[`${metric}:${perspective}`] = recalled(`kind:${metric}:${perspective}`, perspective === "time" ? ["bar", "line", "area"] : metric === "profit" ? ["bar", "step", "pie"] : ["horizontal", "pie", "column"], perspective === "time" ? "bar" : metric === "profit" ? "bar" : "horizontal");
+  }
   context.main.innerHTML = shellPage("", "");
   const page = context.main.querySelector(".module-page");
   page.classList.add("report-page");
   const heading = page.querySelector(".module-page__heading");
   heading.innerHTML = `<button type="button" class="report-export" data-export-report disabled>${icons.download(18)} Xuất Excel</button>`;
   const content = page.querySelector("[data-content]");
-  content.innerHTML = loadingMarkup();
-
-  let buildings;
+  content.innerHTML = '<div class="report-state" role="status">Đang tải danh sách căn...</div>';
   try {
-    const response = await context.api.get("/management/can-tro");
-    buildings = Array.isArray(response.data) ? response.data : [];
+    const response = await context.api.request("/management/can-tro", { signal });
+    if (signal.aborted) return;
+    state.buildings = Array.isArray(response.data) ? response.data : [];
   } catch (error) {
+    if (signal.aborted) return;
     content.innerHTML = `<div class="report-state" role="alert"><h2>Không tải được danh sách căn</h2><p>${escapeHtml(error.message)}</p><button type="button" data-retry-buildings>Thử lại</button></div>`;
     content.querySelector("[data-retry-buildings]").addEventListener("click", () => render.call(this, context), { signal });
     return;
   }
-  const buildingNames = new Map(buildings.map((row) => [row.ma_can, row.ten_can]));
-  const month = currentPeriod();
-  content.innerHTML = `${filterMarkup(buildings, month)}<div class="report-toolbar"><span class="report-applied" data-applied-filter>Đang tải báo cáo...</span>
-    <div class="report-segment report-view-toggle" role="group" aria-label="Kiểu xem"><button type="button" data-report-view="chart">Biểu đồ</button><button type="button" data-report-view="table">Bảng chi tiết</button></div></div>
-    <p class="report-message" data-report-message role="alert"></p><div data-report-result>${loadingMarkup()}</div>`;
-  const form = content.querySelector("[data-report-filter]");
-  const result = content.querySelector("[data-report-result]");
+  state.buildingNames = new Map(state.buildings.map((row) => [row.ma_can, row.ten_can]));
+  state.buildingCount = state.buildings.length;
+  if (state.buildingId && !state.buildingNames.has(state.buildingId)) state.buildingId = "";
+  if (state.view === "compare" && state.buildingCount < 2) state.view = "chart";
+  content.innerHTML = `<div data-filter-slot>${filterMarkup(state, years)}</div><p class="report-message" data-report-message role="alert"></p><div data-screen-slot></div>`;
+  const filterSlot = content.querySelector("[data-filter-slot]");
+  const screenSlot = content.querySelector("[data-screen-slot]");
   const message = content.querySelector("[data-report-message]");
-  const appliedChip = content.querySelector("[data-applied-filter]");
   const exportButton = heading.querySelector("[data-export-report]");
-  const applyButton = form.querySelector("[type=submit]");
-  const state = {
-    view: stored(viewKey, ["chart", "table"], "chart"),
-    tableMode: stored(tableKey, ["building", "type", "transactions"], "transactions"),
-    applied: null, appliedQuery: null, data: null, trend: null,
-    buildingId: "", selectedType: "", search: "", estimatedOnly: false,
-  };
-  let loadVersion = 0;
-  const syncFields = () => {
-    const mode = form.elements.mode.value;
-    form.querySelectorAll("[data-report-mode]").forEach((button) => {
-      const active = button.dataset.reportMode === mode;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    form.querySelectorAll("[data-filter-mode]").forEach((label) => {
-      const enabled = label.dataset.filterMode === mode;
-      label.hidden = !enabled;
-      label.querySelectorAll("input,select").forEach((field) => { field.disabled = !enabled; });
-    });
-  };
-  const paint = () => {
-    content.querySelectorAll("[data-report-view]").forEach((button) => {
-      const active = button.dataset.reportView === state.view;
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    if (!state.data) return;
-    appliedChip.textContent = appliedLabel(state, buildingNames);
-    result.innerHTML = reportBody(state.data, buildingNames, state, state.trend);
-  };
-  const restoreCurrent = () => {
-    applyButton.disabled = false;
-    exportButton.disabled = !state.appliedQuery;
-    if (state.data) paint();
-    else {
-      appliedChip.textContent = "Chưa có báo cáo";
-      result.innerHTML = "";
-    }
-  };
-  const load = async (fields) => {
-    const version = ++loadVersion;
-    let query;
-    try { query = reportQuery(fields); } catch (error) {
-      message.textContent = error.message;
-      restoreCurrent();
-      return;
-    }
-    applyButton.disabled = true;
-    exportButton.disabled = true;
+  let requestVersion = 0;
+  let delay;
+  let yearCursor = -1;
+  const selection = () => ({ year: state.year, period: state.period, buildingId: state.view === "compare" ? "" : state.buildingId });
+  const paint = () => { screenSlot.innerHTML = reportScreen(state); };
+  const filterPaint = () => { filterSlot.innerHTML = filterMarkup(state, years); };
+  const persist = () => { window.history.replaceState(null, "", reportHash(state)); };
+  const apply = async (part = "both") => {
+    if (part === "both") {
+      this.requests?.summary?.abort();
+      this.requests?.trend?.abort();
+      ++requestVersion;
+    } else this.requests?.[part]?.abort();
+    this.requests ||= {};
+    const version = requestVersion;
+    const chosen = selection();
+    state.selectedMonth = chosen.period.startsWith("month-") ? `${chosen.year}-${chosen.period.slice(6).padStart(2, "0")}` : "";
+    if (part !== "trend") { state.summaryStatus = "loading"; state.summaryError = null; }
+    if (part !== "summary") { state.trendStatus = "loading"; state.trendError = null; }
     message.textContent = "";
-    appliedChip.textContent = "Đang áp dụng bộ lọc...";
-    result.innerHTML = loadingMarkup();
-    try {
-      const trendQuery = new URLSearchParams({ period: fields.month || month });
-      if (fields.buildingId) trendQuery.set("buildingId", fields.buildingId);
-      const [cashflow, insights] = await Promise.all([
-        context.api.get(`/v1/reports/cashflow?${query}`),
-        fields.mode === "month" ? context.api.get(`/v1/dashboard/insights?${trendQuery}`) : Promise.resolve(null),
-      ]);
-      if (signal.aborted || version !== loadVersion) return;
-      state.data = readCashflow(cashflow);
-      state.trend = insights?.data?.cashflow6m || null;
-      state.applied = fields;
-      state.appliedQuery = query;
-      state.buildingId = "";
-      state.selectedType = "";
-      state.search = "";
-      state.estimatedOnly = false;
+    if (part !== "trend") exportButton.disabled = true;
+    paint();
+    const getSummary = async () => {
+      const controller = new AbortController(); this.requests.summary = controller;
+      const fresh = () => !signal.aborted && !controller.signal.aborted && version === requestVersion;
+      try {
+      const response = await context.api.request(cashflowPath(chosen), { signal: controller.signal });
+      if (!fresh()) return;
+      state.data = readCashflow(response);
+      state.applied = chosen;
+      state.appliedFields = selectionFields(chosen);
+      state.summaryStatus = "ready";
       exportButton.disabled = false;
       paint();
-    } catch (error) {
-      if (signal.aborted || version !== loadVersion) return;
-      appliedChip.textContent = state.applied ? appliedLabel(state, buildingNames) : "Chưa có báo cáo";
-      const friendly = error.status === 400 ? `Bộ lọc không hợp lệ: ${error.message}` : error.message;
-      result.innerHTML = `<div class="report-state" role="alert"><h2>Không tải được báo cáo</h2><p>${escapeHtml(friendly)}</p><button type="button" data-report-retry>Thử lại</button></div>`;
-      result.querySelector("[data-report-retry]").addEventListener("click", () => load(fields), { signal });
-    } finally { if (version === loadVersion) applyButton.disabled = false; }
+      } catch (error) { if (fresh()) { state.summaryError = error; state.summaryStatus = "error"; paint(); } }
+    };
+    const getTrend = async () => {
+      const controller = new AbortController(); this.requests.trend = controller;
+      const fresh = () => !signal.aborted && !controller.signal.aborted && version === requestVersion;
+      try {
+      const rows = await loadReportTrend(context.api, chosen, controller.signal);
+      if (!fresh()) return;
+      state.trend = rows; state.trendStatus = "ready"; paint();
+      } catch (error) { if (fresh()) { state.trendError = error; state.trendStatus = "error"; paint(); } }
+    };
+    await Promise.all([part !== "trend" ? getSummary() : null, part !== "summary" ? getTrend() : null]);
   };
-  const applyCurrent = () => {
-    const fields = Object.fromEntries(new FormData(form));
-    if (fields.mode === "range" && (!fields.from || !fields.to)) {
-      ++loadVersion;
-      message.textContent = "Chọn đủ ngày bắt đầu và kết thúc để lọc báo cáo.";
-      restoreCurrent();
-      return;
+  const schedule = () => { clearTimeout(delay); persist(); delay = setTimeout(apply, 250); };
+  filterSlot.addEventListener("change", (event) => {
+    if (event.target.matches("[data-report-period]")) state.period = event.target.value;
+    else if (event.target.matches("[data-report-building]")) state.buildingId = event.target.value;
+    else return;
+    schedule();
+  }, { signal });
+  const yearInput = () => filterSlot.querySelector("[data-report-year]");
+  const yearList = () => filterSlot.querySelector("[data-report-years]");
+  const yearError = () => filterSlot.querySelector("[data-report-year-error]");
+  const showYears = (text) => {
+    const list = yearList();
+    const matches = years.filter((year) => String(year).includes(text));
+    list.hidden = false; yearInput().setAttribute("aria-expanded", "true");
+    const options = matches.map((year) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", String(year === state.year));
+      button.dataset.reportYearOption = String(year);
+      button.textContent = String(year);
+      return button;
+    });
+    if (!options.length) {
+      const empty = document.createElement("span");
+      empty.setAttribute("role", "status");
+      empty.textContent = "Không có năm này";
+      options.push(empty);
     }
-    load(fields);
+    list.replaceChildren(...options);
+    yearError().textContent = matches.length ? "" : "Không có năm này";
+    yearCursor = -1;
   };
-  form.addEventListener("click", (event) => {
-    const mode = event.target.closest("[data-report-mode]");
-    if (!mode) return;
-    form.elements.mode.value = mode.dataset.reportMode;
-    syncFields();
-    applyCurrent();
+  const pickYear = (year) => {
+    if (!years.includes(year)) return;
+    state.year = year; state.period = validPeriod(year, state.period, today);
+    filterPaint(); schedule();
+  };
+  filterSlot.addEventListener("input", (event) => {
+    if (!event.target.matches("[data-report-year]")) return;
+    event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+    showYears(event.target.value);
   }, { signal });
-  form.addEventListener("change", (event) => {
-    if (event.target.matches("[name=mode]")) return;
-    applyCurrent();
+  filterSlot.addEventListener("keydown", (event) => {
+    if (!event.target.matches("[data-report-year]")) return;
+    if (event.key === "Escape") { filterPaint(); return; }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (yearList().hidden) showYears(event.target.value);
+      const current = [...yearList().querySelectorAll("[data-report-year-option]")];
+      if (!current.length) return;
+      yearCursor = event.key === "ArrowDown" ? (yearCursor + 1) % current.length : (yearCursor <= 0 ? current.length - 1 : yearCursor - 1);
+      current.forEach((button) => button.classList.remove("is-focused")); current[yearCursor]?.classList.add("is-focused");
+    }
+    if (event.key === "Enter") { event.preventDefault(); pickYear(Number(yearList().querySelector(".is-focused")?.dataset.reportYearOption || event.target.value)); }
   }, { signal });
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    applyCurrent();
+  filterSlot.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-report-year-option]");
+    if (button) pickYear(Number(button.dataset.reportYearOption));
+    else if (event.target.matches("[data-report-year]")) showYears(event.target.value);
+  }, { signal });
+  filterSlot.addEventListener("focusout", (event) => {
+    if (!event.target.matches("[data-report-year]")) return;
+    setTimeout(() => { if (signal.aborted) return; const typed = Number(yearInput()?.value); if (!years.includes(typed)) filterPaint(); else if (typed !== state.year) pickYear(typed); else { yearList().hidden = true; yearInput().setAttribute("aria-expanded", "false"); } }, 120);
   }, { signal });
   content.addEventListener("click", (event) => {
+    const retry = event.target.closest("[data-report-retry]");
+    if (retry) { apply(retry.dataset.reportRetry); return; }
     const view = event.target.closest("[data-report-view]");
-    if (view) { state.view = view.dataset.reportView; remember(viewKey, state.view); paint(); return; }
-    const detail = event.target.closest("[data-detail-mode]");
-    if (detail) { state.tableMode = detail.dataset.detailMode; state.selectedType = ""; state.buildingId = ""; remember(tableKey, state.tableMode); paint(); return; }
-    const type = event.target.closest("[data-type]");
-    if (type) { state.view = "table"; state.tableMode = "type"; state.selectedType = type.dataset.type; state.buildingId = ""; remember(viewKey, state.view); remember(tableKey, state.tableMode); paint(); return; }
-    const building = event.target.closest("[data-building]");
-    if (building) { state.view = "table"; state.tableMode = "transactions"; state.buildingId = building.dataset.building; state.selectedType = ""; remember(viewKey, state.view); remember(tableKey, state.tableMode); paint(); return; }
-    if (event.target.closest("[data-clear-selection]")) { state.buildingId = ""; state.selectedType = ""; paint(); return; }
-    if (event.target.closest("[data-estimated-only]")) { state.estimatedOnly = !state.estimatedOnly; paint(); }
-  }, { signal });
-  content.addEventListener("input", (event) => {
-    if (!event.target.matches("[data-report-search]")) return;
-    state.search = event.target.value;
-    const position = event.target.selectionStart;
-    paint();
-    const input = result.querySelector("[data-report-search]");
-    input?.focus();
-    input?.setSelectionRange(position, position);
+    if (view) {
+      state.view = view.dataset.reportView;
+      filterPaint(); persist(); paint();
+      if (state.view === "compare" || state.applied?.buildingId !== selection().buildingId) schedule();
+      return;
+    }
+    const metric = event.target.closest("[data-report-metric]");
+    if (metric) { state.metric = state.metric === metric.dataset.reportMetric ? "" : metric.dataset.reportMetric; persist(); paint(); return; }
+    if (event.target.closest("[data-report-overview]")) { state.metric = ""; persist(); paint(); return; }
+    const perspective = event.target.closest("[data-report-perspective]");
+    if (perspective) { state.perspective[state.metric] = perspective.dataset.reportPerspective; remember(`perspective:${state.metric}`, state.perspective[state.metric]); paint(); return; }
+    const kind = event.target.closest("[data-report-kind]");
+    if (kind) { const key = `${state.metric}:${state.perspective[state.metric]}`; state.kinds[key] = kind.dataset.reportKind; remember(`kind:${key}`, state.kinds[key]); paint(); }
   }, { signal });
   const readout = (event) => {
     const target = event.target.closest?.("[data-chart-detail]");
-    if (!target) return;
-    const element = result.querySelector("[data-chart-readout]");
+    const element = target?.closest(".report-card")?.querySelector("[data-chart-readout]");
     if (element) element.textContent = target.dataset.chartDetail;
   };
   content.addEventListener("mouseover", readout, { signal });
   content.addEventListener("focusin", readout, { signal });
   exportButton.addEventListener("click", async () => {
-    if (!state.appliedQuery) return;
-    exportButton.disabled = true;
-    message.textContent = "";
+    if (!state.applied) return;
+    exportButton.disabled = true; message.textContent = "";
     try {
-      const { blob, disposition } = await context.api.getBlob(`/v1/reports/cashflow.xlsx?${state.appliedQuery}`);
+      const query = reportQuery(state.appliedFields);
+      const { blob, disposition } = await context.api.getBlob(`/v1/reports/cashflow.xlsx?${query}`);
       const filename = /filename="(bao-cao-thu-chi_[A-Za-z0-9_-]+\.xlsx)"/.exec(disposition)?.[1] || "bao-cao-thu-chi.xlsx";
       const url = URL.createObjectURL(blob);
-      try {
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } finally { URL.revokeObjectURL(url); }
+      try { const link = document.createElement("a"); link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove(); }
+      finally { URL.revokeObjectURL(url); }
     } catch (error) { message.textContent = `Không xuất được Excel: ${error.message}`; }
     finally { exportButton.disabled = false; }
   }, { signal });
-  syncFields();
-  await load({ mode: "month", month, buildingId: "" });
+  persist();
+  await apply();
 }
 
 export default { ...meta, render };
