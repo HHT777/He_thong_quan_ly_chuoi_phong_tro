@@ -4,6 +4,11 @@ export default listTab({ id: "incidents", route: "/operations/incidents", title:
   title: "Sự cố",
   description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố.",
   endpoint: "/v1/incidents",
+  statusOptions: [
+    { value: "CHO_TIEP_NHAN", label: "Chờ tiếp nhận" },
+    { value: "DANG_XU_LY", label: "Đang xử lý" },
+    { value: "DA_XU_LY", label: "Đã xử lý" },
+  ],
   create: {
     label: "Tạo sự cố",
     fields: [

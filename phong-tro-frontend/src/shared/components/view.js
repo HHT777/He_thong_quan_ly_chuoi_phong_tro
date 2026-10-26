@@ -369,8 +369,9 @@ export async function renderList(context, config) {
     const isRoomsModule = config.endpoint.includes("/phong") || config.title === "Phòng";
 
     // Setup initial state
-    let searchQuery = "";
-    let statusFilter = "ALL";
+    const routeFilters = new URLSearchParams(window.location.hash.split("?")[1] || "");
+    let searchQuery = routeFilters.get("search") || "";
+    let statusFilter = routeFilters.get("status") || "ALL";
     let buildingFilter = "ALL";
     let viewMode = "table"; // 'table' or 'grid'
     let currentPage = 1;

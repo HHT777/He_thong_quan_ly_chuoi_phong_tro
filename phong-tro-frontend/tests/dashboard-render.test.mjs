@@ -61,6 +61,19 @@ test("UI-2a-2 loads only summary, insights and incidents once, and renders all d
   assert.doesNotMatch(ui.body("incidents"), /<script>/);
 });
 
+test("FR-132 dashboard links incidents and every task to its processing screen", async () => {
+  const allTasks = structuredClone(insightsResponse);
+  allTasks.data.tasks.forEach((task) => { task.count = 1; });
+  const ui = harness({}, { ...responses, "/v1/dashboard/insights": allTasks });
+  await dashboard.render(ui.context);
+  for (const route of ["/finance/debts", "/residents-contracts/reservations", "/operations/incidents?status=CHO_TIEP_NHAN", "/residents-contracts/requests", "/operations/meter-readings", "/residents-contracts/contracts", "/properties/rooms?status=TRONG"]) {
+    assert.ok(ui.body("tasks").includes(`href="#${route}"`), `Missing task destination ${route}`);
+  }
+  assert.ok(ui.body("incidents").includes('href="#/operations/incidents?search=1"'));
+  assert.ok(ui.body("incidents").includes('href="#/operations/incidents?status=DANG_XU_LY"'));
+  assert.equal(ui.calls.length, 3);
+});
+
 test("FR-132 chart details come from the three loaded APIs on hover and keyboard focus", async () => {
   const ui = harness();
   await dashboard.render(ui.context);
@@ -83,7 +96,7 @@ test("FR-132 chart details come from the three loaded APIs on hover and keyboard
   ui.interact("focusin", detail);
   assert.equal(readout.textContent, detail.dataset.chartDetail);
   ui.interact("focusout", detail);
-  assert.match(readout.textContent, /dùng Tab/);
+  assert.equal(readout.textContent, "");
   assert.equal(ui.calls.length, 3, "hover/focus must not fetch again");
 });
 
