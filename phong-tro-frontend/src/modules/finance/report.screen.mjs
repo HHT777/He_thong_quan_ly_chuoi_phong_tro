@@ -1,6 +1,6 @@
 import { escapeHtml } from "../../shared/components/view.js";
 import { estimatedRows, periodLabel, reportDate, reportMoney, revenueLabel } from "./report.model.mjs";
-import { overviewChart, profitBridgeChart, timeChart, typeChart } from "./report.charts.mjs";
+import { buildingComparisonChart, overviewChart, profitBridgeChart, timeChart, typeChart } from "./report.charts.mjs";
 
 const safe = escapeHtml;
 const names = { revenue: "Doanh thu thực nhận", expenses: "Chi phí", profit: "Lợi nhuận" };
@@ -48,7 +48,7 @@ function chartPanel(data, state, trend) {
 
 function comparePanel(data, state) {
   const rows = (data.byBuilding || []).filter((row) => row.buildingId && row.inComparison).sort((a, b) => b.profit - a.profit);
-  return panel("So sánh các căn", rows.length ? table(["Căn", "Thực nhận", "Chi phí", "Lợi nhuận"], rows.map((row) => `<tr><th scope="row">${safe(state.buildingNames.get(row.buildingId) || "Căn không rõ tên")}</th><td class="report-number">${reportMoney(row.revenue)}</td><td class="report-number">${reportMoney(row.expenses)}</td><td class="report-number">${reportMoney(row.profit)}</td></tr>`)) : '<p class="report-empty">Chưa có căn để so sánh.</p>');
+  return panel("So sánh các căn", rows.length ? `${buildingComparisonChart(rows, state.buildingNames)}${table(["Căn", "Thực nhận", "Chi phí", "Lợi nhuận"], rows.map((row) => `<tr><th scope="row">${safe(state.buildingNames.get(row.buildingId) || "Căn không rõ tên")}</th><td class="report-number">${reportMoney(row.revenue)}</td><td class="report-number">${reportMoney(row.expenses)}</td><td class="report-number">${reportMoney(row.profit)}</td></tr>`))}` : '<p class="report-empty">Chưa có căn để so sánh.</p>');
 }
 
 export function reportScreen(state) {

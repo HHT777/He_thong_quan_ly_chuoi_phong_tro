@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { contrastRatio } from "../src/shared/design/contrast.mjs";
 import { cashflowPath, loadReportTrend, reportHash, reportUrlState } from "../src/modules/finance/report.data.mjs";
 import { reportKpis, reportScreen, statusBlock } from "../src/modules/finance/report.screen.mjs";
-import { overviewChart, profitBridgeChart, timeChart, typeChart } from "../src/modules/finance/report.charts.mjs";
+import { buildingComparisonChart, overviewChart, profitBridgeChart, timeChart, typeChart } from "../src/modules/finance/report.charts.mjs";
+import { defaultPeriodForMode, filterMarkup } from "../src/modules/finance/report.filter.mjs";
 
 const data = {
   totalRevenue: 5000000, grossRevenue: 5100000, discounts: 100000, depositDeductions: 0,
@@ -80,6 +81,41 @@ test("đồ thị âm, bằng 0, một điểm, nhiều loại và profit bridge
   assert.match(typeChart(data.revenueByType, "revenue", "pie"), /100,0%/);
   assert.match(profitBridgeChart({ ...data, profit: -100 }, "pie"), /chỉ dùng khi lợi nhuận không âm/);
   assert.match(profitBridgeChart(data, "step"), /report-bridge-step/);
+});
+
+test("bộ lọc tách năm, loại kỳ và quý; không chọn kỳ tương lai", () => {
+  const markup = filterMarkup({ year: 2026, period: "quarter-2", today: "2026-10", view: "chart", buildingId: "", buildings: [] }, [2026, 2025]);
+  assert.match(markup, /data-report-year/);
+  assert.match(markup, /data-report-mode/);
+  assert.match(markup, /data-report-period/);
+  assert.match(markup, /Quý 2/);
+  assert.doesNotMatch(markup, /<optgroup/);
+  assert.equal(defaultPeriodForMode(2026, "quarter", "2026-10"), "quarter-4");
+  assert.equal(defaultPeriodForMode(2026, "month", "2026-10"), "month-10");
+  assert.equal(defaultPeriodForMode(2026, "year", "2026-10"), "year");
+});
+
+test("so sánh căn có thanh trực quan và số API nguyên giá trị", () => {
+  const names = new Map([["a", "Căn Hoa Sen"], ["b", "Căn Bình Minh"]]);
+  const compared = [{ buildingId: "a", inComparison: true, revenue: 5000000, expenses: 2000000, profit: 3000000 }, { buildingId: "b", inComparison: true, revenue: 1000000, expenses: 1500000, profit: -500000 }];
+  const chart = buildingComparisonChart(compared, names);
+  assert.match(chart, /report-compare-fill--revenue/);
+  assert.match(chart, /report-compare-fill--expenses/);
+  assert.match(chart, /report-compare-fill--loss/);
+  assert.match(chart, /−500\.000 đ/);
+  assert.match(chart, /width:40%/);
+  assert.match(reportScreen(state({ view: "compare", data: { ...data, byBuilding: compared }, buildingNames: names })), /report-compare-chart/);
+  assert.doesNotMatch(buildingComparisonChart([{ ...compared[0], buildingId: '<script>' }], new Map()), /<script>/);
+});
+
+test("chú thích có ký hiệu và chấm lợi nhuận nhỏ", () => {
+  const chart = overviewChart(rows);
+  assert.match(chart, /report-legend-symbol--profit/);
+  assert.match(chart, /report-legend-symbol--expenses/);
+  assert.match(chart, /report-overview-profit-point[^>]*r="3\.5"/);
+  const css = readFileSync(new URL("../src/modules/finance/reports.css", import.meta.url), "utf8");
+  assert.match(css, /report-graphic \{[^}]*850px/);
+  assert.match(css, /report-focus-panel \{ min-height: 0; \}/);
 });
 
 test("token viền lợi nhuận có tương phản đồ họa tối thiểu 3:1; phép thử phủ định nhạt bị đỏ", () => {
