@@ -1,5 +1,5 @@
 import { escapeHtml } from "../../shared/components/view.js";
-import { areaPath, groupBars, groupTypes, linePath, linePoints, moneyScale, pieArcLengths, stepPath } from "./report.geometry.mjs";
+import { areaPath, donutSlicePath, groupBars, groupTypes, linePath, linePoints, moneyScale, pieArcLengths, stepPath } from "./report.geometry.mjs";
 import { expenseLabel, reportMoney, revenueLabel, sharesToOneDecimal } from "./report.model.mjs";
 
 const safe = escapeHtml;
@@ -68,8 +68,8 @@ export function typeChart(rows, metric, kind = "horizontal") {
   const table = hiddenTable("Cơ cấu theo loại", ["Loại", "Số tiền", "Tỷ trọng"], shown.map((row, index) => [names[index], reportMoney(row.amount), `${shares[index].toFixed(1).replace(".", ",")}%`]));
   if (kind === "pie") {
     const arcs = pieArcLengths(shown.map((row) => row.amount));
-    const circles = arcs.map((arc, index) => `<circle class="report-pie-arc report-pie-arc--${index % 6}" cx="100" cy="100" r="68" fill="none" stroke-width="34" stroke-dasharray="${arc.length} ${arc.circumference - arc.length}" stroke-dashoffset="${-arc.offset}" tabindex="0" aria-label="${safe(exact[index])}" data-chart-detail="${safe(exact[index])}"><title>${safe(exact[index])}</title></circle>`).join("");
-    return `${legend([["revenue", "Lát tròn: tỷ trọng theo loại"]], "Tổng tỷ trọng: 100,0%")}<div class="report-pie-layout"><svg class="report-pie" viewBox="0 0 200 200" role="img" aria-label="Cơ cấu theo loại; số chính xác ở bảng đi kèm">${circles}</svg><ul>${shown.map((row, index) => `<li><i class="report-pie-key report-pie-arc--${index % 6}"></i>${safe(names[index])}: ${reportMoney(row.amount)} · ${shares[index].toFixed(1).replace(".", ",")}%</li>`).join("")}</ul></div>${readout()}${table}`;
+    const circles = arcs.map((arc, index) => `<path class="report-pie-slice report-pie-arc--${index % 6}" d="${donutSlicePath(arc.offset / arc.circumference, (arc.offset + arc.length) / arc.circumference)}" tabindex="0" aria-label="${safe(exact[index])}" data-chart-detail="${safe(exact[index])}"><title>${safe(exact[index])}</title></path>`).join("");
+    return `${legend([[metric, "Lát tròn: tỷ trọng theo loại"]], "Tổng tỷ trọng: 100,0%")}<div class="report-pie-layout"><svg class="report-pie" viewBox="0 0 200 200" role="img" aria-label="Cơ cấu theo loại; số chính xác ở bảng đi kèm">${circles}</svg><ul>${shown.map((row, index) => `<li><i class="report-pie-key report-pie-arc--${index % 6}"></i>${safe(names[index])}: ${reportMoney(row.amount)} · ${shares[index].toFixed(1).replace(".", ",")}%</li>`).join("")}</ul></div>${readout()}${table}`;
   }
   const scale = moneyScale(shown.map((row) => row.amount));
   if (kind === "column") {
@@ -77,7 +77,7 @@ export function typeChart(rows, metric, kind = "horizontal") {
     return `${legend([["revenue", "Cột: số tiền từng loại"]], "Đơn vị: đồng")}<div class="report-chart-scroll"><svg class="report-graphic report-graphic--revenue" viewBox="0 0 740 250" role="img" aria-label="Số tiền theo loại; số chính xác ở bảng đi kèm">${grid(scale)}${bars.map((group, index) => `<rect class="report-series-mark" x="${group.bars[0].x}" y="${scale.y(shown[index].amount)}" width="${group.bars[0].width}" height="${Math.max(1, scale.zero - scale.y(shown[index].amount))}" tabindex="0" aria-label="${safe(exact[index])}" data-chart-detail="${safe(exact[index])}"><title>${safe(exact[index])}</title></rect><text class="report-value-label" x="${group.center}" y="${Math.max(15, scale.y(shown[index].amount) - 5)}" text-anchor="middle">${shortMoney(shown[index].amount)}</text><text class="report-x-label" x="${group.center}" y="235" text-anchor="middle">${safe(names[index])}</text>`).join("")}</svg></div>${readout()}${table}`;
   }
   const max = Math.max(...shown.map((row) => Number(row.amount)));
-  return `${legend([["revenue", "Thanh ngang: số tiền theo loại"]], "Đơn vị: đồng")}<div class="report-type-bars">${shown.map((row, index) => `<div class="report-type-bar" tabindex="0" data-chart-detail="${safe(exact[index])}" aria-label="${safe(exact[index])}"><span>${safe(names[index])}</span><span class="report-type-track"><i style="width:${max ? Math.max(1, Number(row.amount) / max * 100) : 0}%"></i></span><strong>${reportMoney(row.amount)}</strong><small>${shares[index].toFixed(1).replace(".", ",")}%</small></div>`).join("")}</div>${readout()}${table}`;
+  return `${legend([[metric, "Thanh ngang: số tiền theo loại"]], "Đơn vị: đồng")}<div class="report-type-bars">${shown.map((row, index) => `<div class="report-type-bar" tabindex="0" data-chart-detail="${safe(exact[index])}" aria-label="${safe(exact[index])}"><span>${safe(names[index])}</span><span class="report-type-track"><i style="width:${max ? Math.max(1, Number(row.amount) / max * 100) : 0}%"></i></span><strong>${reportMoney(row.amount)}</strong><small>${shares[index].toFixed(1).replace(".", ",")}%</small></div>`).join("")}</div>${readout()}${table}`;
 }
 
 export function profitBridgeChart(data, kind = "bar") {
@@ -91,7 +91,7 @@ export function profitBridgeChart(data, kind = "bar") {
   if (kind === "pie") {
     if (profit < 0 || revenue <= 0) return '<p class="report-empty">Biểu đồ tròn chỉ dùng khi lợi nhuận không âm và thực nhận lớn hơn 0.</p>';
     const arcs = pieArcLengths([expenses, profit]);
-    return `${legend([["expenses", "Lát xanh: chi phí"], ["profit-bar", "Lát vàng: lợi nhuận"]])}<div class="report-pie-layout"><svg class="report-pie" viewBox="0 0 200 200" role="img" aria-label="Chi phí và lợi nhuận từ thực nhận; số chính xác ở bảng đi kèm">${arcs.map((arc, index) => `<circle class="${index ? "report-pie-profit" : "report-pie-arc--1"}" cx="100" cy="100" r="68" fill="none" stroke-width="34" stroke-dasharray="${arc.length} ${arc.circumference - arc.length}" stroke-dashoffset="${-arc.offset}" tabindex="0" aria-label="${labels[index + 1]}: ${details[index + 1]}" data-chart-detail="${labels[index + 1]}: ${details[index + 1]}"/>`).join("")}</svg><ul><li>Chi phí: ${details[1]}</li><li>Lợi nhuận: ${details[2]}</li></ul></div>${readout()}${table}`;
+    return `${legend([["expenses", "Lát xanh: chi phí"], ["profit-bar", "Lát vàng: lợi nhuận"]])}<div class="report-pie-layout"><svg class="report-pie" viewBox="0 0 200 200" role="img" aria-label="Chi phí và lợi nhuận từ thực nhận; số chính xác ở bảng đi kèm">${arcs.map((arc, index) => `<path class="report-pie-slice ${index ? "report-pie-profit" : "report-pie-arc--1"}" d="${donutSlicePath(arc.offset / arc.circumference, (arc.offset + arc.length) / arc.circumference)}" tabindex="0" aria-label="${labels[index + 1]}: ${details[index + 1]}" data-chart-detail="${labels[index + 1]}: ${details[index + 1]}"/>`).join("")}</svg><ul><li>Chi phí: ${details[1]}</li><li>Lợi nhuận: ${details[2]}</li></ul></div>${readout()}${table}`;
   }
   const scale = moneyScale([revenue, expenses, profit]);
   const points = linePoints(rows.map((row) => ({ value: row.value })), "value", scale);
@@ -102,14 +102,23 @@ export function profitBridgeChart(data, kind = "bar") {
 
 export function buildingComparisonChart(rows, buildingNames) {
   if (!rows.length) return '<p class="report-empty">Chưa có căn để so sánh.</p>';
-  const max = Math.max(1, ...rows.flatMap((row) => [Number(row.revenue) || 0, Number(row.expenses) || 0, Math.abs(Number(row.profit) || 0)]));
-  const bar = (value, type) => `<span class="report-compare-track"><i class="report-compare-fill report-compare-fill--${type}" style="width:${Math.max(0, Math.min(100, Math.abs(Number(value) || 0) / max * 100))}%"></i></span>`;
-  return `${legend([["revenue", "Thực nhận"], ["expenses", "Chi phí"], ["profit", "Lợi nhuận (lỗ hiển thị màu đỏ)"]], "Các thanh dùng chung một tỷ lệ; rê chuột hoặc Tab để xem số chính xác.")}
-    <div class="report-compare-chart" role="group" aria-label="So sánh thực nhận, chi phí và lợi nhuận giữa các căn">
-      ${rows.map((row) => {
-        const name = buildingNames.get(row.buildingId) || "Căn không rõ tên";
-        const detail = `${name}: thực nhận ${reportMoney(row.revenue)}, chi phí ${reportMoney(row.expenses)}, lợi nhuận ${reportMoney(row.profit)}`;
-        return `<div class="report-compare-row" tabindex="0" aria-label="${safe(detail)}" data-chart-detail="${safe(detail)}"><strong class="report-compare-name">${safe(name)}</strong><div class="report-compare-series">${bar(row.revenue, "revenue")}${bar(row.expenses, "expenses")}${bar(row.profit, Number(row.profit) < 0 ? "loss" : "profit")}</div><span class="report-compare-amount">${reportMoney(row.profit)}</span></div>`;
-      }).join("")}
-    </div>${readout()}`;
+  const positiveMax = Math.max(1, ...rows.flatMap((row) => [Number(row.revenue) || 0, Number(row.expenses) || 0, Number(row.profit) || 0]));
+  const negativeMax = Math.max(0, ...rows.map((row) => -(Number(row.profit) || 0)));
+  const baseline = negativeMax ? 170 : 205;
+  const positiveHeight = baseline - 24;
+  const negativeHeight = 48;
+  const width = Math.max(740, rows.length * 156 + 90);
+  const chartRows = rows.map((row, index) => {
+    const name = buildingNames.get(row.buildingId) || "Căn không rõ tên";
+    const detail = `${name}: thực nhận ${reportMoney(row.revenue)}, chi phí ${reportMoney(row.expenses)}, lợi nhuận ${reportMoney(row.profit)}`;
+    const x = 75 + index * (width - 120) / rows.length;
+    const columns = [[row.revenue, "revenue"], [row.expenses, "expenses"], [row.profit, Number(row.profit) < 0 ? "loss" : "profit"]];
+    return `<g><title>${safe(detail)}</title>${columns.map(([raw, type], position) => {
+      const amount = Number(raw) || 0;
+      const height = amount < 0 ? Math.abs(amount) / negativeMax * negativeHeight : amount / positiveMax * positiveHeight;
+      return `<rect class="report-compare-column report-compare-column--${type}" x="${x + position * 27}" y="${amount < 0 ? baseline : baseline - height}" width="22" height="${height}"/>`;
+    }).join("")}<rect class="report-focus-target" tabindex="0" x="${x - 4}" y="20" width="84" height="${baseline + negativeHeight - 20}" aria-label="${safe(detail)}" data-chart-detail="${safe(detail)}"/><text class="report-compare-axis-label" x="${x + 38}" y="${baseline + (negativeMax ? negativeHeight : 0) + 22}" text-anchor="middle">${safe(name)}</text></g>`;
+  }).join("");
+  return `${legend([["revenue", "Thực nhận"], ["expenses", "Chi phí"], ["profit-bar", "Lợi nhuận"], ["loss", "Lỗ"]], "Cùng một thang tiền; số chính xác ở bảng bên dưới.")}
+    <div class="report-chart-scroll"><svg class="report-compare-columns" viewBox="0 0 ${width} ${negativeMax ? 270 : 255}" role="img" aria-label="Biểu đồ cột so sánh thực nhận, chi phí và lợi nhuận các căn"><line class="report-grid-line" x1="62" x2="${width - 20}" y1="24" y2="24"/><text x="2" y="28">${shortMoney(positiveMax)}</text><line class="report-zero-line" x1="62" x2="${width - 20}" y1="${baseline}" y2="${baseline}"/><text x="22" y="${baseline + 4}">0 đ</text>${chartRows}</svg></div>${readout()}`;
 }

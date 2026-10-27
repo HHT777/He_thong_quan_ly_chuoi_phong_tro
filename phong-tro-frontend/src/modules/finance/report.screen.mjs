@@ -33,16 +33,18 @@ function detailTable(data, state, trend) {
 
 function chartChoices(state) {
   const perspective = state.perspective[state.metric] || "time";
-  const types = perspective === "time" ? [["bar", "Cột"], ["line", "Đường"], ["area", "Vùng"]] : state.metric === "profit" ? [["bar", "Cột so sánh"], ["step", "Bậc thang"], ["pie", "Tròn"]] : [["horizontal", "Thanh ngang"], ["pie", "Tròn"], ["column", "Cột"]];
-  const kind = state.kinds[`${state.metric}:${perspective}`] || types[0][0];
-  return `<div class="report-chart-tools"><div class="report-segment" role="tablist" aria-label="Góc nhìn"><button type="button" role="tab" data-report-perspective="time" aria-selected="${perspective === "time"}" class="${perspective === "time" ? "is-active" : ""}">Theo thời gian</button><button type="button" role="tab" data-report-perspective="other" aria-selected="${perspective === "other"}" class="${perspective === "other" ? "is-active" : ""}">${state.metric === "profit" ? "Từ thu đến lãi" : "Theo loại thu"}</button></div><div class="report-segment" role="group" aria-label="Dạng biểu đồ">${types.map(([value, label]) => `<button type="button" data-report-kind="${value}" aria-pressed="${kind === value}" class="${kind === value ? "is-active" : ""}" ${value === "pie" && state.metric === "profit" && (state.data.profit < 0 || state.data.totalRevenue <= 0) ? 'disabled title="Cần thực nhận lớn hơn 0 và lợi nhuận không âm"' : ""}>${label}</button>`).join("")}</div></div>`;
+  const types = perspective === "time" ? [["bar", "Cột"], ["area", "Vùng"]] : state.metric === "profit" ? [["bar", "Cột so sánh"], ["pie", "Tròn"]] : [["horizontal", "Thanh ngang"], ["pie", "Tròn"]];
+  const kind = types.some(([value]) => value === state.kinds[`${state.metric}:${perspective}`]) ? state.kinds[`${state.metric}:${perspective}`] : types[0][0];
+  return `<div class="report-chart-tools"><div class="report-segment" role="tablist" aria-label="Góc nhìn"><button type="button" role="tab" data-report-perspective="time" aria-selected="${perspective === "time"}" class="${perspective === "time" ? "is-active" : ""}">Theo thời gian</button><button type="button" role="tab" data-report-perspective="other" aria-selected="${perspective === "other"}" class="${perspective === "other" ? "is-active" : ""}">${state.metric === "profit" ? "Từ thu đến lãi" : state.metric === "expenses" ? "Theo loại chi" : "Theo loại thu"}</button></div><div class="report-segment" role="group" aria-label="Dạng biểu đồ">${types.map(([value, label]) => `<button type="button" data-report-kind="${value}" aria-pressed="${kind === value}" class="${kind === value ? "is-active" : ""}" ${value === "pie" && state.metric === "profit" && (state.data.profit < 0 || state.data.totalRevenue <= 0) ? 'disabled title="Cần thực nhận lớn hơn 0 và lợi nhuận không âm"' : ""}>${label}</button>`).join("")}</div></div>`;
 }
 
 function chartPanel(data, state, trend) {
   if (!state.metric) return panel("Thu – chi – lợi nhuận theo tháng", trend?.length ? overviewChart(trend, state.selectedMonth) : '<p class="report-empty">Chưa có dữ liệu theo tháng.</p>');
   const perspective = state.perspective[state.metric] || "time";
-  const kind = state.kinds[`${state.metric}:${perspective}`] || (perspective === "time" ? "bar" : state.metric === "profit" ? "bar" : "horizontal");
-  const graphic = perspective === "time" ? (trend?.length ? timeChart(trend, state.metric, kind, state.selectedMonth) : '<p class="report-empty">Chưa có dữ liệu theo tháng.</p>') : state.metric === "profit" ? profitBridgeChart(data, kind) : typeChart(data.revenueByType || [], "revenue", kind);
+  const preferred = state.kinds[`${state.metric}:${perspective}`];
+  const allowed = perspective === "time" ? ["bar", "area"] : state.metric === "profit" ? ["bar", "pie"] : ["horizontal", "pie"];
+  const kind = allowed.includes(preferred) ? preferred : allowed[0];
+  const graphic = perspective === "time" ? (trend?.length ? timeChart(trend, state.metric, kind, state.selectedMonth) : '<p class="report-empty">Chưa có dữ liệu theo tháng.</p>') : state.metric === "profit" ? profitBridgeChart(data, kind) : typeChart(state.metric === "expenses" ? data.expensesByType || [] : data.revenueByType || [], state.metric, kind);
   return panel(names[state.metric], `${chartChoices(state)}${graphic}`);
 }
 

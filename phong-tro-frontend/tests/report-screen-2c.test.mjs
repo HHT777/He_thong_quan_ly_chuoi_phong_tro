@@ -11,6 +11,7 @@ const data = {
   totalRevenue: 5000000, grossRevenue: 5100000, discounts: 100000, depositDeductions: 0,
   totalExpenses: 2000000, profit: 3000000,
   revenueByType: [{ type: "SUA_CHUA", amount: 100000 }, { type: "TIEN_PHONG", amount: 4900000 }],
+  expensesByType: [{ type: "BAO_TRI", amount: 2000000 }],
   byBuilding: [{ buildingId: "a", inComparison: true, revenue: 5000000, expenses: 2000000, profit: 3000000 }],
   receiptDetails: [{ source: "THU_TIEN", type: "TIEN_PHONG", amount: 4900000, date: "2026-10-09", buildingId: "a" }],
 };
@@ -61,6 +62,21 @@ test("KPI là nút và từng góc nhìn chỉ hiện chỉ tiêu đã chọn", 
   assert.match(profit, /Xem tổng quan/);
 });
 
+test("mỗi góc nhìn chỉ có hai kiểu biểu đồ và loại bỏ lựa chọn cũ đã lưu", () => {
+  const time = reportScreen(state({ metric: "revenue", kinds: { "revenue:time": "line" } }));
+  assert.match(time, /data-report-kind="bar" aria-pressed="true"/);
+  assert.match(time, /data-report-kind="area"/);
+  assert.doesNotMatch(time, /data-report-kind="line"/);
+  const types = reportScreen(state({ metric: "expenses", perspective: { expenses: "other" }, kinds: { "expenses:other": "column" } }));
+  assert.match(types, /data-report-kind="horizontal" aria-pressed="true"/);
+  assert.match(types, /data-report-kind="pie"/);
+  assert.doesNotMatch(types, /data-report-kind="column"/);
+  assert.match(types, /Bảo trì: 2\.000\.000/);
+  assert.doesNotMatch(types, /Tiền phòng: 4\.900\.000/);
+  const profit = reportScreen(state({ metric: "profit", perspective: { profit: "other" }, kinds: { "profit:other": "step" } }));
+  assert.doesNotMatch(profit, /data-report-kind="step"/);
+});
+
 test("khối lỗi, tải, rỗng, có dữ liệu độc lập", () => {
   assert.match(statusBlock({ status: "error", error: Error("Lỗi server"), retry: "trend" }), /data-report-retry="trend"/);
   assert.match(statusBlock({ status: "loading" }), /aria-label="Đang tải"/);
@@ -79,6 +95,8 @@ test("đồ thị âm, bằng 0, một điểm, nhiều loại và profit bridge
   assert.match(timeChart([{ month: "2026-10", totalRevenue: 0 }], "revenue", "line"), /report-series-point/);
   assert.match(overviewChart(rows), /Đường vàng: lợi nhuận/);
   assert.match(typeChart(data.revenueByType, "revenue", "pie"), /100,0%/);
+  assert.match(typeChart(data.revenueByType, "revenue", "pie"), /<path class="report-pie-slice/);
+  assert.doesNotMatch(typeChart(data.revenueByType, "revenue", "pie"), /stroke-dasharray/);
   assert.match(profitBridgeChart({ ...data, profit: -100 }, "pie"), /chỉ dùng khi lợi nhuận không âm/);
   assert.match(profitBridgeChart(data, "step"), /report-bridge-step/);
 });
@@ -86,6 +104,9 @@ test("đồ thị âm, bằng 0, một điểm, nhiều loại và profit bridge
 test("bộ lọc tách năm, loại kỳ và quý; không chọn kỳ tương lai", () => {
   const markup = filterMarkup({ year: 2026, period: "quarter-2", today: "2026-10", view: "chart", buildingId: "", buildings: [] }, [2026, 2025]);
   assert.match(markup, /data-report-year/);
+  assert.match(markup, /class="report-year-grid"/);
+  assert.match(markup, /data-report-year-option="2025"/);
+  assert.doesNotMatch(markup, /input type="text" role="combobox"/);
   assert.match(markup, /data-report-mode/);
   assert.match(markup, /data-report-period/);
   assert.match(markup, /Quý 2/);
@@ -95,16 +116,17 @@ test("bộ lọc tách năm, loại kỳ và quý; không chọn kỳ tương la
   assert.equal(defaultPeriodForMode(2026, "year", "2026-10"), "year");
 });
 
-test("so sánh căn có thanh trực quan và số API nguyên giá trị", () => {
+test("so sánh căn có biểu đồ cột cùng tỷ lệ, cột lỗ và số API nguyên giá trị", () => {
   const names = new Map([["a", "Căn Hoa Sen"], ["b", "Căn Bình Minh"]]);
   const compared = [{ buildingId: "a", inComparison: true, revenue: 5000000, expenses: 2000000, profit: 3000000 }, { buildingId: "b", inComparison: true, revenue: 1000000, expenses: 1500000, profit: -500000 }];
   const chart = buildingComparisonChart(compared, names);
-  assert.match(chart, /report-compare-fill--revenue/);
-  assert.match(chart, /report-compare-fill--expenses/);
-  assert.match(chart, /report-compare-fill--loss/);
+  assert.match(chart, /report-compare-columns/);
+  assert.match(chart, /report-compare-column--revenue/);
+  assert.match(chart, /report-compare-column--expenses/);
+  assert.match(chart, /report-compare-column--loss/);
   assert.match(chart, /−500\.000 đ/);
-  assert.match(chart, /width:40%/);
-  assert.match(reportScreen(state({ view: "compare", data: { ...data, byBuilding: compared }, buildingNames: names })), /report-compare-chart/);
+  assert.match(chart, /height="48"/);
+  assert.match(reportScreen(state({ view: "compare", data: { ...data, byBuilding: compared }, buildingNames: names })), /report-compare-columns/);
   assert.doesNotMatch(buildingComparisonChart([{ ...compared[0], buildingId: '<script>' }], new Map()), /<script>/);
 });
 

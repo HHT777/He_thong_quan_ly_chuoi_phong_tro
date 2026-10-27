@@ -129,17 +129,16 @@
 }
 
 /* UI-2c report screen */
-.report-filter { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; }
-.report-filter > label { display: grid; gap: 6px; min-width: 0; color: var(--ui2-ink); font-size: 13px; font-weight: 700; }
+.report-filter { grid-template-columns: minmax(110px, .55fr) repeat(3, minmax(150px, 1fr)); gap: 10px; align-items: start; padding: 10px 12px; }
+.report-filter > label, .report-filter > .report-year { display: grid; gap: 4px; min-width: 0; color: var(--ui2-ink); font-size: 12px; font-weight: 700; }
 .report-filter > label[hidden] { display: none; }
-.report-filter input, .report-filter select { height: 44px; }
+.report-filter input, .report-filter select { height: 38px; }
 .report-year { position: relative; }
-.report-year > small { min-height: 0; color: var(--ui2-red); font-weight: 500; }
-.report-year > small:empty { display: none; }
-.report-year [role="listbox"] { position: absolute; z-index: 10; top: 72px; left: 0; right: 0; max-height: 220px; overflow-y: auto; padding: 4px; border: 1px solid var(--ui2-border); border-radius: 8px; background: #fff; box-shadow: var(--ui2-shadow); }
-.report-year [role="listbox"][hidden] { display: none; }
-.report-year [role="option"] { display: block; width: 100%; padding: 9px; border: 0; border-radius: 5px; background: #fff; color: var(--ui2-ink); text-align: left; }
-.report-year [role="option"]:hover, .report-year [role="option"].is-focused { background: #eaf0fb; }
+.report-year-trigger { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 38px; padding: 0 12px; border: 1px solid var(--ui2-border); border-radius: 8px; background: #fff; color: var(--ui2-ink); font: inherit; text-align: left; }
+.report-year-grid { position: absolute; z-index: 10; top: calc(100% + 5px); left: 0; width: max(100%, 210px); display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 9px; border: 1px solid var(--ui2-border); border-radius: 9px; background: #fff; box-shadow: var(--ui2-shadow); }
+.report-year-grid[hidden] { display: none; }
+.report-year-grid button { min-height: 36px; border: 1px solid transparent; border-radius: 6px; background: #f3f6fb; color: var(--ui2-ink); }
+.report-year-grid button:hover, .report-year-grid button[aria-pressed="true"] { background: var(--ui2-navy); color: #fff; }
 .report-view-toggle button:disabled { cursor: not-allowed; }
 .report-kpi--button { width: 100%; color: var(--ui2-ink); text-align: left; font: inherit; }
 .report-kpi--button:hover { border-color: var(--ui2-navy-active); }
@@ -193,16 +192,19 @@
 .report-type-track i { display: block; height: 100%; border-radius: 4px; background: var(--ui2-navy); }
 .report-type-bar strong, .report-type-bar small { text-align: right; }
 .report-pie-layout { display: flex; align-items: center; gap: 24px; }
-.report-pie { width: min(240px, 45%); flex: 0 0 auto; transform: rotate(-90deg); }
+.report-pie { width: min(240px, 45%); flex: 0 0 auto; }
+.report-pie-slice { stroke: none; }
+.report-pie-slice:hover, .report-pie-slice:focus-visible { filter: brightness(1.12); }
+.report-pie-slice:focus-visible { stroke: #fff; stroke-width: 2; outline: 2px solid var(--ui2-navy-active); outline-offset: 2px; }
 .report-pie-layout ul { display: grid; gap: 8px; padding-left: 0; list-style: none; font-size: 13px; }
 .report-pie-key { display: inline-block; width: 12px; height: 12px; margin-right: 7px; border-radius: 2px; }
-.report-pie-arc--0 { stroke: var(--ui2-navy); background: var(--ui2-navy); }
-.report-pie-arc--1 { stroke: #4c74d1; background: #4c74d1; }
-.report-pie-arc--2 { stroke: #3157ac; background: #3157ac; }
-.report-pie-arc--3 { stroke: #7892cb; background: #7892cb; }
-.report-pie-arc--4 { stroke: #203e85; background: #203e85; }
-.report-pie-arc--5 { stroke: #9baed3; background: #9baed3; }
-.report-pie-profit { stroke: var(--chart-profit-line); }
+.report-pie-arc--0 { fill: var(--ui2-navy); background: var(--ui2-navy); }
+.report-pie-arc--1 { fill: #4c74d1; background: #4c74d1; }
+.report-pie-arc--2 { fill: #3157ac; background: #3157ac; }
+.report-pie-arc--3 { fill: #7892cb; background: #7892cb; }
+.report-pie-arc--4 { fill: #203e85; background: #203e85; }
+.report-pie-arc--5 { fill: #9baed3; background: #9baed3; }
+.report-pie-profit { fill: var(--chart-profit-line); }
 .report-chain-total { margin: 0 0 14px; padding: 14px; border: 1px solid var(--ui2-border); border-radius: 9px; background: #fff; font-weight: 700; }
 .report-compare-chart { display: grid; gap: 12px; margin-bottom: 18px; }
 .report-compare-row { display: grid; grid-template-columns: minmax(115px, 175px) minmax(180px, 1fr) minmax(90px, 130px); align-items: center; gap: 14px; padding: 8px 10px; border-radius: 8px; }
@@ -215,6 +217,13 @@
 .report-compare-fill--expenses { background: #4c74d1; }
 .report-compare-fill--profit { background: var(--chart-profit-line); }
 .report-compare-fill--loss { background: var(--ui2-red); }
+.report-compare-columns { display: block; width: min(100%, 920px); min-width: 640px; height: auto; margin-inline: auto; font: 12px var(--font-sans); fill: var(--ui2-ink); }
+.report-compare-column--revenue { fill: var(--ui2-navy); }
+.report-compare-column--expenses { fill: #4c74d1; }
+.report-compare-column--profit { fill: var(--chart-profit-fill); stroke: var(--chart-profit-line); stroke-width: 1; }
+.report-compare-column--loss { fill: var(--ui2-red); }
+.report-compare-axis-label { font-size: 11px; }
+.report-legend-symbol--loss { background: var(--ui2-red); }
 .report-compare-amount { text-align: right; white-space: nowrap; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .report-page button:focus-visible, .report-page select:focus-visible, .report-page input:focus-visible { outline: 2px solid var(--ui2-navy-active); outline-offset: 2px; }
 @media (max-width: 1279px) { .report-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

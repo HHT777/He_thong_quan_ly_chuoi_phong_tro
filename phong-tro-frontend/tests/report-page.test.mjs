@@ -8,6 +8,7 @@ const data = {
   totalRevenue: 3_000_000, grossRevenue: 3_100_000, discounts: 100_000, depositDeductions: 200_000,
   totalExpenses: 1_300_000, profit: 1_700_000,
   revenueByType: [{ type: "TIEN_DIEN", amount: 700_000 }, { type: "TIEN_PHONG", amount: 2_300_000 }],
+  expensesByType: [{ type: "BAO_TRI", amount: 1_300_000 }],
   byBuilding: [
     { buildingId: "a", inComparison: true, revenue: 2_500_000, expenses: 700_000, profit: 1_800_000 },
     { buildingId: "b", inComparison: false, revenue: 500_000, expenses: 0, profit: 500_000 },

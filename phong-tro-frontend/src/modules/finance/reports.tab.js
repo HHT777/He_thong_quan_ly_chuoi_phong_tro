@@ -26,7 +26,7 @@ async function render(context) {
   state.period = validPeriod(state.year, state.period, today);
   for (const metric of ["revenue", "expenses", "profit"]) {
     state.perspective[metric] = recalled(`perspective:${metric}`, ["time", "other"], "time");
-    for (const perspective of ["time", "other"]) state.kinds[`${metric}:${perspective}`] = recalled(`kind:${metric}:${perspective}`, perspective === "time" ? ["bar", "line", "area"] : metric === "profit" ? ["bar", "step", "pie"] : ["horizontal", "pie", "column"], perspective === "time" ? "bar" : metric === "profit" ? "bar" : "horizontal");
+    for (const perspective of ["time", "other"]) state.kinds[`${metric}:${perspective}`] = recalled(`kind:${metric}:${perspective}`, perspective === "time" ? ["bar", "area"] : metric === "profit" ? ["bar", "pie"] : ["horizontal", "pie"], perspective === "time" ? "bar" : metric === "profit" ? "bar" : "horizontal");
   }
   context.main.innerHTML = shellPage("", "");
   const page = context.main.querySelector(".module-page");
@@ -56,7 +56,6 @@ async function render(context) {
   const exportButton = heading.querySelector("[data-export-report]");
   let requestVersion = 0;
   let delay;
-  let yearCursor = -1;
   const selection = () => ({ year: state.year, period: state.period, buildingId: state.view === "compare" ? "" : state.buildingId });
   const paint = () => { screenSlot.innerHTML = reportScreen(state); };
   const filterPaint = () => { filterSlot.innerHTML = filterMarkup(state, years); };
@@ -111,61 +110,30 @@ async function render(context) {
   }, { signal });
   const yearInput = () => filterSlot.querySelector("[data-report-year]");
   const yearList = () => filterSlot.querySelector("[data-report-years]");
-  const yearError = () => filterSlot.querySelector("[data-report-year-error]");
-  const showYears = (text) => {
-    const list = yearList();
-    const matches = years.filter((year) => String(year).includes(text));
-    list.hidden = false; yearInput().setAttribute("aria-expanded", "true");
-    const options = matches.map((year) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.setAttribute("role", "option");
-      button.setAttribute("aria-selected", String(year === state.year));
-      button.dataset.reportYearOption = String(year);
-      button.textContent = String(year);
-      return button;
-    });
-    if (!options.length) {
-      const empty = document.createElement("span");
-      empty.setAttribute("role", "status");
-      empty.textContent = "Không có năm này";
-      options.push(empty);
-    }
-    list.replaceChildren(...options);
-    yearError().textContent = matches.length ? "" : "Không có năm này";
-    yearCursor = -1;
+  const toggleYears = (open) => {
+    yearList().hidden = !open;
+    yearInput().setAttribute("aria-expanded", String(open));
+    if (open) yearList().querySelector('[aria-pressed="true"]')?.focus();
   };
   const pickYear = (year) => {
     if (!years.includes(year)) return;
     state.year = year; state.period = validPeriod(year, state.period, today);
     filterPaint(); schedule();
   };
-  filterSlot.addEventListener("input", (event) => {
-    if (!event.target.matches("[data-report-year]")) return;
-    event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
-    showYears(event.target.value);
-  }, { signal });
   filterSlot.addEventListener("keydown", (event) => {
-    if (!event.target.matches("[data-report-year]")) return;
-    if (event.key === "Escape") { filterPaint(); return; }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      if (yearList().hidden) showYears(event.target.value);
-      const current = [...yearList().querySelectorAll("[data-report-year-option]")];
-      if (!current.length) return;
-      yearCursor = event.key === "ArrowDown" ? (yearCursor + 1) % current.length : (yearCursor <= 0 ? current.length - 1 : yearCursor - 1);
-      current.forEach((button) => button.classList.remove("is-focused")); current[yearCursor]?.classList.add("is-focused");
-    }
-    if (event.key === "Enter") { event.preventDefault(); pickYear(Number(yearList().querySelector(".is-focused")?.dataset.reportYearOption || event.target.value)); }
+    if (event.key === "Escape" && !yearList().hidden) { toggleYears(false); yearInput().focus(); }
   }, { signal });
   filterSlot.addEventListener("click", (event) => {
     const button = event.target.closest("[data-report-year-option]");
     if (button) pickYear(Number(button.dataset.reportYearOption));
-    else if (event.target.matches("[data-report-year]")) showYears(event.target.value);
+    else if (event.target.closest("[data-report-year]")) toggleYears(yearList().hidden);
   }, { signal });
   filterSlot.addEventListener("focusout", (event) => {
-    if (!event.target.matches("[data-report-year]")) return;
-    setTimeout(() => { if (signal.aborted) return; const typed = Number(yearInput()?.value); if (!years.includes(typed)) filterPaint(); else if (typed !== state.year) pickYear(typed); else { yearList().hidden = true; yearInput().setAttribute("aria-expanded", "false"); } }, 120);
+    if (!event.target.closest(".report-year")) return;
+    if (!event.relatedTarget || !filterSlot.querySelector(".report-year")?.contains(event.relatedTarget)) toggleYears(false);
+  }, { signal });
+  document.addEventListener("pointerdown", (event) => {
+    if (!filterSlot.querySelector(".report-year")?.contains(event.target) && !yearList().hidden) toggleYears(false);
   }, { signal });
   content.addEventListener("click", (event) => {
     const retry = event.target.closest("[data-report-retry]");

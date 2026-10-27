@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { areaPath, groupBars, groupTypes, linePath, linePoints, moneyScale, niceStep, pieArcLengths, stepPath } from "../src/modules/finance/report.geometry.mjs";
+import { areaPath, donutSlicePath, groupBars, groupTypes, linePath, linePoints, moneyScale, niceStep, pieArcLengths, stepPath } from "../src/modules/finance/report.geometry.mjs";
 
 test("thang tiền có âm, có đường không và tick dễ đọc", () => {
   const scale = moneyScale([-4_000_000, 0, 12_000_000]);
@@ -36,4 +36,12 @@ test("cung tròn luôn cộng đúng chu vi và hơn sáu loại gom vào Khác"
   assert.equal(grouped.length, 6);
   assert.equal(grouped.at(-1).type, "OTHER");
   assert.equal(grouped.at(-1).amount, 6);
+});
+
+test("lát donut dùng đường bao khép kín, không chồng nét đứt ở điểm nối", () => {
+  assert.equal(donutSlicePath(0, 0), "");
+  assert.match(donutSlicePath(0, 0.858), / A85,85 0 1 1 /);
+  assert.match(donutSlicePath(0.858, 1), / A85,85 0 0 1 /);
+  assert.equal((donutSlicePath(0, 1).match(/ A85,85 /g) || []).length, 2);
+  assert.ok(donutSlicePath(0, 1).endsWith(" Z"));
 });

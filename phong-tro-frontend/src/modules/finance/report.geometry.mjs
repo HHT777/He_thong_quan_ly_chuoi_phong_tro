@@ -59,6 +59,21 @@ export function pieArcLengths(values, radius = 68) {
   });
 }
 
+export function donutSlicePath(startFraction, endFraction, outerRadius = 85, innerRadius = 51) {
+  const start = Math.max(0, Math.min(1, Number(startFraction)));
+  const end = Math.max(start, Math.min(1, Number(endFraction)));
+  if (end === start) return "";
+  const point = (radius, fraction) => {
+    const angle = fraction * Math.PI * 2 - Math.PI / 2;
+    return `${100 + radius * Math.cos(angle)},${100 + radius * Math.sin(angle)}`;
+  };
+  const section = (from, to) => {
+    const large = to - from > 0.5 ? 1 : 0;
+    return `M${point(outerRadius, from)} A${outerRadius},${outerRadius} 0 ${large} 1 ${point(outerRadius, to)} L${point(innerRadius, to)} A${innerRadius},${innerRadius} 0 ${large} 0 ${point(innerRadius, from)} Z`;
+  };
+  return end - start >= 1 ? `${section(0, 0.5)} ${section(0.5, 1)}` : section(start, end);
+}
+
 export function groupTypes(rows, limit = 6) {
   const sorted = [...rows].sort((a, b) => finite(b.amount) - finite(a.amount));
   if (sorted.length <= limit) return sorted;

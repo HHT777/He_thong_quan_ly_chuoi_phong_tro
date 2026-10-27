@@ -34,7 +34,7 @@ export function reportMoney(value) {
 export function readCashflow(response) {
   const data = response?.data;
   const moneyFields = ["totalRevenue", "grossRevenue", "discounts", "depositDeductions", "totalExpenses", "profit"];
-  const rowFields = ["revenueByType", "byBuilding", "receiptDetails"];
+  const rowFields = ["revenueByType", "expensesByType", "byBuilding", "receiptDetails"];
   if (!data || moneyFields.some((key) => typeof data[key] !== "number" || !Number.isFinite(data[key]))
       || rowFields.some((key) => !Array.isArray(data[key]))) {
     throw new TypeError("Dữ liệu báo cáo trả về không hợp lệ.");
