@@ -1,29 +1,96 @@
 import { listTab } from "../../shared/components/tab-factory.js";
-import { date, money } from "../../shared/components/view.js";
+import { date, escapeHtml, money } from "../../shared/components/view.js";
+import { buildCompletionPayload, buildCreateIncidentPayload, loadIncidentFormData, mountIncidentSelectors, showTenantResponsibility, tenantSelectionForResponsibility } from "./incident-form.mjs";
+import "./incidents-form.css";
+
+async function setupSelectors({ context, form, overlay, incidentRoomId = "", responsible = () => false }) {
+  const status = document.createElement("p");
+  status.className = "incident-form-status";
+  status.setAttribute("role", "status");
+  form.prepend(status);
+  const submit = form.querySelector('button[type="submit"]');
+  submit.disabled = true;
+  const load = async () => {
+    status.textContent = "Đang tải căn, phòng và người thuê…";
+    status.classList.remove("is-error");
+    try {
+      const data = await loadIncidentFormData(context.api);
+      status.remove();
+      const typeInput = form.querySelector('[name="type"]');
+      const typeField = typeInput?.closest(".modal-field");
+      if (typeField && data.categories.length) {
+        typeField.innerHTML = `<span>Loại sự cố</span><select class="form-control" name="type" required>${data.categories.map((category) => `<option value="${escapeHtml(category.ma)}">${escapeHtml(category.ten)}</option>`).join("")}</select>`;
+      }
+      const selectors = mountIncidentSelectors({
+        form, data, incidentRoomId, tenantFieldName: overlay.querySelector('[name="responsibleTenantId"]') ? "responsibleTenantId" : "tenantId",
+        responsibleTenant: Boolean(overlay.querySelector('[name="responsibleTenantId"]')),
+        isTenantRequired: responsible,
+      });
+      if (incidentRoomId) {
+        for (const name of ["buildingId", "roomId"]) {
+          const input = form.querySelector(`[data-selector="${name}"] [role="combobox"]`);
+          input.disabled = true;
+          input.setAttribute("aria-readonly", "true");
+        }
+      }
+      submit.disabled = false;
+      return selectors;
+    } catch {
+      status.classList.add("is-error");
+      status.textContent = "Không tải được danh sách. Kiểm tra kết nối rồi thử lại.";
+      const retry = document.createElement("button");
+      retry.type = "button"; retry.className = "btn btn--secondary"; retry.textContent = "Thử lại";
+      retry.addEventListener("click", async () => { retry.disabled = true; await load(); });
+      status.append(" ", retry);
+      return null;
+    }
+  };
+  return load();
+}
+
 export default listTab({ id: "incidents", route: "/operations/incidents", title: "Sự cố", tabLabel: "Sự cố", group: "incidents", order: 51, roles: ["CHU_TRO"] }, {
   title: "Sự cố",
-  description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố.",
+  description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố. Chỉ xóa được báo cáo chưa tiếp nhận.",
   endpoint: "/v1/incidents",
+  create: {
+    label: "Tạo sự cố",
+    fields: [
+      { name: "buildingId", label: "Căn", required: true },
+      { name: "roomId", label: "Phòng", required: true },
+      { name: "tenantId", label: "Khách đang ở" },
+      { name: "type", label: "Loại sự cố", required: true },
+      { name: "priority", label: "Mức độ ưu tiên", required: true, value: "TRUNG_BINH", options: [
+        { value: "TRUNG_BINH", label: "Trung bình" }, { value: "THAP", label: "Thấp" },
+        { value: "CAO", label: "Cao" }, { value: "KHAN_CAP", label: "Khẩn cấp" },
+      ] },
+      { name: "description", label: "Mô tả", type: "textarea", required: true },
+    ],
+    map: buildCreateIncidentPayload,
+    onOpen: ({ context, form, overlay }) => setupSelectors({ context, form, overlay }),
+  },
+  beforeLoad: async (api) => {
+    try {
+      const rooms = [];
+      for (let page = 1; ; page += 1) {
+        const response = await api.get(`/phong?limit=100&page=${page}`);
+        rooms.push(...(Array.isArray(response.data) ? response.data : []));
+        if (!response.pagination?.hasNext) break;
+      }
+      return new Map(rooms.map((room) => [room.ma_phong, room]));
+    } catch {
+      return new Map();
+    }
+  },
+  transform: (rows, _buildingScope, roomsById) => (Array.isArray(rows) ? rows : []).map((row) => {
+    const room = roomsById?.get(row.ma_phong);
+    return room ? { ...row, phongTro: { ...room, canTro: room.canTro || null } } : row;
+  }),
   statusOptions: [
     { value: "CHO_TIEP_NHAN", label: "Chờ tiếp nhận" },
     { value: "DANG_XU_LY", label: "Đang xử lý" },
     { value: "DA_XU_LY", label: "Đã xử lý" },
   ],
-  create: {
-    label: "Tạo sự cố",
-    fields: [
-      { name: "roomId", label: "Mã phòng", required: true },
-      { name: "type", label: "Loại sự cố", required: true },
-      { name: "priority", label: "Mức độ ưu tiên", required: true, options: [
-        { value: "TRUNG_BINH", label: "Trung bình" }, { value: "THAP", label: "Thấp" },
-        { value: "CAO", label: "Cao" }, { value: "KHAN_CAP", label: "Khẩn cấp" },
-      ] },
-      { name: "description", label: "Mô tả", type: "textarea", required: true },
-      { name: "previousIncidentId", label: "Sự cố trước (mã, nếu có)" },
-    ],
-    map: (raw) => ({ ...raw, previousIncidentId: raw.previousIncidentId || undefined }),
-  },
-  columns: [{ label: "Phòng", format: (row) => row.phongTro?.so_phong || row.ma_phong }, { label: "Nội dung", key: "mo_ta" }, { label: "Ưu tiên", key: "muc_do_uu_tien" }, { label: "Trạng thái", key: "trang_thai" }, { label: "Chi phí", format: (row) => money(row.chi_phi_sua_chua) }, { label: "Ngày gửi", format: (row) => date(row.ngay_gui) }],
+  columns: [{ label: "Phòng", format: (row) => row.phongTro?.so_phong ? `Phòng ${row.phongTro.so_phong}` : "Không rõ phòng" }, { label: "Căn", format: (row) => row.phongTro?.canTro?.ten_can || "—" }, { label: "Nội dung", key: "mo_ta" }, { label: "Ưu tiên", key: "muc_do_uu_tien" }, { label: "Trạng thái", key: "trang_thai" }, { label: "Chi phí", format: (row) => money(row.chi_phi_sua_chua) }, { label: "Ngày gửi", format: (row) => date(row.ngay_gui) }],
   rowActions: [
     {
       id: "accept",

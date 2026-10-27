@@ -87,7 +87,7 @@ function fieldControl(field, value = "") {
   return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>`;
 }
 
-export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit }) {
+export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit, onOpen }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
@@ -154,16 +154,18 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
   });
 
   document.body.appendChild(overlay);
+  onOpen?.({ overlay, form });
 }
 
 // Modal helper for create forms
-function openCreateModal(config, onCreated, buildingScope) {
+function openCreateModal(config, onCreated, buildingScope, context) {
   return openFormModal({
     title: config.create.label || "Thêm mới",
     fields: typeof config.create.fields === "function" ? config.create.fields(buildingScope) : config.create.fields,
     initial: typeof config.create.initial === "function" ? config.create.initial() : config.create.initial || {},
     submitLabel: config.create.label || "Thêm mới",
     submit: (raw) => onCreated(config.create.map ? config.create.map(raw) : raw),
+    onOpen: config.create.onOpen ? ({ overlay, form }) => config.create.onOpen({ context, overlay, form }) : undefined,
   });
 }
 
@@ -248,10 +250,10 @@ function renderCardGrid(container, rows) {
       ${rows
         .map(
           (room, index) => `
-        <article class="grid-card-item" role="button" tabindex="0" data-room-index="${escapeHtml(index)}" aria-label="Xem chi tiết phòng ${escapeHtml(room.so_phong || room.ma_phong)}">
+        <article class="grid-card-item" role="button" tabindex="0" data-room-index="${escapeHtml(index)}" aria-label="Xem chi tiết phòng ${escapeHtml(room.so_phong || "không rõ số")}">
           <div class="grid-card-header">
             <div>
-              <h4 class="grid-card-title">Phòng ${escapeHtml(room.so_phong || room.ma_phong || "—")}</h4>
+              <h4 class="grid-card-title">Phòng ${escapeHtml(room.so_phong || "không rõ số")}</h4>
               <div class="grid-card-building">${escapeHtml(room.canTro?.ten_can || "Căn trọ")}</div>
             </div>
             <div>${formatStatusBadge(room.trang_thai)}</div>
@@ -349,10 +351,11 @@ export async function renderList(context, config) {
   }
 
   try {
+    const preloaded = config.beforeLoad ? await config.beforeLoad(context.api) : undefined;
     const response = await context.api.get(config.endpoint);
     const buildingScope = config.buildingScope ? await config.buildingScope(context.api, config.buildingScopeOptions) : null;
     buildingScope?.mount(actions, () => renderList(context, config));
-    let data = config.transform ? config.transform(response.data, buildingScope) : response.data;
+    let data = config.transform ? config.transform(response.data, buildingScope, preloaded) : response.data;
     if (config.loadAllPages && response.pagination?.hasNext) {
       data = [...(data || [])];
       for (let page = 2; ; page += 1) {
@@ -686,7 +689,7 @@ export async function renderList(context, config) {
           await context.api.post(config.create.endpoint || config.endpoint, body, headers);
           config.create.onCreated?.(body);
           await renderList(context, config);
-        }, buildingScope);
+        }, buildingScope, context);
       });
     };
 
