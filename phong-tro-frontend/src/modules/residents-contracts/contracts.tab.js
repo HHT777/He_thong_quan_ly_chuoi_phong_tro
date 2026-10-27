@@ -15,8 +15,8 @@ const safeHistory = (item) => {
   const afterEnvelope = parse(row.sau_json);
   const after = parse(afterEnvelope.contract || afterEnvelope);
   const type = item.type === "CHANGE" ? ({ CREATE: "Tạo hợp đồng", UPDATE: "Sửa hợp đồng", LIQUIDATE: "Thanh lý" }[afterEnvelope.action] || "Sửa hợp đồng") : ({ RENEWAL: "Gia hạn", ROOM_TRANSFER: "Chuyển phòng" }[item.type] || "Lịch sử");
-  const keys = ["ngay_bat_dau", "ngay_ket_thuc", "gia_thue", "ma_phong", "trang_thai", "don_gia_dien", "don_gia_nuoc"];
-  const detail = item.type === "CHANGE" ? keys.filter((key) => before[key] !== after[key] && (before[key] != null || after[key] != null)).map((key) => `${key}: ${before[key] ?? "—"} → ${after[key] ?? "—"}`).join(" · ") : item.type === "RENEWAL" ? `${row.ngay_ket_thuc_cu} → ${row.ngay_ket_thuc_moi} (${row.so_thang} tháng)` : `${row.ma_phong_cu} → ${row.ma_phong_moi} (${row.ngay_chuyen})`;
+  const keys = ["ngay_bat_dau", "ngay_ket_thuc", "gia_thue", "trang_thai", "don_gia_dien", "don_gia_nuoc"];
+  const detail = item.type === "CHANGE" ? keys.filter((key) => before[key] !== after[key] && (before[key] != null || after[key] != null)).map((key) => `${key}: ${before[key] ?? "—"} → ${after[key] ?? "—"}`).join(" · ") : item.type === "RENEWAL" ? `${row.ngay_ket_thuc_cu} → ${row.ngay_ket_thuc_moi} (${row.so_thang} tháng)` : `Phòng cũ → phòng mới (${row.ngay_chuyen})`;
   return { type, date: date(item.occurredAt), detail };
 };
 const numericContractValues = (raw) => ({
@@ -69,7 +69,7 @@ async function openContractDetail(context, row) {
       if (!overlay.isConnected) return;
       detail.innerHTML = `<dl class="contract-detail-grid">
         <div><dt>Khách thuê</dt><dd>${escapeHtml(contract.khachThue?.ho_ten)}</dd></div>
-        <div><dt>Phòng</dt><dd>${escapeHtml(contract.phongTro?.so_phong || contract.ma_phong)}</dd></div>
+        <div><dt>Phòng</dt><dd>${escapeHtml(contract.phongTro?.so_phong ? `Phòng ${contract.phongTro.so_phong}` : "Không rõ phòng")}</dd></div>
         <div><dt>Giá thuê hợp đồng</dt><dd>${escapeHtml(money(contract.gia_thue))}</dd></div>
         <div><dt>Trạng thái</dt><dd>${escapeHtml(statusLabel(contract.trang_thai))}</dd></div>
         <div><dt>Ngày bắt đầu</dt><dd>${escapeHtml(date(contract.ngay_bat_dau))}</dd></div>

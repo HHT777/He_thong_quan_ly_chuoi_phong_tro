@@ -1,6 +1,7 @@
 import { shellPage, escapeHtml, money, date, confirmAction } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
+import { loadAllPages } from "./incident-form.mjs";
 import "./move-outs.css";
 
 const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "move-outs", order: 52, roles: ["CHU_TRO"] };
@@ -52,7 +53,7 @@ function resultMarkup(result) {
   const lines = result.snapshot?.lines || [];
   return `<section class="panel settlement-result" data-settlement-result>
     <header><span class="settlement-eyebrow">HOÀN TẤT</span><h2>Biên bản quyết toán</h2></header>
-    <p>Mã biên bản: <strong>${escapeHtml(report.ma_bien_ban)}</strong></p>
+    <p>Biên bản đã được tạo.</p>
     <p>Tổng khấu trừ: <strong>${money(result.totalDeduction)}</strong> · Cọc được hoàn: <strong>${money(result.refund)}</strong> · Nợ sau thanh lý: <strong>${money(result.postDebt)}</strong></p>
     <div class="table-wrap"><table><thead><tr><th>Khoản</th><th>Lý do</th><th>Số tiền</th></tr></thead><tbody>${lines.map((line) => `<tr><td>${escapeHtml(line.type)}</td><td>${escapeHtml(line.reason)}</td><td>${money(line.amount)}</td></tr>`).join("")}</tbody></table></div>
     <form class="form-grid" data-refund-form data-report-id="${escapeHtml(report.ma_bien_ban)}">
@@ -68,10 +69,14 @@ async function render(context) {
   context.main.innerHTML = shellPage("Trả phòng & thanh lý", "Chọn yêu cầu đã duyệt, kiểm tra context rồi quyết toán và hoàn cọc từng phần.");
   const content = context.main.querySelector("[data-content]");
   try {
-    const response = await context.api.get("/v1/move-outs");
+    const [response, contracts] = await Promise.all([
+      context.api.get("/v1/move-outs"),
+      loadAllPages(context.api, "/hop-dong").catch(() => []),
+    ]);
+    const contractsById = new Map(contracts.map((contract) => [String(contract.ma_hop_dong), contract]));
     const rows = (response.data || []).filter((row) => row.trang_thai === "DA_PHE_DUYET" && row.ma_hop_dong);
     if (!rows.length) { content.innerHTML = '<div class="empty-state moveout-empty"><h3>Không có yêu cầu trả phòng đã duyệt</h3><p>Các yêu cầu đã được duyệt sẽ xuất hiện tại đây để tiếp tục kiểm tra và quyết toán.</p></div>'; return; }
-    content.innerHTML = `<section class="moveout-requests panel"><header><div><span class="settlement-eyebrow">CẦN XỬ LÝ</span><h2>Yêu cầu trả phòng đã duyệt</h2></div><span class="moveout-count">${rows.length} yêu cầu</span></header><div class="moveout-request-list">${rows.map((row, index) => `<article class="moveout-request"><div class="moveout-request__contract"><span>Hợp đồng</span><strong title="${escapeHtml(row.ma_hop_dong)}">${escapeHtml(row.ma_hop_dong.slice(0, 8))}…</strong></div><div><span>Nội dung</span><strong>${escapeHtml(row.noi_dung || "Đề nghị trả phòng")}</strong></div><div><span>Ngày gửi</span><strong>${escapeHtml(date(row.ngay_gui))}</strong></div><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></article>`).join("")}</div></section><div class="moveout-workspace" data-workspace></div>`;
+    content.innerHTML = `<section class="moveout-requests panel"><header><div><span class="settlement-eyebrow">CẦN XỬ LÝ</span><h2>Yêu cầu trả phòng đã duyệt</h2></div><span class="moveout-count">${rows.length} yêu cầu</span></header><div class="moveout-request-list">${rows.map((row, index) => { const contract = contractsById.get(String(row.ma_hop_dong)); const room = contract?.phongTro?.so_phong ? `Phòng ${contract.phongTro.so_phong}` : "Không rõ phòng"; const tenant = contract?.khachThue?.ho_ten || "Khách thuê"; return `<article class="moveout-request"><div class="moveout-request__contract"><span>${escapeHtml(room)}</span><strong>${escapeHtml(tenant)}</strong></div><div><span>Nội dung</span><strong>${escapeHtml(row.noi_dung || "Đề nghị trả phòng")}</strong></div><div><span>Ngày gửi</span><strong>${escapeHtml(date(row.ngay_gui))}</strong></div><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></article>`; }).join("")}</div></section><div class="moveout-workspace" data-workspace></div>`;
     const workspace = content.querySelector("[data-workspace]");
     content.querySelectorAll("[data-open-context]").forEach((button) => button.addEventListener("click", async () => {
       button.disabled = true; workspace.innerHTML = '<div class="panel moveout-loading" role="status">Đang tải dữ liệu quyết toán…</div>';

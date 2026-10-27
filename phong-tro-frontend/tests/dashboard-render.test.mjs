@@ -69,7 +69,8 @@ test("FR-132 dashboard links incidents and every task to its processing screen",
   for (const route of ["/finance/debts", "/residents-contracts/reservations", "/operations/incidents?status=CHO_TIEP_NHAN", "/residents-contracts/requests", "/operations/meter-readings", "/residents-contracts/contracts", "/properties/rooms?status=TRONG"]) {
     assert.ok(ui.body("tasks").includes(`href="#${route}"`), `Missing task destination ${route}`);
   }
-  assert.ok(ui.body("incidents").includes('href="#/operations/incidents?search=1"'));
+  assert.match(ui.body("incidents"), /href="#\/operations\/incidents\?search=/);
+  assert.doesNotMatch(ui.body("incidents"), /search=1(?:"|&)/, "incident UUID must not be exposed in the URL");
   assert.ok(ui.body("incidents").includes('href="#/operations/incidents?status=DANG_XU_LY"'));
   assert.equal(ui.calls.length, 3);
 });

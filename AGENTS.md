@@ -155,3 +155,11 @@ Giai đoạn 0, B (lịch sử hợp đồng 010, chuyển phòng 011), C (rút 
 - Làm theo từng giai đoạn, DỪNG đúng điểm đã hẹn, báo cáo bằng bảng: FR | File | Mô tả | Test | Trạng thái, kèm mốc test trước/sau, hash commit, lỗi thật phát hiện, mục còn thiếu, câu hỏi cần quyết định.
 - Nếu một chỉ thị của người dùng mâu thuẫn với SRS, làm theo SRS và nêu lệch (từng có trường hợp chỉ thị sai về giữ phòng quá hạn). Thà dừng hỏi còn hơn tự suy đoán số liệu tiền.
 - Có thể dùng lại skill/kinh nghiệm: sai lầm đã gặp gồm CHECK dùng `CASE` (MySQL 8 lỗi), `include` trùng thuộc tính trong một object Sequelize (bị ghi đè), `GET_LOCK` gắn kết nối, clone sạch thiếu `.env`.
+
+## Cập nhật biểu mẫu sự cố (27/10/2026)
+
+- Nhánh làm việc `sua-su-co-form`, tạo từ `ui-2c-bao-cao`; giữ nguyên checkpoint UI-2c-1 và không rebase/merge/push. Phạm vi chỉ frontend và tài liệu, không đổi API/schema/backend.
+- Biểu mẫu tạo sự cố chọn Căn → Phòng → Người đang ở; hỗ trợ người đứng tên và người ở cùng ghép được với hồ sơ khách. Hoàn tất yêu cầu nhập khách/căn cứ khi khách chịu; nếu Chủ trọ chịu thì xóa chọn khách khỏi form và payload. Quy tắc tài chính theo SRS: chờ khấu trừ cọc khi trả phòng.
+- Bằng chứng nghiệp vụ, mâu thuẫn tài liệu cũ, API hiện có/thiếu và giới hạn ghép người ở cùng được ghi trong `docs/INCIDENT_FORM.md`.
+- Test frontend trước sửa: 53 đạt, 1 bỏ qua live DB. Kết quả cuối cần là `node --test --test-concurrency=1 tests/*.test.mjs`; không build frontend, không truy cập DB `phong_tro*`/MariaDB 3306, không push. Người dùng tự build và xem UI.
+- Giữ nguyên các file untracked chủ ý và CSS nháp `phong-tro-frontend/src/shared/styles/management.css`; khi commit chỉ stage hunk/file thuộc phạm vi sự cố hoặc UUID audit.

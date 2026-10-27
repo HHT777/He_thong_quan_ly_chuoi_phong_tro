@@ -9,7 +9,7 @@ async function openRoomDetails(context, summary) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `<div class="modal-dialog room-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="room-detail-title">
-    <div class="modal-header"><h3 class="modal-title" id="room-detail-title">Phòng ${escapeHtml(summary.so_phong || summary.ma_phong)}</h3>
+    <div class="modal-header"><h3 class="modal-title" id="room-detail-title">Phòng ${escapeHtml(summary.so_phong || "không rõ số")}</h3>
       <button type="button" class="modal-close-btn" data-modal-close aria-label="Đóng chi tiết phòng">×</button></div>
     <div class="modal-body" data-room-detail>Đang tải thông tin phòng...</div>
   </div>`;
@@ -37,7 +37,6 @@ async function openRoomDetails(context, summary) {
       <div><dt>Căn trọ</dt><dd>${escapeHtml(room.canTro?.ten_can)}</dd></div>
       <div><dt>Trạng thái</dt><dd>${formatStatusBadge(room.trang_thai)}</dd></div>
       <div><dt>Địa chỉ căn</dt><dd>${escapeHtml(room.canTro?.dia_chi)}</dd></div>
-      <div><dt>Mã phòng</dt><dd>${escapeHtml(room.ma_phong)}</dd></div>
       <div><dt>Giá thuê mỗi tháng</dt><dd>${escapeHtml(money(room.gia_thue))}</dd></div>
       <div><dt>Diện tích</dt><dd>${escapeHtml(room.dien_tich)} m²</dd></div>
       <div><dt>Số người tối đa</dt><dd>${escapeHtml(room.so_nguoi_toi_da)} người</dd></div>

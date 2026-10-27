@@ -3,7 +3,7 @@ export default listTab({ id: "assets", route: "/properties/assets", title: "Nộ
   title: "Nội thất & tài sản",
   description: "Theo dõi và cập nhật tài sản gắn với từng phòng.",
   endpoint: "/v1/assets",
-  columns: [{ label: "Tài sản", key: "ten_tai_san" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong || row.ma_phong }, { label: "Số lượng", key: "so_luong" }, { label: "Tình trạng", key: "tinh_trang" }, { label: "Ghi chú", key: "ghi_chu" }],
+  columns: [{ label: "Tài sản", key: "ten_tai_san" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong ? `Phòng ${row.phongTro.so_phong}` : "Không rõ phòng" }, { label: "Số lượng", key: "so_luong" }, { label: "Tình trạng", key: "tinh_trang" }, { label: "Ghi chú", key: "ghi_chu" }],
   create: { label: "Thêm tài sản", fields: [{ name: "name", label: "Tên tài sản", required: true }, { name: "roomId", label: "Mã phòng", required: true }, { name: "quantity", label: "Số lượng", type: "number", required: true }, { name: "condition", label: "Tình trạng" }, { name: "note", label: "Ghi chú" }], map: (raw) => ({ ...raw, quantity: Number(raw.quantity) }) },
   rowActions: [
     {
