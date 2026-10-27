@@ -206,6 +206,11 @@
 .report-pie-arc--5 { fill: #9baed3; background: #9baed3; }
 .report-pie-profit { fill: var(--chart-profit-line); }
 .report-chain-total { margin: 0 0 14px; padding: 14px; border: 1px solid var(--ui2-border); border-radius: 9px; background: #fff; font-weight: 700; }
+.report-compare-chips { display: flex; gap: 8px; overflow-x: auto; padding: 3px 0 8px; }
+.report-compare-chip { flex: 0 0 auto; padding: 7px 12px; border: 1px solid var(--ui2-border); border-radius: 999px; background: #fff; color: var(--ui2-navy); font-size: 13px; cursor: pointer; }
+.report-compare-chip.is-active { border-color: var(--ui2-navy-active); background: var(--ui2-canvas); }
+.report-compare-chip:disabled { cursor: default; opacity: .65; }
+.report-compare-summary { margin: 8px 0 16px; font-size: 13px; color: var(--ui2-ink); }
 .report-compare-chart { display: grid; gap: 12px; margin-bottom: 18px; }
 .report-compare-row { display: grid; grid-template-columns: minmax(115px, 175px) minmax(180px, 1fr) minmax(90px, 130px); align-items: center; gap: 14px; padding: 8px 10px; border-radius: 8px; }
 .report-compare-row:hover, .report-compare-row:focus-visible { background: #f3f7ff; }

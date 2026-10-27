@@ -104,9 +104,10 @@ export function buildingComparisonChart(rows, buildingNames) {
   if (!rows.length) return '<p class="report-empty">Chưa có căn để so sánh.</p>';
   const positiveMax = Math.max(1, ...rows.flatMap((row) => [Number(row.revenue) || 0, Number(row.expenses) || 0, Number(row.profit) || 0]));
   const negativeMax = Math.max(0, ...rows.map((row) => -(Number(row.profit) || 0)));
-  const baseline = negativeMax ? 170 : 205;
-  const positiveHeight = baseline - 24;
-  const negativeHeight = 48;
+  const chartHeight = 180;
+  const pixelsPerUnit = chartHeight / (positiveMax + negativeMax);
+  const baseline = 24 + positiveMax * pixelsPerUnit;
+  const chartBottom = 24 + chartHeight;
   const width = Math.max(740, rows.length * 156 + 90);
   const chartRows = rows.map((row, index) => {
     const name = buildingNames.get(row.buildingId) || "Căn không rõ tên";
@@ -115,10 +116,10 @@ export function buildingComparisonChart(rows, buildingNames) {
     const columns = [[row.revenue, "revenue"], [row.expenses, "expenses"], [row.profit, Number(row.profit) < 0 ? "loss" : "profit"]];
     return `<g><title>${safe(detail)}</title>${columns.map(([raw, type], position) => {
       const amount = Number(raw) || 0;
-      const height = amount < 0 ? Math.abs(amount) / negativeMax * negativeHeight : amount / positiveMax * positiveHeight;
+      const height = Math.abs(amount) * pixelsPerUnit;
       return `<rect class="report-compare-column report-compare-column--${type}" x="${x + position * 27}" y="${amount < 0 ? baseline : baseline - height}" width="22" height="${height}"/>`;
-    }).join("")}<rect class="report-focus-target" tabindex="0" x="${x - 4}" y="20" width="84" height="${baseline + negativeHeight - 20}" aria-label="${safe(detail)}" data-chart-detail="${safe(detail)}"/><text class="report-compare-axis-label" x="${x + 38}" y="${baseline + (negativeMax ? negativeHeight : 0) + 22}" text-anchor="middle">${safe(name)}</text></g>`;
+    }).join("")}<rect class="report-focus-target" tabindex="0" x="${x - 4}" y="20" width="84" height="${chartBottom - 20}" aria-label="${safe(detail)}" data-chart-detail="${safe(detail)}"/><text class="report-compare-axis-label" x="${x + 38}" y="${chartBottom + 22}" text-anchor="middle">${safe(name)}</text></g>`;
   }).join("");
   return `${legend([["revenue", "Thực nhận"], ["expenses", "Chi phí"], ["profit-bar", "Lợi nhuận"], ["loss", "Lỗ"]], "Cùng một thang tiền; số chính xác ở bảng bên dưới.")}
-    <div class="report-chart-scroll"><svg class="report-compare-columns" viewBox="0 0 ${width} ${negativeMax ? 270 : 255}" role="img" aria-label="Biểu đồ cột so sánh thực nhận, chi phí và lợi nhuận các căn"><line class="report-grid-line" x1="62" x2="${width - 20}" y1="24" y2="24"/><text x="2" y="28">${shortMoney(positiveMax)}</text><line class="report-zero-line" x1="62" x2="${width - 20}" y1="${baseline}" y2="${baseline}"/><text x="22" y="${baseline + 4}">0 đ</text>${chartRows}</svg></div>${readout()}`;
+    <div class="report-chart-scroll"><svg class="report-compare-columns" viewBox="0 0 ${width} 255" role="img" aria-label="Biểu đồ cột so sánh thực nhận, chi phí và lợi nhuận các căn"><line class="report-grid-line" x1="62" x2="${width - 20}" y1="24" y2="24"/><text x="2" y="28">${shortMoney(positiveMax)}</text><line class="report-zero-line" x1="62" x2="${width - 20}" y1="${baseline}" y2="${baseline}"/><text x="22" y="${baseline + 4}">0 đ</text>${negativeMax ? `<text x="2" y="${chartBottom + 4}">${shortMoney(-negativeMax)}</text>` : ""}${chartRows}</svg></div>${readout()}`;
 }

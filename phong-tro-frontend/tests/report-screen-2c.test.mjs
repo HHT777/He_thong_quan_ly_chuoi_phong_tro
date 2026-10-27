@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { contrastRatio } from "../src/shared/design/contrast.mjs";
 import { cashflowPath, loadReportTrend, reportHash, reportUrlState } from "../src/modules/finance/report.data.mjs";
-import { reportKpis, reportScreen, statusBlock } from "../src/modules/finance/report.screen.mjs";
+import { comparisonSelection, reportKpis, reportScreen, statusBlock } from "../src/modules/finance/report.screen.mjs";
 import { buildingComparisonChart, overviewChart, profitBridgeChart, timeChart, typeChart } from "../src/modules/finance/report.charts.mjs";
 import { defaultPeriodForMode, filterMarkup } from "../src/modules/finance/report.filter.mjs";
 
@@ -125,9 +125,39 @@ test("so sánh căn có biểu đồ cột cùng tỷ lệ, cột lỗ và số 
   assert.match(chart, /report-compare-column--expenses/);
   assert.match(chart, /report-compare-column--loss/);
   assert.match(chart, /−500\.000 đ/);
-  assert.match(chart, /height="48"/);
+  const heights = [...chart.matchAll(/class="report-compare-column report-compare-column--(revenue|loss)"[^>]*height="([\d.]+)"/g)];
+  const revenueHeight = Number(heights.find((match) => match[1] === "revenue")[2]);
+  const lossHeight = Number(heights.find((match) => match[1] === "loss")[2]);
+  assert.ok(Math.abs(revenueHeight / lossHeight - 10) < 1e-9);
   assert.match(reportScreen(state({ view: "compare", data: { ...data, byBuilding: compared }, buildingNames: names })), /report-compare-columns/);
   assert.doesNotMatch(buildingComparisonChart([{ ...compared[0], buildingId: '<script>' }], new Map()), /<script>/);
+});
+
+test("chọn căn, xếp hạng và hiển thị chi phí chưa phân căn theo dữ liệu server", () => {
+  const byBuilding = [
+    { buildingId: "a", inComparison: true, revenue: 9, expenses: 2, profit: 7 },
+    { buildingId: "b", inComparison: true, revenue: 6, expenses: 3, profit: 3 },
+    { buildingId: "c", inComparison: true, revenue: 4, expenses: 5, profit: -1 },
+    { buildingId: "d", inComparison: false, revenue: 2, expenses: 1, profit: 1 },
+    { buildingId: null, inComparison: false, revenue: 0, expenses: 6, profit: -6 },
+  ];
+  const chosen = comparisonSelection({ byBuilding }, ["a", "c", "d"]);
+  assert.deepEqual(chosen.rows.map((row) => row.buildingId), ["a", "c"]);
+  assert.equal(comparisonSelection({ byBuilding }, ["a"]).rows.length, 3);
+  const markup = reportScreen(state({ view: "compare", compareBuildingIds: ["a", "c"], data: { ...data, byBuilding }, buildingNames: new Map([["a", "Căn A"], ["b", "Căn B"], ["c", "Căn C"], ["d", "Căn D"]]) }));
+  assert.match(markup, /Lợi nhuận cao nhất: Căn A/);
+  assert.match(markup, /Thấp nhất: Căn C/);
+  assert.match(markup, /Căn D · Ngừng hoạt động/);
+  assert.match(markup, /Chưa phân căn <small>\(đã tính trong tổng kỳ\)/);
+  assert.match(markup, /data-compare-building="b" aria-pressed="false"/);
+});
+
+test("bảng chi phí hiển thị loại chi từ API và số tiền của khoản chi", () => {
+  const expenseData = { ...data, receiptDetails: [{ source: "CHI_PHI", type: "VE_SINH", date: "2026-10-03", buildingId: "a", amount: 300000 }] };
+  const markup = reportScreen(state({ view: "table", metric: "expenses", data: expenseData }));
+  assert.match(markup, /Vệ sinh/);
+  assert.match(markup, /300\.000 đ/);
+  assert.doesNotMatch(markup, /Số gộp/);
 });
 
 test("chú thích có ký hiệu và chấm lợi nhuận nhỏ", () => {

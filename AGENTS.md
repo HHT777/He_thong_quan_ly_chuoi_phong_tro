@@ -1,5 +1,11 @@
 # AGENTS.md — Bàn giao cho AI tiếp tục
 
+## Cập nhật So sánh căn UI-2c-2 (27/10/2026)
+
+- Nhánh `ui-2c-bao-cao`: bổ sung chip chọn căn có dữ liệu, xếp hạng lợi nhuận và dòng chưa phân căn theo API; biểu đồ cột dùng cùng tỷ lệ cho giá trị dương và âm. Bảng chi phí hiển thị loại chi do API trả. Báo cáo chỉ đọc, thao tác khoản chi ở tab Thu chi theo quyết định người dùng.
+- Frontend test 53 đạt, 1 live DB bỏ qua; bộ quét `innerHTML` 2 đạt, 0 vi phạm. Phép thử phủ định đổi tỷ lệ cột lỗ làm test đỏ, khôi phục thì xanh. Chưa build hoặc kiểm tra UI với DB thật trong lượt này; người dùng tự kiểm tra. Không kết nối DB thật, không push. Giữ nguyên `management.css` đang sửa và các file untracked chủ ý.
+- So sánh theo tháng chưa có endpoint tổng hợp; không bật vì cần nhiều request. API chi tiết báo cáo chưa trả ghi chú và trạng thái từng khoản chi.
+
 ## Điểm dừng UI-2c-1 Báo cáo (26/10/2026; ưu tiên hiện hành)
 
 - Nhánh `ui-2c-bao-cao` tạo từ `origin/main` đã chứa UI-2a; tag local `checkpoint-before-ui-2c-1`. Các commit UI-2c-1: `6a51061` (kỳ/query), `2419186` (hình học/biểu đồ), `34d92b8` (giao diện, token, test), `e5ff62b` (tài liệu và bộ quét HTML), `4a102ce` (nhãn số, thao tác chạm). `docs/REPORT_SCREEN.md` nối phần tử với API và ghi rõ phần để UI-2c-2.

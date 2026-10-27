@@ -136,6 +136,19 @@ async function render(context) {
     if (!filterSlot.querySelector(".report-year")?.contains(event.target) && !yearList().hidden) toggleYears(false);
   }, { signal });
   content.addEventListener("click", (event) => {
+    const building = event.target.closest("[data-compare-building]");
+    if (building) {
+      const active = (state.data?.byBuilding || []).filter((row) => row.buildingId && row.inComparison);
+      const current = Array.isArray(state.compareBuildingIds) ? active.filter((row) => state.compareBuildingIds.includes(row.buildingId)) : active;
+      const selected = new Set((current.length >= Math.min(2, active.length) ? current : active).map((row) => row.buildingId));
+      if (selected.has(building.dataset.compareBuilding)) {
+        if (selected.size <= 2) return;
+        selected.delete(building.dataset.compareBuilding);
+      } else selected.add(building.dataset.compareBuilding);
+      state.compareBuildingIds = [...selected];
+      paint();
+      return;
+    }
     const retry = event.target.closest("[data-report-retry]");
     if (retry) { apply(retry.dataset.reportRetry); return; }
     const view = event.target.closest("[data-report-view]");
