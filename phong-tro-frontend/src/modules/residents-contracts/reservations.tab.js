@@ -6,7 +6,7 @@ import { loadBuildingScope } from "./building-scope.js";
 export default {
   id: "reservations", route: "/residents-contracts/reservations", title: "Giữ phòng", tabLabel: "Giữ phòng", group: "residents-contracts", order: 30, roles: ["CHU_TRO"],
   async render(context) {
-    context.main.innerHTML = shellPage("Giữ phòng", "Quá hạn không tự giải phóng phòng; Chủ trọ cần xử lý.");
+    context.main.innerHTML = shellPage("Giữ phòng", "");
     const content = context.main.querySelector("[data-content]");
     const actions = context.main.querySelector("[data-actions]");
     try {
@@ -14,7 +14,8 @@ export default {
       const holds = (holdResult.data || []).filter((row) => scope.matchesRoom(row.ma_phong));
       const vacant = scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && room.trang_thai === "TRONG");
       actions.innerHTML = '<button type="button" class="btn btn--primary" data-create-hold>Giữ phòng mới</button>';
-      scope.mount(actions, () => this.render(context));
+      scope.mount(actions, () => this.render(context), null, { showBuildingLabel: false });
+      actions.classList.add("reservation-page-actions");
       actions.querySelector("[data-create-hold]").disabled = !vacant.length;
       actions.querySelector("[data-create-hold]").addEventListener("click", () => openFormModal({
         title: "Giữ phòng trống", submitLabel: "Tạo giữ phòng",

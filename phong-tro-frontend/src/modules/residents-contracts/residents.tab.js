@@ -1,6 +1,8 @@
 import { listTab } from "../../shared/components/tab-factory.js";
 import { loadBuildingScope } from "./building-scope.js";
 import { openCoTenantsBox } from "./co-tenants.tab.js";
+import { escapeHtml } from "../../shared/components/view.js";
+import "./residents.css";
 
 const ACTIVE_CONTRACTS = new Set(["DANG_HIEU_LUC", "SAP_HET_HAN"]);
 
@@ -46,6 +48,32 @@ function residentRoster(tenants = [], scope = {}) {
   return rows;
 }
 
+function openResidentDetails(row) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `<section class="modal-dialog resident-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="resident-detail-title">
+    <header class="modal-header"><h2 class="modal-title" id="resident-detail-title">Chi tiết cư dân</h2><button type="button" class="modal-close-btn" aria-label="Đóng">×</button></header>
+    <div class="modal-body"><dl class="resident-detail-grid">
+      <div><dt>Họ tên</dt><dd>${escapeHtml(row.ho_ten || "—")}</dd></div>
+      <div><dt>Điện thoại</dt><dd>${escapeHtml(row.so_dien_thoai || "—")}</dd></div>
+      <div><dt>Giấy tờ</dt><dd>${escapeHtml(row.cccd_giay_to || "—")}</dd></div>
+      <div><dt>Vai trò</dt><dd>${escapeHtml(row.vai_tro_cu_tru || "—")}</dd></div>
+      <div><dt>Căn</dt><dd>${escapeHtml(row.ten_can || "—")}</dd></div>
+      <div><dt>Phòng</dt><dd>${escapeHtml(row.so_phong || "—")}</dd></div>
+    </dl></div>
+  </section>`;
+  const onEscape = (event) => { if (event.key === "Escape") close(); };
+  const close = () => {
+    document.removeEventListener("keydown", onEscape);
+    overlay.remove();
+  };
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay || event.target.closest(".modal-close-btn")) close();
+  });
+  document.addEventListener("keydown", onEscape);
+  document.body.appendChild(overlay);
+}
+
 export default listTab({ id: "residents", route: "/residents-contracts/residents", title: "Cư dân", tabLabel: "Cư dân", group: "residents-contracts", order: 30, roles: ["CHU_TRO"] }, {
   title: "Cư dân",
   description: "Danh sách người đứng tên hợp đồng và người ở cùng trong các phòng đang thuê.",
@@ -55,6 +83,8 @@ export default listTab({ id: "residents", route: "/residents-contracts/residents
   buildingScopeOptions: { contracts: true, roomFilter: true },
   toolbarActions: [{ id: "co-tenants", label: "Người ở cùng", run: (context, refresh) => openCoTenantsBox(context, refresh) }],
   buildingMatch: (row, scope) => row.ma_phong ? scope.matchesRoom(row.ma_phong) : scope.matchesResident(row),
+  actionMenu: true,
+  openDetail: (_context, row) => openResidentDetails(row),
   columns: [
     { label: "Họ tên", key: "ho_ten" },
     { label: "Điện thoại", key: "so_dien_thoai" },
@@ -65,6 +95,15 @@ export default listTab({ id: "residents", route: "/residents-contracts/residents
   ],
   create: { label: "Thêm cư dân", fields: [{ name: "ho_ten", label: "Họ tên", required: true }, { name: "so_dien_thoai", label: "Số điện thoại", required: true }, { name: "cccd_giay_to", label: "CCCD/Giấy tờ", required: true }] },
   rowActions: [
+    { id: "details", label: "Xem chi tiết", openDetail: true },
+    {
+      id: "create-account",
+      label: "Tạo tài khoản",
+      visible: (row) => !row.isCoTenant && Boolean(row.ma_khach_thue) && !row.ma_tai_khoan
+        && (row.hopDongs || []).some((contract) => ACTIVE_CONTRACTS.has(contract.trang_thai)),
+      confirm: (row) => `Tạo tài khoản cho ${row.ho_ten}, dùng số điện thoại ${row.so_dien_thoai} làm tên đăng nhập? Chỉ tạo được khi hợp đồng còn hiệu lực và đã nhận cọc.`,
+      run: (context, row) => context.api.post("/v1/accounts", { tenantId: row.ma_khach_thue }),
+    },
     {
       id: "edit",
       label: "Sửa hồ sơ",

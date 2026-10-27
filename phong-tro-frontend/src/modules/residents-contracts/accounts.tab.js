@@ -9,6 +9,18 @@ export default listTab({ id: "tenant-accounts", route: "/residents-contracts/acc
   columns: [
     { label: "Họ tên", key: "ho_ten" },
     { label: "Điện thoại", key: "so_dien_thoai" },
+    { label: "Căn", format: (row) => {
+      const contract = (row.hopDongs || []).find((item) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(item.trang_thai)) || (row.hopDongs || [])[0];
+      return contract?.phongTro?.canTro?.ten_can || "—";
+    } },
+    { label: "Phòng", format: (row) => {
+      const contract = (row.hopDongs || []).find((item) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(item.trang_thai)) || (row.hopDongs || [])[0];
+      return contract?.phongTro?.so_phong || "—";
+    } },
+    { label: "Hợp đồng", format: (row) => {
+      const contract = (row.hopDongs || []).find((item) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(item.trang_thai));
+      return contract ? contract.trang_thai === "SAP_HET_HAN" ? "Sắp hết hạn" : "Đang hiệu lực" : "Không có hợp đồng hiệu lực";
+    } },
     { label: "Tên đăng nhập", format: (row) => row.taiKhoan?.ten_dang_nhap || "—" },
     { label: "Trạng thái", format: (row) => row.taiKhoan?.trang_thai || "CHUA_CAP" },
   ],
@@ -16,8 +28,8 @@ export default listTab({ id: "tenant-accounts", route: "/residents-contracts/acc
     {
       id: "create",
       label: "Tạo tài khoản",
-      visible: (row) => !row.ma_tai_khoan,
-      confirm: (row) => `Cấp tài khoản dùng số điện thoại ${row.so_dien_thoai}?`,
+      visible: (row) => !row.ma_tai_khoan && (row.hopDongs || []).some((contract) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(contract.trang_thai)),
+      confirm: (row) => `Tạo tài khoản cho ${row.ho_ten}, dùng số điện thoại ${row.so_dien_thoai} làm tên đăng nhập? Chỉ tạo được khi hợp đồng còn hiệu lực và đã nhận cọc.`,
       run: (context, row) => context.api.post("/v1/accounts", { tenantId: row.ma_khach_thue }),
     },
     {

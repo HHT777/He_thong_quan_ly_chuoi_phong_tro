@@ -17,12 +17,12 @@ Migration đang dùng nằm ở `migrations/004_*.sql` đến `migrations/016_*.
 
 ```bash
 npm ci
-npm run dev
+npm start
 ```
 
 Đặt cấu hình kết nối trong `.env` của backend. Cần `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRE`; `PORT` mặc định là 3001. Không đưa `.env` vào Git. `GET /health` kiểm tra tiến trình; `GET /ready` kiểm tra kết nối database.
 
-OCR chạy thành dịch vụ riêng. Đặt `OCR_BASE_URL` theo đúng host/cổng đang chạy; nếu OCR lỗi, màn chỉ số điện cho nhập tay. Xem hướng dẫn trong `docs/OCR_SETUP.md` ở thư mục gốc.
+`npm start` tự khởi động API OCR cùng backend. Lần đầu cần Python 3 và Internet để tạo môi trường ảo/cài thư viện; các lần sau tự dùng lại môi trường. Xem cấu hình và cách chạy OCR riêng trong [`../docs/OCR_SETUP.md`](../docs/OCR_SETUP.md).
 
 ## Kiểm thử
 

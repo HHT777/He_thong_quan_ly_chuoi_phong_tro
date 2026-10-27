@@ -58,7 +58,11 @@ async function render(context) {
   let delay;
   const selection = () => ({ year: state.year, period: state.period, buildingId: state.view === "compare" ? "" : state.buildingId });
   const paint = () => { screenSlot.innerHTML = reportScreen(state); };
-  const filterPaint = () => { filterSlot.innerHTML = filterMarkup(state, years); };
+  const filterPaint = () => {
+    filterSlot.innerHTML = filterMarkup(state, years);
+    filterSlot.querySelector("[data-report-export-slot]")?.append(exportButton);
+  };
+  filterSlot.querySelector("[data-report-export-slot]")?.append(exportButton);
   const persist = () => { window.history.replaceState(null, "", reportHash(state)); };
   const apply = async (part = "both") => {
     if (part === "both") {

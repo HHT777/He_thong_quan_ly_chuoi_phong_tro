@@ -1,6 +1,6 @@
 # Tích hợp dịch vụ OCR chỉ số điện
 
-Backend không chạy Python bằng tiến trình con. `meterReading.service.js` gửi ảnh qua HTTP tới dịch vụ FastAPI trong `phong-tro-ocr/`. Mã nguồn và hai model cần chạy đã được đưa vào repository chính; dịch vụ vẫn phải khởi động bằng một tiến trình riêng.
+Backend gửi ảnh qua HTTP tới dịch vụ FastAPI trong `phong-tro-ocr/`. Với lệnh `npm start`, backend tự tạo môi trường Python lần đầu, cài thư viện OCR và khởi động dịch vụ cùng lúc với API. Khi backend tắt, tiến trình OCR do nó khởi chạy cũng dừng.
 
 ## Cấu hình backend
 
@@ -27,7 +27,19 @@ Backend gọi `POST {OCR_BASE_URL}/ocr` bằng `multipart/form-data`, trường 
 
 `ocr_value` phải chỉ gồm chữ số. Endpoint kiểm tra sức khỏe của dịch vụ Python là `GET /health`.
 
-## Khởi động dịch vụ OCR
+## Khởi động cùng backend
+
+Cài Node.js 20+, MySQL và Python 3. Khi chạy backend bằng `npm start`, OCR tự khởi động tại `http://127.0.0.1:8000`. Lần chạy đầu sẽ tạo `phong-tro-ocr/.venv` và cài `requirements.txt`, có thể mất vài phút và cần kết nối Internet. Các lần sau dùng lại môi trường đã cài. Khi `requirements.txt` thay đổi, thư viện sẽ được cài lại tự động.
+
+Mở terminal tại `phong-tro-backend`:
+
+```powershell
+npm start
+```
+
+Giữ terminal mở trong lúc sử dụng. Kiểm tra OCR tại `http://127.0.0.1:8000/health`. Nếu Python không nằm trong PATH, đặt `OCR_PYTHON` trong `.env` thành đường dẫn Python 3. Nếu OCR đã chạy tại URL mặc định thì backend sẽ dùng dịch vụ đó mà không mở bản thứ hai. Nếu `OCR_BASE_URL` trỏ ra máy khác, backend dùng dịch vụ ngoài và không tự khởi động OCR cục bộ.
+
+## Khởi động OCR riêng (tùy chọn)
 
 Sau khi clone repository chính, chạy tại thư mục `phong-tro-ocr/` (nơi chứa `requirements.txt`, `models/` và package `app`):
 

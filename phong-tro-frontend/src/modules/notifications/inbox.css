@@ -1,0 +1,65 @@
+.inbox-panel {
+  overflow: hidden;
+  border: 1px solid #d8e2f1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(26 54 103 / 5%);
+}
+
+.inbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e7edf6;
+}
+
+.inbox-search { flex: 1 1 320px; }
+.inbox-search input,
+.inbox-filter select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d6e0ef;
+  border-radius: 12px;
+  background: #fff;
+  color: #17336f;
+  font: inherit;
+}
+
+.inbox-filter { flex: 0 1 180px; }
+.inbox-count { margin-left: auto; color: #7182a0; font-size: 13px; white-space: nowrap; }
+.inbox-message { margin: 0; padding: 0 18px; color: #607399; }
+.inbox-message:not(:empty) { padding-top: 14px; padding-bottom: 14px; }
+
+.inbox-item {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #edf1f7;
+}
+.inbox-item:last-child { border-bottom: 0; }
+.inbox-item:hover { background: #fafcff; }
+.inbox-item--unread { background: #f7faff; }
+.inbox-item__marker { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.inbox-item--unread .inbox-item__marker { background: #315bb2; box-shadow: 0 0 0 4px #e7efff; }
+.inbox-item__meta { display: flex; align-items: center; gap: 10px; color: #8291ab; font-size: 12px; }
+.inbox-item__type { color: #315bb2; font-size: 12px; font-weight: 700; }
+.inbox-item__body p { margin: 6px 0 0; color: #20385f; line-height: 1.5; overflow-wrap: anywhere; }
+.inbox-item--unread .inbox-item__body p { color: #142f70; font-weight: 600; }
+.inbox-item__read { color: #8391a8; font-size: 12px; }
+.inbox-item__button { min-height: 36px; padding: 0 12px; white-space: nowrap; }
+.inbox-empty { display: grid; gap: 5px; justify-items: center; padding: 48px 16px; color: #7484a1; text-align: center; }
+.inbox-empty strong { color: #20385f; }
+
+@media (max-width: 640px) {
+  .inbox-toolbar { flex-wrap: wrap; padding: 12px; }
+  .inbox-search { flex-basis: 100%; }
+  .inbox-filter { flex: 1 1 150px; }
+  .inbox-count { margin-left: 0; }
+  .inbox-item { grid-template-columns: 8px minmax(0, 1fr); gap: 10px; padding: 14px 12px; }
+  .inbox-item__button, .inbox-item__read { grid-column: 2; justify-self: start; }
+}

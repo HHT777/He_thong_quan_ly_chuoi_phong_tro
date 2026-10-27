@@ -4,7 +4,7 @@
   "description": "Backend API for Hệ Thống Quản Lý Chuỗi Phòng Trọ",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node scripts/start-with-ocr.js",
     "dev": "nodemon src/index.js",
     "seed": "node scripts/seed.js",
     "test": "npm run test:unit && npm run test:integration",

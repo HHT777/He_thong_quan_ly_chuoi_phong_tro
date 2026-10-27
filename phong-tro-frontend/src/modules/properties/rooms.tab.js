@@ -57,7 +57,33 @@ export default listTab({ id: "rooms", route: "/properties/rooms", title: "Phòng
   sortRows: (a, b) => new Intl.Collator("vi", { numeric: true, sensitivity: "base" }).compare(String(a.so_phong || ""), String(b.so_phong || "")),
   openDetail: openRoomDetails,
   columns: [{ label: "Số phòng", key: "so_phong" }, { label: "Căn trọ", format: (row) => row.canTro?.ten_can || "—" }, { label: "Giá thuê", format: (row) => money(row.gia_thue) }, { label: "Tối đa", key: "so_nguoi_toi_da" }, { label: "Trạng thái", key: "trang_thai" }],
-  create: { label: "Thêm phòng", fields: [{ name: "so_phong", label: "Số phòng", required: true }, { name: "ma_can", label: "Mã căn trọ", required: true }, { name: "dien_tich", label: "Diện tích", type: "number", required: true }, { name: "gia_thue", label: "Giá thuê", type: "number", required: true }, { name: "so_nguoi_toi_da", label: "Số người tối đa", type: "number", required: true }], map: numberFields },
+  create: {
+    label: "Thêm phòng",
+    fields: [
+      { name: "so_phong", label: "Số phòng", required: true },
+      { name: "ma_can", label: "Căn trọ", options: [{ value: "", label: "Đang tải danh sách căn..." }], required: true },
+      { name: "dien_tich", label: "Diện tích", type: "number", required: true },
+      { name: "gia_thue", label: "Giá thuê", type: "number", required: true },
+      { name: "so_nguoi_toi_da", label: "Số người tối đa", type: "number", required: true },
+    ],
+    onOpen: async ({ context, form }) => {
+      const buildingSelect = form.elements.namedItem("ma_can");
+      buildingSelect.disabled = true;
+      try {
+        const response = await context.api.get("/management/can-tro?limit=100");
+        const buildings = Array.isArray(response.data) ? response.data : [];
+        buildingSelect.replaceChildren(new Option("Chọn căn trọ", ""));
+        buildings.forEach((building) => buildingSelect.add(new Option(building.ten_can, building.ma_can)));
+        if (buildings.length === 0) buildingSelect.replaceChildren(new Option("Chưa có căn trọ", ""));
+      } catch (error) {
+        buildingSelect.replaceChildren(new Option("Không tải được danh sách căn", ""));
+        showToast(`Không tải được danh sách căn trọ: ${error.message}`, "error");
+      } finally {
+        buildingSelect.disabled = false;
+      }
+    },
+    map: numberFields,
+  },
   rowActions: [
     { id: "details", label: "Xem chi tiết", openDetail: true },
     {

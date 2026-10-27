@@ -21,5 +21,6 @@ export function filterMarkup(state, years) {
     <label><span>Xem theo</span><select data-report-mode>${option("month", "Tháng", mode === "month")}${option("quarter", "Quý", mode === "quarter")}${option("year", "Cả năm", mode === "year")}</select></label>
     <label ${mode === "year" ? "hidden" : ""}><span>${mode === "quarter" ? "Quý" : "Tháng"}</span><select data-report-period>${choices.map((row) => option(row.value, row.label, row.value === state.period, row.disabled)).join("")}</select></label>
     <label data-report-building-wrap ${state.view === "compare" ? "hidden" : ""}><span>Căn</span><select data-report-building>${option("", "Tất cả căn", !state.buildingId)}${state.buildings.map((row) => option(row.ma_can, row.ten_can, state.buildingId === row.ma_can)).join("")}</select></label>
+    <div class="report-export-slot" data-report-export-slot></div>
   </div>`;
 }

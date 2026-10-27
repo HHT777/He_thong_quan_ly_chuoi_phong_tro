@@ -25,7 +25,8 @@
 .bill-table th, .bill-table td { padding: 11px 10px; border-bottom: 1px solid #e9eef6; text-align: left; font-size: 13px; }
 .bill-table th { color: #61718a; background: #f6f9fe; font-weight: 750; }
 .bill-table small, .bill-room-list small { display: block; margin-top: 3px; color: #73839a; font-size: 11px; }
-.bill-table td:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.bill-table td:last-child { text-align: right; white-space: nowrap; }
+.bill-table td:last-child > .bill-menu { display: inline-block; margin-left: 6px; vertical-align: middle; }
 .bill-table td:nth-child(4), .bill-table td:nth-child(5), .bill-room-list > label > span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bill-status { display: inline-flex; padding: 5px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .bill-status--draft { background: #fff0d5; color: #8c5600; }

@@ -146,7 +146,7 @@ class ThanhToanController {
 
   async getThanhToanList(req, res, next) {
     try {
-      validateQuery(req.query, { strings: ["ma_khoan_phai_thu", "ma_thanh_toan"], positiveIntegers: ["page", "limit"] });
+      validateQuery(req.query, { strings: ["ma_khoan_phai_thu", "ma_thanh_toan", "ma_can"], positiveIntegers: ["page", "limit"] });
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;

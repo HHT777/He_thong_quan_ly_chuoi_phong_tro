@@ -1,0 +1,15 @@
+.payment-list-panel { overflow: hidden; }
+.payment-filter-label { color: var(--text-secondary, #52617a); font-weight: 700; }
+.payment-toolbar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.payment-count { color: var(--text-muted, #7b8798); font-size: 13px; }
+.payment-table { min-width: 1080px; }
+.payment-table th:first-child,
+.payment-table td:first-child { width: 44px; text-align: center; }
+.payment-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-primary, #173876); }
+.payment-table .payment-note { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payment-empty { padding: 36px; text-align: center; color: var(--text-muted, #7b8798); }
+@media (max-width: 760px) {
+  .payment-list-panel .mgmt-toolbar { align-items: stretch; }
+  .payment-toolbar-actions { width: 100%; }
+  .payment-toolbar-actions .btn { flex: 1; }
+}

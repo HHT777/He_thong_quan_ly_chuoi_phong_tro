@@ -51,10 +51,10 @@ export async function loadBuildingScope(api, { contracts = false, roomFilter = f
   };
   const matchesContractId = (contractId) => matchesContract(contractById.get(String(contractId)));
 
-  const mount = (container, onChange) => {
+  const mount = (container, onChange, before = null, { showBuildingLabel = true } = {}) => {
     const label = document.createElement("label");
     label.className = "resident-building-filter";
-    label.innerHTML = `Căn <select class="mgmt-filter-select" aria-label="Lọc theo căn">
+    label.innerHTML = `${showBuildingLabel ? "Căn " : ""}<select class="mgmt-filter-select" aria-label="Lọc theo căn">
       <option value="ALL">Tất cả căn trọ</option>
       ${buildings.map((building) => `<option value="${escapeHtml(building.id)}" ${selected === building.id ? "selected" : ""}>${escapeHtml(building.name)}</option>`).join("")}
     </select>${roomFilter ? `Phòng <select class="mgmt-filter-select" aria-label="Lọc theo phòng">
@@ -71,7 +71,8 @@ export async function loadBuildingScope(api, { contracts = false, roomFilter = f
       else sessionStorage.setItem(ROOM_STORAGE_KEY, event.target.value);
       onChange();
     });
-    container.prepend(label);
+    if (before) container.insertBefore(label, before);
+    else container.prepend(label);
   };
 
   const buildingById = new Map(buildings.map((building) => [building.id, building]));

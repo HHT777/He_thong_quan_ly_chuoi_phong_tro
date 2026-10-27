@@ -5,7 +5,11 @@ import { buildingComparisonChart, overviewChart, profitBridgeChart, timeChart, t
 const safe = escapeHtml;
 const names = { revenue: "Doanh thu thực nhận", expenses: "Chi phí", profit: "Lợi nhuận" };
 const amounts = { revenue: "totalRevenue", expenses: "totalExpenses", profit: "profit" };
-const icon = { revenue: "₫", expenses: "▣", profit: "↗" };
+const icon = {
+  revenue: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M6 9c1.4 0 2.5-1.1 2.5-2.5M18 15c-1.4 0-2.5 1.1-2.5 2.5M12 8v8m2-6.5c-.5-.8-1.3-1.2-2.3-1.2-1.2 0-2 .6-2 1.5 0 2.4 4.6 1 4.6 3.5 0 .9-.8 1.7-2.1 1.7-1 0-1.9-.4-2.5-1.3"/></svg>',
+  expenses: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.8h9l4 4v6.1M15 2.8v4h4M6 2.8v18.4l2.2-1.5 2.2 1.5 2.2-1.5 2.2 1.5 1.2-.8"/><path d="M8.5 10h6M8.5 13h4"/><circle cx="18" cy="17.5" r="4.2"/><path d="M16.3 17.5h3.4"/></svg>',
+  profit: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 16 5-5 4 3 7-8"/><circle cx="4" cy="16" r="1.5" fill="currentColor"/><circle cx="9" cy="11" r="1.5" fill="currentColor"/><circle cx="13" cy="14" r="1.5" fill="currentColor"/><circle cx="20" cy="6" r="1.5" fill="currentColor"/></svg>',
+};
 const panel = (title, body) => `<section class="report-card report-focus-panel"><h2>${safe(title)}</h2>${body}</section>`;
 const table = (headers, rows) => `<div class="report-table-scroll"><table class="report-table"><thead><tr>${headers.map((name) => `<th scope="col">${safe(name)}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 

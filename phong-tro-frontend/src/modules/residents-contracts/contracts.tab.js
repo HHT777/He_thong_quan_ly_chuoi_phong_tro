@@ -146,10 +146,11 @@ async function openContractDetail(context, row) {
 
 export default listTab({ id: "contracts", route: "/residents-contracts/contracts", title: "Hợp đồng", tabLabel: "Hợp đồng", group: "residents-contracts", order: 31, roles: ["CHU_TRO"] }, {
   title: "Hợp đồng",
-  description: "Tạo hợp đồng kèm hồ sơ cọc và gia hạn hợp đồng hiện có.",
+  description: "",
   endpoint: "/hop-dong?limit=100",
   loadAllPages: true,
   buildingScope: loadBuildingScope,
+  buildingScopeInToolbar: true,
   buildingMatch: (row, scope) => scope.matchesContract(row),
   statusOptions: [
     { value: "DANG_HIEU_LUC", label: "Đang hiệu lực" },

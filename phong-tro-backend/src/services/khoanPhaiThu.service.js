@@ -103,7 +103,19 @@ class KhoanPhaiThuService {
     } : item);
     if (requester?.vai_tro === "KHACH_THUE") where.da_gui = true;
     if (filters.search) where.ma_hop_dong = { [Op.in]: await searchContractIds(filters.search) };
-    const { count, rows } = await ThanhToan.findAndCountAll({ where, include, distinct: true, limit: pagination.limit, offset: pagination.offset, order: [["nam", "DESC"], ["thang", "DESC"], ["ma_thanh_toan", "DESC"]] });
+    const { count, rows } = await ThanhToan.findAndCountAll({
+      where,
+      include,
+      distinct: true,
+      limit: pagination.limit,
+      offset: pagination.offset,
+      order: [
+        [{ model: HopDong, as: "hopDong" }, { model: PhongTro, as: "phongTro" }, "so_phong", "ASC"],
+        ["nam", "DESC"],
+        ["thang", "DESC"],
+        ["ma_thanh_toan", "DESC"],
+      ],
+    });
     return { count, total: count, data: rows };
   }
 

@@ -169,7 +169,7 @@ function openCreateModal(config, onCreated, buildingScope, context) {
   });
 }
 
-export function renderTable(container, columns, rows, rowActions = []) {
+export function renderTable(container, columns, rows, rowActions = [], actionMenu = false) {
   if (!rows || !rows.length) {
     container.innerHTML = `
       <div class="empty-state">
@@ -221,7 +221,9 @@ export function renderTable(container, columns, rows, rowActions = []) {
                   return `<td class="${isNumeric ? "table-align-right tabular-nums" : ""}">${escapeHtml(rawVal)}</td>`;
                 })
                 .join("")}
-              ${rowActions.length ? `<td><div class="table-actions">${rowActions.filter((action) => !action.visible || action.visible(row)).map((action) => `<button class="btn ${action.className || "btn--secondary"}" data-row-action="${escapeHtml(action.id)}" data-row-index="${rows.indexOf(row)}">${escapeHtml(action.label)}</button>`).join(" ") || "—"}</div></td>` : ""}
+              ${rowActions.length ? `<td>${actionMenu
+                ? `<div class="row-action-menu"><button type="button" class="row-action-menu__trigger" data-action-menu-toggle aria-label="Thao tác" aria-expanded="false">⋯</button><div class="row-action-menu__items">${rowActions.filter((action) => !action.visible || action.visible(row)).map((action) => `<button type="button" class="row-action-menu__item" data-row-action="${escapeHtml(action.id)}" data-row-index="${rows.indexOf(row)}">${escapeHtml(action.label)}</button>`).join("") || "<span class=\"row-action-menu__empty\">Không có thao tác</span>"}</div></div>`
+                : `<div class="table-actions">${rowActions.filter((action) => !action.visible || action.visible(row)).map((action) => `<button class="btn ${action.className || "btn--secondary"}" data-row-action="${escapeHtml(action.id)}" data-row-index="${rows.indexOf(row)}">${escapeHtml(action.label)}</button>`).join(" ") || "—"}</div>`}</td>` : ""}
             </tr>
           `
             )
@@ -354,7 +356,7 @@ export async function renderList(context, config) {
     const preloaded = config.beforeLoad ? await config.beforeLoad(context.api) : undefined;
     const response = await context.api.get(config.endpoint);
     const buildingScope = config.buildingScope ? await config.buildingScope(context.api, config.buildingScopeOptions) : null;
-    buildingScope?.mount(actions, () => renderList(context, config));
+    if (buildingScope && !config.buildingScopeInToolbar) buildingScope.mount(actions, () => renderList(context, config));
     let data = config.transform ? config.transform(response.data, buildingScope, preloaded) : response.data;
     if (config.loadAllPages && response.pagination?.hasNext) {
       data = [...(data || [])];
@@ -549,12 +551,17 @@ export async function renderList(context, config) {
         </div>
       `;
 
+      if (buildingScope && config.buildingScopeInToolbar) {
+        const toolbarLeft = content.querySelector(".mgmt-toolbar-left");
+        buildingScope.mount(toolbarLeft, () => renderList(context, config), content.querySelector("#mgmtStatusFilter"));
+      }
+
       // Render Table or Grid into container
       const viewContainer = content.querySelector("#mgmtViewContainer");
       if (viewMode === "grid" && isRoomsModule) {
         renderCardGrid(viewContainer, paginated);
       } else {
-        renderTable(viewContainer, config.columns, paginated, config.rowActions || []);
+        renderTable(viewContainer, config.columns, paginated, config.rowActions || [], config.actionMenu);
       }
 
       content.querySelectorAll("[data-toolbar-action]").forEach((button) => {
@@ -594,6 +601,14 @@ export async function renderList(context, config) {
           } else if (!action.confirm || window.confirm(action.confirm(row))) {
             await execute();
           }
+        });
+      });
+
+      viewContainer.querySelectorAll("[data-action-menu-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const expanded = button.getAttribute("aria-expanded") === "true";
+          viewContainer.querySelectorAll("[data-action-menu-toggle]").forEach((other) => other.setAttribute("aria-expanded", "false"));
+          button.setAttribute("aria-expanded", String(!expanded));
         });
       });
 

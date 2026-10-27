@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { Op, fn, col } = require("sequelize");
 const sequelize = require("../config/database");
-const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, KhachThue, ThongBao } = require("../models");
+const { ThanhToan, GiaoDichThanhToan, KhoanThu, HopDong, PhongTro, CanTro, KhachThue, ThongBao } = require("../models");
 const billService = require("./khoanPhaiThu.service");
 const { writeAuditLog } = require("./auditLog.service");
 const { buildSnapshot } = require("./receiptSnapshot.service");
@@ -66,6 +66,11 @@ class ThanhToanService {
     if (filters.ma_khoan_phai_thu || filters.ma_thanh_toan) where.ma_thanh_toan = filters.ma_khoan_phai_thu || filters.ma_thanh_toan;
     const tenantWhere = filters.ma_khach_thue ? { ma_khach_thue: filters.ma_khach_thue } : undefined;
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
+    const requestedRoomScope = filters.ma_can
+      ? (ownedBuildings
+        ? { [Op.and]: [{ ma_can: filters.ma_can }, { ma_can: { [Op.in]: ownedBuildings } }] }
+        : { ma_can: filters.ma_can })
+      : (ownedBuildings ? { ma_can: { [Op.in]: ownedBuildings } } : undefined);
     const { count, rows } = await GiaoDichThanhToan.findAndCountAll({
       where, distinct: true, limit: pagination.limit, offset: pagination.offset,
       include: [{
@@ -79,11 +84,16 @@ class ThanhToanService {
           where: tenantWhere,
           include: [
             { model: KhachThue, as: "khachThue", attributes: ["ma_khach_thue", "ho_ten"] },
-            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "so_phong"],
-              ...(ownedBuildings ? { required: true, where: { ma_can: { [Op.in]: ownedBuildings } } } : {}) },
+            { model: PhongTro, as: "phongTro", attributes: ["ma_phong", "so_phong", "ma_can"],
+              ...(requestedRoomScope ? {
+                required: true,
+                where: requestedRoomScope,
+              } : {}),
+              include: [{ model: CanTro, as: "canTro", attributes: ["ma_can", "ten_can"] }] },
           ],
         }],
-      }],
+      },
+      { model: KhoanThu, as: "khoanThu", attributes: ["ghi_chu", "trang_thai_ghi_nhan", "ly_do_huy"], required: false }],
       order: [["thoi_diem_ghi_nhan", "DESC"]],
     });
     return { count, total: count, data: rows };

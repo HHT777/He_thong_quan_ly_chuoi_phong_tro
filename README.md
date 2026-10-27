@@ -1,6 +1,6 @@
 # Quản lý chuỗi phòng trọ ISK19
 
-Ứng dụng gồm frontend Vite trong [`phong-tro-frontend/`](phong-tro-frontend/), API Express/MySQL trong [`phong-tro-backend/`](phong-tro-backend/) và dịch vụ OCR FastAPI cùng hai model trong [`phong-tro-ocr/`](phong-tro-ocr/). OCR chạy bằng tiến trình riêng theo [`docs/OCR_SETUP.md`](docs/OCR_SETUP.md).
+Ứng dụng gồm frontend Vite trong [`phong-tro-frontend/`](phong-tro-frontend/), API Express/MySQL trong [`phong-tro-backend/`](phong-tro-backend/) và dịch vụ OCR FastAPI cùng hai model trong [`phong-tro-ocr/`](phong-tro-ocr/). Lệnh `npm start` của backend tự chuẩn bị môi trường Python và khởi động OCR; xem [`docs/OCR_SETUP.md`](docs/OCR_SETUP.md).
 
 ## Tiếp tục phát triển
 
