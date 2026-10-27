@@ -103,15 +103,54 @@ export default listTab({ id: "incidents", route: "/operations/incidents", title:
       label: "Hoàn tất",
       visible: (row) => row.trang_thai === "DANG_XU_LY",
       fields: [
+        { name: "buildingId", label: "Căn", required: true },
+        { name: "roomId", label: "Phòng", required: true },
         { name: "responsible", label: "Đối tượng chịu phí", required: true, options: [{ value: "CHU_TRO", label: "Chủ trọ" }, { value: "KHACH_THUE", label: "Khách thuê" }] },
         { name: "cost", label: "Chi phí sửa chữa", type: "number", required: true },
         { name: "note", label: "Kết quả xử lý", type: "textarea", required: true },
         { name: "replacement", label: "Thiết bị thay thế" },
-        { name: "responsibleTenantId", label: "Mã khách chịu phí (nếu có)" },
+        { name: "responsibleTenantId", label: "Khách chịu phí" },
         { name: "responsibilityBasis", label: "Căn cứ trách nhiệm (nếu có)", type: "textarea" },
       ],
-      map: (raw) => ({ ...raw, status: "DA_XU_LY", cost: Number(raw.cost), responsibleTenantId: raw.responsibleTenantId || undefined, responsibilityBasis: raw.responsibilityBasis || undefined }),
+      onOpen: async ({ context, row, form, overlay }) => {
+        const selectors = await setupSelectors({ context, form, overlay, incidentRoomId: row.ma_phong, responsible: () => showTenantResponsibility(form.querySelector('[name="responsible"]')?.value) });
+        const responsible = form.querySelector('[name="responsible"]');
+        const tenant = form.querySelector('[data-selector="responsibleTenantId"]');
+        const basis = form.querySelector('[name="responsibilityBasis"]')?.closest(".modal-field");
+        const help = document.createElement("p");
+        help.className = "incident-form-hint";
+        help.textContent = "Khoản khách chịu sẽ được trừ vào tiền cọc khi trả phòng.";
+        basis?.after(help);
+        const update = () => {
+          const tenantMode = showTenantResponsibility(responsible.value);
+          if (tenant) tenant.hidden = !tenantMode;
+          if (basis) basis.hidden = !tenantMode;
+          const basisInput = basis?.querySelector('[name="responsibilityBasis"]');
+          if (basisInput) basisInput.required = tenantMode;
+          help.hidden = !tenantMode;
+          if (selectors) {
+            const selected = tenantSelectionForResponsibility(responsible.value, selectors.state.tenantId, selectors.state.roomId ? selectors.defaultRoomTenantId : "");
+            if (selected) selectors.selectTenant(selected);
+            else selectors.clearTenant();
+          }
+        };
+        responsible.addEventListener("change", update);
+        update();
+      },
+      map: buildCompletionPayload,
       run: (context, row, values) => context.api.patch(`/v1/incidents/${row.ma_su_co}`, values),
+    },
+    {
+      id: "delete",
+      label: "Xóa",
+      title: "Xóa báo cáo sự cố",
+      submitLabel: "Xóa sự cố",
+      successMessage: "Đã xóa báo cáo sự cố.",
+      className: "btn--danger",
+      visible: (row) => row.trang_thai === "CHO_TIEP_NHAN",
+      fields: [{ name: "reason", label: "Lý do xóa", type: "textarea", required: true }],
+      map: (raw) => ({ reason: raw.reason.trim() }),
+      run: (context, row, values) => context.api.request(`/v1/incidents/${row.ma_su_co}`, { method: "DELETE", body: JSON.stringify(values) }),
     },
   ],
 });

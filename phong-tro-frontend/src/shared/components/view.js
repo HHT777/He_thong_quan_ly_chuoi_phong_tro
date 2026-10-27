@@ -589,6 +589,7 @@ export async function renderList(context, config) {
               initial: action.initial ? action.initial(row) : {},
               submitLabel: action.submitLabel || action.label,
               submit: execute,
+              onOpen: action.onOpen ? ({ overlay, form }) => action.onOpen({ context, row, overlay, form }) : undefined,
             });
           } else if (!action.confirm || window.confirm(action.confirm(row))) {
             await execute();
