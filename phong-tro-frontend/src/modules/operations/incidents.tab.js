@@ -15,11 +15,25 @@ async function setupSelectors({ context, form, overlay, incidentRoomId = "", res
     status.classList.remove("is-error");
     try {
       const data = await loadIncidentFormData(context.api);
-      status.remove();
+      if (data.warnings.length) {
+        status.classList.add("is-warning");
+        status.textContent = "Một số thông tin bổ sung chưa tải được. Bạn vẫn có thể tạo sự cố.";
+        console.warn("Incident form optional data failed:", data.warnings);
+      } else {
+        status.remove();
+      }
       const typeInput = form.querySelector('[name="type"]');
       const typeField = typeInput?.closest(".modal-field");
-      if (typeField && data.categories.length) {
-        typeField.innerHTML = `<span>Loại sự cố</span><select class="form-control" name="type" required>${data.categories.map((category) => `<option value="${escapeHtml(category.ma)}">${escapeHtml(category.ten)}</option>`).join("")}</select>`;
+      if (typeField) {
+        const categories = data.categories.length ? data.categories : [
+          { ma: "THIET_BI", ten: "Thiết bị" },
+          { ma: "DIEN", ten: "Điện" },
+          { ma: "NUOC", ten: "Nước" },
+          { ma: "VE_SINH", ten: "Vệ sinh" },
+          { ma: "AN_NINH", ten: "An ninh" },
+          { ma: "KHAC", ten: "Khác" },
+        ];
+        typeField.innerHTML = `<span>Loại sự cố</span><select class="form-control" name="type" required><option value="" selected disabled>Chọn loại sự cố</option>${categories.map((category) => `<option value="${escapeHtml(category.ma)}">${escapeHtml(category.ten)}</option>`).join("")}</select>`;
       }
       const selectors = mountIncidentSelectors({
         form, data, incidentRoomId, tenantFieldName: overlay.querySelector('[name="responsibleTenantId"]') ? "responsibleTenantId" : "tenantId",
@@ -35,9 +49,9 @@ async function setupSelectors({ context, form, overlay, incidentRoomId = "", res
       }
       submit.disabled = false;
       return selectors;
-    } catch {
+    } catch (error) {
       status.classList.add("is-error");
-      status.textContent = "Không tải được danh sách. Kiểm tra kết nối rồi thử lại.";
+      status.textContent = error?.message || "Không tải được danh sách phòng. Kiểm tra kết nối rồi thử lại.";
       const retry = document.createElement("button");
       retry.type = "button"; retry.className = "btn btn--secondary"; retry.textContent = "Thử lại";
       retry.addEventListener("click", async () => { retry.disabled = true; await load(); });
@@ -50,23 +64,30 @@ async function setupSelectors({ context, form, overlay, incidentRoomId = "", res
 
 export default listTab({ id: "incidents", route: "/operations/incidents", title: "Sự cố", tabLabel: "Sự cố", group: "incidents", order: 51, roles: ["CHU_TRO"] }, {
   title: "Sự cố",
-  description: "Tiếp nhận, hoàn tất xử lý và ghi nhận đúng nhánh tài chính của sự cố. Chỉ xóa được báo cáo chưa tiếp nhận.",
+  description: "",
   endpoint: "/v1/incidents",
   create: {
     label: "Tạo sự cố",
     fields: [
       { name: "buildingId", label: "Căn", required: true },
       { name: "roomId", label: "Phòng", required: true },
-      { name: "tenantId", label: "Khách đang ở" },
       { name: "type", label: "Loại sự cố", required: true },
+      { name: "responsible", label: "Người chịu phí", required: true, options: [
+        { value: "CHU_TRO", label: "Chủ trọ" },
+        { value: "KHACH_THUE", label: "Khách thuê" },
+      ] },
       { name: "priority", label: "Mức độ ưu tiên", required: true, value: "TRUNG_BINH", options: [
         { value: "TRUNG_BINH", label: "Trung bình" }, { value: "THAP", label: "Thấp" },
         { value: "CAO", label: "Cao" }, { value: "KHAN_CAP", label: "Khẩn cấp" },
       ] },
+      { name: "tenantId", label: "Khách liên quan" },
       { name: "description", label: "Mô tả", type: "textarea", required: true },
     ],
     map: buildCreateIncidentPayload,
-    onOpen: ({ context, form, overlay }) => setupSelectors({ context, form, overlay }),
+    onOpen: async ({ context, form, overlay }) => {
+      form.classList.add("incident-create-form");
+      await setupSelectors({ context, form, overlay });
+    },
   },
   beforeLoad: async (api) => {
     try {
@@ -105,16 +126,18 @@ export default listTab({ id: "incidents", route: "/operations/incidents", title:
       fields: [
         { name: "buildingId", label: "Căn", required: true },
         { name: "roomId", label: "Phòng", required: true },
-        { name: "responsible", label: "Đối tượng chịu phí", required: true, options: [{ value: "CHU_TRO", label: "Chủ trọ" }, { value: "KHACH_THUE", label: "Khách thuê" }] },
-        { name: "cost", label: "Chi phí sửa chữa", type: "number", required: true },
-        { name: "note", label: "Kết quả xử lý", type: "textarea", required: true },
-        { name: "replacement", label: "Thiết bị thay thế" },
+        { name: "responsible", label: "Ai chịu chi phí?", required: true, options: [{ value: "CHU_TRO", label: "Chủ trọ" }, { value: "KHACH_THUE", label: "Khách thuê" }] },
         { name: "responsibleTenantId", label: "Khách chịu phí" },
-        { name: "responsibilityBasis", label: "Căn cứ trách nhiệm (nếu có)", type: "textarea" },
+        { name: "cost", label: "Chi phí sửa chữa (đồng)", type: "number", required: true },
+        { name: "replacement", label: "Thiết bị thay thế" },
+        { name: "note", label: "Kết quả xử lý", type: "textarea", required: true },
+        { name: "responsibilityBasis", label: "Lý do khách chịu phí", type: "textarea" },
       ],
       onOpen: async ({ context, row, form, overlay }) => {
+        form.classList.add("incident-completion-form");
         const selectors = await setupSelectors({ context, form, overlay, incidentRoomId: row.ma_phong, responsible: () => showTenantResponsibility(form.querySelector('[name="responsible"]')?.value) });
         const responsible = form.querySelector('[name="responsible"]');
+        if (row.doi_tuong_chiu_phi && responsible) responsible.value = row.doi_tuong_chiu_phi;
         const tenant = form.querySelector('[data-selector="responsibleTenantId"]');
         const basis = form.querySelector('[name="responsibilityBasis"]')?.closest(".modal-field");
         const help = document.createElement("p");

@@ -10,7 +10,7 @@ const nextPeriod = () => {
   return `${year + (month === 12 ? 1 : 0)}-${String(month === 12 ? 1 : month + 1).padStart(2, "0")}-01`;
 };
 
-export async function openCoTenantsBox(context, onChanged = () => {}) {
+export async function openCoTenantsBox(context, onChanged = () => {}, { requestId = "" } = {}) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `<section class="modal-dialog co-tenant-box" role="dialog" aria-modal="true" aria-labelledby="co-tenant-box-title">
@@ -37,15 +37,18 @@ export async function openCoTenantsBox(context, onChanged = () => {}) {
       ]);
       scope = nextScope;
       members = (memberResult.data || []).filter((row) => scope.matchesContractId(row.ma_hop_dong));
-      pending = (requestResult.data || []).filter((row) => row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG" && row.trang_thai === "CHO_XU_LY" && scope.matchesRoom(row.ma_phong));
+      const proposals = (requestResult.data || []).filter((row) => row.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG"
+        && scope.matchesRoom(row.ma_phong)
+        && (requestId ? String(row.ma_yeu_cau) === String(requestId) : row.trang_thai === "CHO_XU_LY"));
+      pending = proposals;
       const locationFor = (roomId) => {
         const room = scope.roomById.get(String(roomId));
         const building = room && scope.buildingById.get(String(room.ma_can));
         return { building: building?.name || "—", room: room?.so_phong || "—" };
       };
       content.innerHTML = `<p>Đối chiếu thông tin và sức chứa trước khi duyệt đề xuất. Khi đánh dấu rời phòng, thời điểm có hiệu lực từ kỳ nước tiếp theo.</p>
-        <section class="co-tenant-box__section"><h3>Đề xuất chờ xử lý (${pending.length})</h3>
-          ${pending.length ? `<div class="table-wrap"><table><thead><tr><th>Căn</th><th>Phòng</th><th>Nội dung</th><th>Ngày gửi</th><th>Thao tác</th></tr></thead><tbody>${pending.map((row, index) => { const location = locationFor(row.ma_phong); return `<tr><td>${escapeHtml(location.building)}</td><td>${escapeHtml(location.room)}</td><td>${escapeHtml(row.noi_dung)}</td><td>${escapeHtml(date(row.ngay_gui))}</td><td><button class="btn btn--secondary" data-approve="${index}">Xem và duyệt</button> <button class="btn btn--secondary" data-reject="${index}">Từ chối</button></td></tr>`; }).join("")}</tbody></table></div>` : `<p>Không có đề xuất đang chờ.</p>`}
+        <section class="co-tenant-box__section"><h3>${requestId ? "Yêu cầu được chọn" : "Đề xuất chờ xử lý"} (${pending.length})</h3>
+          ${pending.length ? `<div class="table-wrap"><table><thead><tr><th>Căn</th><th>Phòng</th><th>Nội dung</th><th>Ngày gửi</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${pending.map((row, index) => { const location = locationFor(row.ma_phong); return `<tr${requestId ? ' class="co-tenant-box__selected-request"' : ""}><td>${escapeHtml(location.building)}</td><td>${escapeHtml(location.room)}</td><td>${escapeHtml(row.noi_dung)}</td><td>${escapeHtml(date(row.ngay_gui))}</td><td>${escapeHtml(row.trang_thai)}</td><td>${row.trang_thai === "CHO_XU_LY" ? `<button class="btn btn--secondary" data-approve="${index}">Xem và duyệt</button> <button class="btn btn--secondary" data-reject="${index}">Từ chối</button>` : "—"}</td></tr>`; }).join("")}</tbody></table></div>` : `<p>${requestId ? "Không tìm thấy yêu cầu này trong danh sách được quản lý." : "Không có đề xuất đang chờ."}</p>`}
         </section>
         <section class="co-tenant-box__section"><h3>Người ở cùng (${members.length})</h3>
           ${members.length ? `<div class="table-wrap"><table><thead><tr><th>Họ tên</th><th>Điện thoại</th><th>Giấy tờ</th><th>Ngày sinh</th><th>Giới tính</th><th>Thường trú</th><th>Quan hệ</th><th>Căn</th><th>Phòng</th><th>Ngày vào</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${members.map((row, index) => { const location = locationFor(row.ma_phong); return `<tr><td>${escapeHtml(row.ho_ten)}</td><td>${escapeHtml(row.so_dien_thoai)}</td><td>${escapeHtml(row.cccd_giay_to)}</td><td>${escapeHtml(date(row.ngay_sinh))}</td><td>${escapeHtml(row.gioi_tinh)}</td><td>${escapeHtml(row.dia_chi_thuong_tru)}</td><td>${escapeHtml(row.quan_he)}</td><td>${escapeHtml(location.building)}</td><td>${escapeHtml(location.room)}</td><td>${escapeHtml(date(row.ngay_vao))}</td><td>${escapeHtml(row.trang_thai_cu_tru)}</td><td>${row.trang_thai_cu_tru === "DANG_O" ? `<button class="btn btn--secondary" data-leave="${index}">Rời phòng</button>` : "—"}</td></tr>`; }).join("")}</tbody></table></div>` : `<p>Chưa có người ở cùng được ghi nhận.</p>`}

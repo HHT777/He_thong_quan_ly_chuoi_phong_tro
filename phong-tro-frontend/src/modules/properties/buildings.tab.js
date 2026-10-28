@@ -1,7 +1,7 @@
 import { listTab } from "../../shared/components/tab-factory.js";
 export default listTab({ id: "buildings", route: "/properties/buildings", title: "Căn trọ", tabLabel: "Căn trọ", group: "properties", order: 20, roles: ["CHU_TRO"] }, {
   title: "Căn trọ",
-  description: "Quản lý danh mục căn trọ, thông tin và trạng thái hoạt động.",
+  description: "",
   endpoint: "/management/can-tro",
   columns: [{ label: "Tên căn", key: "ten_can" }, { label: "Địa chỉ", key: "dia_chi" }, { label: "Trạng thái", key: "trang_thai" }, { label: "Số phòng", format: (row) => row.phongs?.length || 0 }],
   create: { label: "Thêm căn trọ", fields: [{ name: "ten_can", label: "Tên căn", required: true }, { name: "dia_chi", label: "Địa chỉ", required: true }, { name: "mo_ta", label: "Mô tả" }] },

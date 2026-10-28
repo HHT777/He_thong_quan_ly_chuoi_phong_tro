@@ -31,7 +31,7 @@ const fields = (buildings, row) => [
 export default {
   id: "cashflow", route: "/finance/cashflow", title: "Thu chi", tabLabel: "Thu chi", group: "finance", order: 43, roles: ["CHU_TRO"],
   async render(context) {
-    context.main.innerHTML = shellPage("Thu chi", "Quản lý khoản chi vận hành. Khoản thu từ phiếu được ghi nhận qua luồng thanh toán.");
+    context.main.innerHTML = shellPage("Thu chi", "");
     const content = context.main.querySelector("[data-content]");
     content.classList.add("cashflow-page");
     content.innerHTML = '<div class="cashflow-state" role="status">Đang tải khoản chi...</div>';
@@ -45,14 +45,18 @@ export default {
     }
     const buildingNames = new Map(buildings.map((row) => [row.ma_can, row.ten_can]));
     let rows = [];
+    let selectedBuildingId = "";
     let status = "loading";
     let errorMessage = "";
     const paint = () => {
+      const visibleRows = selectedBuildingId
+        ? rows.filter((row) => row.ma_can === selectedBuildingId)
+        : rows;
       const body = status === "loading" ? '<p role="status">Đang tải khoản chi...</p>' : status === "error"
         ? `<p role="alert">${escapeHtml(errorMessage)}</p><button type="button" data-expense-retry>Thử lại</button>`
-        : rows.length ? `<div class="cashflow-table-scroll"><table><thead><tr><th>Loại chi</th><th>Căn</th><th>Ngày</th><th>Số tiền</th><th>Ghi chú</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${escapeHtml(expenseLabel(row.loai_khoan_chi))}</td><td>${escapeHtml(row.ma_can ? buildingNames.get(row.ma_can) : "Toàn chuỗi")}</td><td>${escapeHtml(row.ngay_phat_sinh)}</td><td class="cashflow-amount">${escapeHtml(money(row.so_tien))}</td><td class="cashflow-note">${escapeHtml(displayExpenseNote(row))}</td><td><span class="cashflow-status ${row.trang_thai === "DA_HUY" ? "cashflow-status--cancelled" : ""}">${row.trang_thai === "DA_HUY" ? "Đã hủy" : "Hiệu lực"}</span></td><td><details class="cashflow-menu"><summary aria-label="Thao tác khoản chi">⋯</summary><div class="cashflow-menu__content"><button type="button" data-expense-view="${escapeHtml(row.ma_khoan_chi)}">Xem chi tiết</button>${row.trang_thai === "HIEU_LUC" && !row.ma_su_co ? `<button type="button" data-expense-edit="${escapeHtml(row.ma_khoan_chi)}">Sửa</button><button type="button" class="cashflow-menu__danger" data-expense-cancel="${escapeHtml(row.ma_khoan_chi)}">Xóa</button>` : ""}</div></details></td></tr>`).join("")}</tbody></table></div>`
-          : '<p>Chưa có khoản chi cho các căn đang quản lý.</p>';
-      content.innerHTML = `<section class="cashflow-panel"><div class="cashflow-heading"><div><h2>Khoản chi</h2><p>Hủy khoản chi sẽ lưu lý do và không tính vào báo cáo.</p></div><button type="button" class="btn btn--primary" data-expense-add ${buildings.length ? "" : "disabled"}>+ Thêm khoản chi</button></div>${body}</section>`;
+        : visibleRows.length ? `<div class="cashflow-table-scroll"><table><thead><tr><th>Loại chi</th><th>Căn</th><th>Ngày</th><th>Số tiền</th><th>Ghi chú</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${visibleRows.map((row) => `<tr><td>${escapeHtml(expenseLabel(row.loai_khoan_chi))}</td><td>${escapeHtml(row.ma_can ? buildingNames.get(row.ma_can) : "Toàn chuỗi")}</td><td>${escapeHtml(row.ngay_phat_sinh)}</td><td class="cashflow-amount">${escapeHtml(money(row.so_tien))}</td><td class="cashflow-note">${escapeHtml(displayExpenseNote(row))}</td><td><span class="cashflow-status ${row.trang_thai === "DA_HUY" ? "cashflow-status--cancelled" : ""}">${row.trang_thai === "DA_HUY" ? "Đã hủy" : "Hiệu lực"}</span></td><td><details class="cashflow-menu"><summary aria-label="Thao tác khoản chi">⋯</summary><div class="cashflow-menu__content"><button type="button" data-expense-view="${escapeHtml(row.ma_khoan_chi)}">Xem chi tiết</button>${row.trang_thai === "HIEU_LUC" && !row.ma_su_co ? `<button type="button" data-expense-edit="${escapeHtml(row.ma_khoan_chi)}">Sửa</button><button type="button" class="cashflow-menu__danger" data-expense-cancel="${escapeHtml(row.ma_khoan_chi)}">Xóa</button>` : ""}</div></details></td></tr>`).join("")}</tbody></table></div>`
+          : `<p>${selectedBuildingId ? "Không có khoản chi ở căn này." : "Chưa có khoản chi cho các căn đang quản lý."}</p>`;
+      content.innerHTML = `<section class="cashflow-panel"><div class="cashflow-heading"><div><h2>Khoản chi</h2><p>Hủy khoản chi sẽ lưu lý do và không tính vào báo cáo.</p></div><button type="button" class="btn btn--primary" data-expense-add ${buildings.length ? "" : "disabled"}>+ Thêm khoản chi</button></div><div class="cashflow-filters"><label for="cashflow-building-filter">Căn</label><select id="cashflow-building-filter" data-expense-building-filter><option value="">Tất cả căn</option>${buildings.map((building) => `<option value="${escapeHtml(building.ma_can)}" ${building.ma_can === selectedBuildingId ? "selected" : ""}>${escapeHtml(building.ten_can)}</option>`).join("")}</select></div>${body}</section>`;
     };
     const refresh = async () => {
       status = "loading"; paint();
@@ -109,6 +113,12 @@ export default {
           await context.api.request(`${endpoint}/${encodeURIComponent(row.ma_khoan_chi)}`, { method: "DELETE", body: JSON.stringify({ reason: reason.trim() }) });
           await refresh();
         } });
+    });
+    content.addEventListener("change", (event) => {
+      const filter = event.target.closest("[data-expense-building-filter]");
+      if (!filter) return;
+      selectedBuildingId = filter.value;
+      paint();
     });
     await refresh();
   },

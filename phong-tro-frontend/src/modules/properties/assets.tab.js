@@ -2,7 +2,7 @@ import { listTab } from "../../shared/components/tab-factory.js";
 import { showToast } from "../../shared/components/toast.js";
 export default listTab({ id: "assets", route: "/properties/assets", title: "Nội thất & tài sản", tabLabel: "Nội thất & tài sản", group: "properties", order: 22, roles: ["CHU_TRO"] }, {
   title: "Nội thất & tài sản",
-  description: "Theo dõi và cập nhật tài sản gắn với từng phòng.",
+  description: "",
   endpoint: "/v1/assets",
   columns: [{ label: "Tài sản", key: "ten_tai_san" }, { label: "Phòng", format: (row) => row.phongTro?.so_phong ? `Phòng ${row.phongTro.so_phong}` : "Không rõ phòng" }, { label: "Số lượng", key: "so_luong" }, { label: "Tình trạng", key: "tinh_trang" }, { label: "Ghi chú", key: "ghi_chu" }],
   create: {

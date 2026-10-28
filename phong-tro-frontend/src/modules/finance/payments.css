@@ -1,10 +1,29 @@
 .payment-list-panel { overflow: hidden; }
+.payment-list-panel > .table-wrap {
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
 .payment-filter-label { color: var(--text-secondary, #52617a); font-weight: 700; }
 .payment-toolbar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .payment-count { color: var(--text-muted, #7b8798); font-size: 13px; }
-.payment-table { min-width: 1080px; }
+.payment-table {
+  min-width: 1080px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-inline: 1px solid var(--ui2-border, #d8e2f2);
+  border-bottom: 1px solid var(--ui2-border, #d8e2f2);
+}
 .payment-table th:first-child,
 .payment-table td:first-child { width: 44px; text-align: center; }
+.payment-table th:nth-child(5),
+.payment-table td:nth-child(5) {
+  width: 148px;
+  min-width: 148px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .payment-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-primary, #173876); }
 .payment-table .payment-note { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .payment-empty { padding: 36px; text-align: center; color: var(--text-muted, #7b8798); }

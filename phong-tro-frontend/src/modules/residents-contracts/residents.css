@@ -80,6 +80,26 @@
   font-weight: 600;
 }
 
+/* Keep the resident filters and list close to the section tabs. The shared
+   shell's general page padding leaves too much empty space on this compact
+   list screen. */
+#module-root:has(.resident-building-filter) {
+  padding-top: 18px;
+  padding-bottom: 24px;
+}
+
+.module-page:has(.resident-building-filter) > .module-page__heading {
+  margin-bottom: 12px;
+}
+
+/* The list panel already provides the outer frame. Avoid a second rounded
+   frame around the table on both resident and tenant-account lists. */
+.module-page .panel #mgmtViewContainer > .table-wrap {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 @media (max-width: 600px) {
   .resident-detail-grid { grid-template-columns: 1fr; }
 }

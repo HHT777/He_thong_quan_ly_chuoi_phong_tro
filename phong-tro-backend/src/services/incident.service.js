@@ -44,9 +44,13 @@ async function validatePreviousIncident(previousId, roomId, newId, user, transac
 async function create(payload, user) {
   const roomId = payload.roomId;
   const previousId = payload.previousIncidentId || null;
+  const responsible = payload.responsible || null;
   if (previousId && !roomId) throw fail(422, "Không thể liên kết sự cố khu vực chung", "INCIDENT_COMMON_AREA_LINK_UNSUPPORTED");
   if (!roomId || !String(payload.description || "").trim()) {
     throw fail(422, "Thiếu thông tin sự cố", "INCIDENT_REQUIRED_FIELDS");
+  }
+  if (responsible && !["CHU_TRO", "KHACH_THUE"].includes(responsible)) {
+    throw fail(422, "Người chịu phí không hợp lệ", "INVALID_COST_RESPONSIBILITY");
   }
   if (previousId && user.vai_tro !== "CHU_TRO") {
     throw fail(403, "Chỉ Chủ trọ được liên kết sự cố", "FORBIDDEN");
@@ -59,6 +63,7 @@ async function create(payload, user) {
       loai_su_co: payload.type || payload.title || "KHAC",
       muc_do_uu_tien: payload.priority || "TRUNG_BINH",
       mo_ta: payload.description,
+      ...(user.vai_tro === "CHU_TRO" && responsible ? { doi_tuong_chiu_phi: responsible } : {}),
       hinh_anh_url: payload.imageUrl || null,
       trang_thai: user.vai_tro === "CHU_TRO" ? "DANG_XU_LY" : "CHO_TIEP_NHAN",
       ...(user.vai_tro === "CHU_TRO" ? { nguoi_tiep_nhan_id: user.ma_tai_khoan, ngay_tiep_nhan: new Date() } : {}),
@@ -68,7 +73,7 @@ async function create(payload, user) {
       incident.ma_su_co_truoc = previousId;
     }
     await incident.save({ transaction });
-    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_CREATED", entityType: "SuCo", entityId: incident.ma_su_co, after: { roomId, hasPrevious: Boolean(previousId) } });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "INCIDENT_CREATED", entityType: "SuCo", entityId: incident.ma_su_co, after: { roomId, hasPrevious: Boolean(previousId), responsible: incident.doi_tuong_chiu_phi || null } });
     return incident;
   });
 }
@@ -220,8 +225,7 @@ async function softDelete(incidentId, reason, user) {
     const hasProcessingData = incident.trang_thai !== "CHO_TIEP_NHAN"
       || incident.nguoi_tiep_nhan_id
       || incident.ket_qua_xu_ly
-      || incident.chi_phi_sua_chua !== null
-      || incident.doi_tuong_chiu_phi;
+      || incident.chi_phi_sua_chua !== null;
     if (hasProcessingData || links.expense || links.pendingTenantCharge) {
       throw fail(409, "Chỉ được xóa báo cáo chờ tiếp nhận chưa có dữ liệu xử lý", "INCIDENT_CANNOT_BE_DELETED");
     }

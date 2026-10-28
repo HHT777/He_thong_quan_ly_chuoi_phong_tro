@@ -21,11 +21,20 @@ const billInclude = [
 ];
 
 async function searchContractIds(search) {
-  const term = `%${search}%`;
-  const matches = await HopDong.findAll({ attributes: ["ma_hop_dong"], include: [
-    { model: PhongTro, as: "phongTro", required: false, where: { so_phong: { [Op.like]: term } }, attributes: [] },
-    { model: KhachThue, as: "khachThue", required: false, where: { ho_ten: { [Op.like]: term } }, attributes: [] },
-  ], where: { [Op.or]: [ { "$phongTro.ma_phong$": { [Op.ne]: null } }, { "$khachThue.ma_khach_thue$": { [Op.ne]: null } } ] } });
+  const term = `%${search.trim()}%`;
+  const [rooms, tenants] = await Promise.all([
+    PhongTro.findAll({ attributes: ["ma_phong"], where: { so_phong: { [Op.like]: term } } }),
+    KhachThue.findAll({ attributes: ["ma_khach_thue"], where: { ho_ten: { [Op.like]: term } } }),
+  ]);
+  const roomIds = rooms.map((room) => room.ma_phong);
+  const tenantIds = tenants.map((tenant) => tenant.ma_khach_thue);
+  if (!roomIds.length && !tenantIds.length) return [];
+  const matches = await HopDong.findAll({ attributes: ["ma_hop_dong"], where: {
+    [Op.or]: [
+      { ma_phong: { [Op.in]: roomIds } },
+      { ma_khach_thue: { [Op.in]: tenantIds } },
+    ],
+  } });
   return matches.map((row) => row.ma_hop_dong);
 }
 

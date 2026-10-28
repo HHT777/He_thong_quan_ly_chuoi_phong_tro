@@ -1,4 +1,4 @@
-.bill-page { display: grid; gap: 18px; color: var(--ui2-ink, #14233c); }
+.bill-page { display: grid; gap: 14px; color: var(--ui2-ink, #14233c); }
 .bill-hero, .bill-filters, .bill-page .panel { border: 1px solid var(--ui2-border, #dce5f1); background: #fff; border-radius: 15px; box-shadow: var(--ui2-shadow, 0 3px 14px #102a4c0c); }
 .bill-hero { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 24px; background: linear-gradient(120deg, #f4f8ff, #fff 65%); }
 .bill-eyebrow { color: #4269a6; font-size: 11px; font-weight: 800; letter-spacing: .11em; }
@@ -52,6 +52,23 @@
 @media (prefers-reduced-motion: reduce) { .bill-loading__pulse { animation: none; } }
 .bill-disclosure summary { cursor: pointer; color: #173967; font-size: 15px; font-weight: 750; }
 .bill-disclosure > div { margin-top: 15px; }
+.bill-disclosure [data-definitions] { display: grid; gap: 12px; }
+.bill-disclosure [data-definitions] > button[data-new] { justify-self: start; min-height: 40px; padding: 9px 16px; border: 1px solid #123665; border-radius: 9px; background: #123665; color: #fff; font: inherit; font-weight: 750; cursor: pointer; box-shadow: 0 3px 8px #12366524; }
+.bill-disclosure [data-definitions] > button[data-new]:hover { background: #1c4a91; border-color: #1c4a91; }
+.bill-disclosure [data-definitions] > button[data-new]:focus-visible { outline: 3px solid #83a9ed; outline-offset: 2px; }
+.bill-disclosure [data-definitions] .bill-room-list { width: 100%; box-sizing: border-box; }
+.bill-disclosure [data-definitions] .bill-room-list > div { min-height: 58px; }
+.bill-disclosure [data-definitions] .bill-room-list > div > span:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bill-disclosure [data-definitions] .bill-room-list > p { margin: 0; padding: 18px 16px; color: #526783; }
+.bill-payment-filters { display: grid; width: fit-content; max-width: 100%; grid-template-columns: minmax(150px, 190px) minmax(150px, 190px) minmax(190px, 240px) auto auto; align-items: end; gap: 10px; margin-bottom: 12px; }
+.bill-payment-filters label { display: grid; gap: 6px; color: #455875; font-size: 12px; font-weight: 700; }
+.bill-payment-filters input, .bill-payment-filters select { width: 100%; min-height: 40px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #cdd9e8; border-radius: 8px; background: #fff; color: #203654; font: inherit; }
+.bill-payment-filters :focus-visible { outline: 3px solid #83a9ed; outline-offset: 2px; }
+.bill-payment-filters .btn { min-height: 40px; white-space: nowrap; }
+.bill-disclosure [data-payment-list] .bill-room-list { width: 100%; box-sizing: border-box; }
+.bill-disclosure [data-payment-list] .bill-room-list > div { min-height: 58px; }
+.bill-disclosure [data-payment-list] .bill-room-list > div > span:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bill-disclosure [data-payment-list] .bill-room-list > p { margin: 0; padding: 18px 16px; color: #526783; }
 .bill-modal { padding: 16px; overflow: auto; }
 .bill-dialog { width: min(760px, 100%); max-height: min(90vh, 850px); overflow: auto; margin: auto; border-radius: 16px; background: #fff; box-shadow: 0 24px 70px #091c4180; }
 .bill-dialog > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid #e0e8f2; }
@@ -82,5 +99,7 @@
 .bill-run-log { padding-top: 10px; border-top: 1px solid #e6edf5; }
 .bill-run-log h3 { margin: 0; font-size: 14px; }
 @media (max-width: 1050px) { .bill-hero { align-items: flex-start; flex-direction: column; } .bill-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bill-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .bill-payment-filters { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .bill-filters, .bill-dialog-filters, .bill-stats { grid-template-columns: 1fr; } .bill-dialog > header, .bill-dialog__body { padding: 15px; } .bill-hero { padding: 18px; } .bill-hero__actions { width: 100%; } }
+@media (max-width: 600px) { .bill-payment-filters { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .bill-segments { grid-template-columns: 1fr; } .bill-page .table-wrap { overflow-x: auto; } .bill-dialog { max-height: calc(100vh - 32px); } }

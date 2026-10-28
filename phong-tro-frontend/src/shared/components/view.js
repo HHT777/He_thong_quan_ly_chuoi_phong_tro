@@ -189,7 +189,7 @@ export function renderTable(container, columns, rows, rowActions = [], actionMen
             ${columns
               .map((column) => {
                 const isNumeric = /giá|tiền|số|lượng|diện tích/i.test(column.label || column.key || "");
-                return `<th class="${isNumeric ? "table-align-right" : ""}">${escapeHtml(column.label)}</th>`;
+                return `<th class="${[isNumeric ? "table-align-right" : "", column.className || ""].filter(Boolean).map(escapeHtml).join(" ")}">${escapeHtml(column.label)}</th>`;
               })
               .join("")}
             ${rowActions.length ? "<th>Thao tác</th>" : ""}
@@ -218,7 +218,7 @@ export function renderTable(container, columns, rows, rowActions = [], actionMen
                     return `<td>${formatTruncatedList(rawVal)}</td>`;
                   }
 
-                  return `<td class="${isNumeric ? "table-align-right tabular-nums" : ""}">${escapeHtml(rawVal)}</td>`;
+                  return `<td class="${[isNumeric ? "table-align-right tabular-nums" : "", column.className || ""].filter(Boolean).map(escapeHtml).join(" ")}">${escapeHtml(rawVal)}</td>`;
                 })
                 .join("")}
               ${rowActions.length ? `<td>${actionMenu
@@ -377,6 +377,7 @@ export async function renderList(context, config) {
     const routeFilters = new URLSearchParams(window.location.hash.split("?")[1] || "");
     let searchQuery = routeFilters.get("search") || "";
     let statusFilter = routeFilters.get("status") || "ALL";
+    let routeContractId = config.routeContractFilter ? routeFilters.get(config.routeContractFilter.param) || "" : "";
     let buildingFilter = "ALL";
     let viewMode = "table"; // 'table' or 'grid'
     let currentPage = 1;
@@ -429,9 +430,17 @@ export async function renderList(context, config) {
       `;
     };
 
+    const normalizeSearch = (value) => String(value ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLocaleLowerCase("vi");
+
     // Filter rows logic
     const getFilteredRows = () => {
       return allRows.filter((row) => {
+        if (routeContractId && String(config.routeContractFilter.id(row)) !== routeContractId) return false;
         if (buildingScope && !config.buildingMatch(row, buildingScope)) return false;
         // Status filter
         if (statusFilter !== "ALL" && row.trang_thai !== statusFilter) {
@@ -443,26 +452,20 @@ export async function renderList(context, config) {
         }
         // Search query
         if (searchQuery) {
-          const q = searchQuery.toLowerCase();
-          const match = Object.values(row).some((val) => {
-            if (typeof val === "object" && val !== null) {
-              return Object.values(val).some((sub) => String(sub).toLowerCase().includes(q));
-            }
-            return String(val || "").toLowerCase().includes(q);
-          });
-          if (!match) return false;
+          if (!normalizeSearch(JSON.stringify(row)).includes(normalizeSearch(searchQuery.trim()))) return false;
         }
         return true;
       });
     };
 
     // Main render function inside content
-    const updateView = () => {
+    const updateView = (preserveToolbar = false) => {
       const filtered = getFilteredRows();
       const startIndex = (currentPage - 1) * pageSize;
       const paginated = filtered.slice(startIndex, startIndex + pageSize);
 
-      content.innerHTML = `
+      const nextContent = document.createElement("div");
+      nextContent.innerHTML = `
         ${renderStatStrip()}
 
         <div class="panel" style="overflow:hidden;">
@@ -513,7 +516,7 @@ export async function renderList(context, config) {
               }
 
               ${
-                (config.toolbarActions || []).map((action) => `<button type="button" class="btn btn--secondary" data-toolbar-action="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>`).join("")
+                (config.toolbarActions || []).map((action) => `<button type="button" class="btn ${escapeHtml(action.className || "btn--secondary")}" data-toolbar-action="${escapeHtml(action.id)}">${escapeHtml(action.label)}</button>`).join("")
               }
 
               ${
@@ -530,12 +533,13 @@ export async function renderList(context, config) {
 
           <!-- Active Filter Chips Bar -->
           ${
-            searchQuery || statusFilter !== "ALL" || buildingFilter !== "ALL"
+            searchQuery || routeContractId || statusFilter !== "ALL" || buildingFilter !== "ALL"
               ? `
             <div class="mgmt-filter-chips">
               <span>Đang lọc theo:</span>
               ${searchQuery ? `<span class="filter-chip">Từ khóa: "${escapeHtml(searchQuery)}" <span class="filter-chip-remove" id="clearSearchChip">✕</span></span>` : ""}
-              ${statusFilter !== "ALL" ? `<span class="filter-chip">Trạng thái: ${escapeHtml(statusFilter)} <span class="filter-chip-remove" id="clearStatusChip">✕</span></span>` : ""}
+              ${routeContractId ? `<span class="filter-chip">Hợp đồng: ${escapeHtml(config.routeContractFilter.label(allRows.find((row) => String(config.routeContractFilter.id(row)) === routeContractId) || {}))} <span class="filter-chip-remove" id="clearContractChip">✕</span></span>` : ""}
+              ${statusFilter !== "ALL" ? `<span class="filter-chip">Trạng thái: ${escapeHtml((config.statusOptions || []).find((option) => option.value === statusFilter)?.label || statusFilter)} <span class="filter-chip-remove" id="clearStatusChip">✕</span></span>` : ""}
               ${buildingFilter !== "ALL" ? `<span class="filter-chip">Căn: ${escapeHtml(buildingFilter)} <span class="filter-chip-remove" id="clearBuildingChip">✕</span></span>` : ""}
               <span class="filter-chip-clear" id="clearAllFiltersBtn">Xóa lọc</span>
             </div>
@@ -551,7 +555,22 @@ export async function renderList(context, config) {
         </div>
       `;
 
-      if (buildingScope && config.buildingScopeInToolbar) {
+      const currentPanel = preserveToolbar ? content.querySelector("#mgmtSearchInput")?.closest(".panel") : null;
+      const currentToolbar = currentPanel?.querySelector(".mgmt-toolbar");
+      const nextPanel = nextContent.querySelector("#mgmtSearchInput")?.closest(".panel");
+      if (currentPanel && currentToolbar && nextPanel) {
+        // Keep the focused input connected to the document while results change.
+        [...currentPanel.children].forEach((child) => {
+          if (child !== currentToolbar) child.remove();
+        });
+        [...nextPanel.children].forEach((child) => {
+          if (!child.classList.contains("mgmt-toolbar")) currentPanel.append(child);
+        });
+      } else {
+        content.replaceChildren(...nextContent.childNodes);
+      }
+
+      if (!preserveToolbar && buildingScope && config.buildingScopeInToolbar) {
         const toolbarLeft = content.querySelector(".mgmt-toolbar-left");
         buildingScope.mount(toolbarLeft, () => renderList(context, config), content.querySelector("#mgmtStatusFilter"));
       }
@@ -564,7 +583,7 @@ export async function renderList(context, config) {
         renderTable(viewContainer, config.columns, paginated, config.rowActions || [], config.actionMenu);
       }
 
-      content.querySelectorAll("[data-toolbar-action]").forEach((button) => {
+      if (!preserveToolbar) content.querySelectorAll("[data-toolbar-action]").forEach((button) => {
         button.addEventListener("click", async () => {
           const action = (config.toolbarActions || []).find((item) => item.id === button.dataset.toolbarAction);
           if (action) await action.run(context, () => renderList(context, config));
@@ -642,12 +661,17 @@ export async function renderList(context, config) {
       );
 
       // Bind Toolbar Events
+      if (!preserveToolbar) {
       const searchInput = content.querySelector("#mgmtSearchInput");
-      searchInput?.addEventListener("input", (e) => {
-        searchQuery = e.target.value.trim();
+      const applySearch = (input) => {
+        searchQuery = input.value;
         currentPage = 1;
-        updateView();
+        updateView(true);
+      };
+      searchInput?.addEventListener("input", (event) => {
+        if (!event.isComposing) applySearch(event.target);
       });
+      searchInput?.addEventListener("compositionend", (event) => applySearch(event.target));
 
       content.querySelector("#mgmtStatusFilter")?.addEventListener("change", (e) => {
         statusFilter = e.target.value;
@@ -670,10 +694,17 @@ export async function renderList(context, config) {
         viewMode = "grid";
         updateView();
       });
+      }
 
       // Filter Chips Events
       content.querySelector("#clearSearchChip")?.addEventListener("click", () => {
         searchQuery = "";
+        currentPage = 1;
+        updateView();
+      });
+
+      content.querySelector("#clearContractChip")?.addEventListener("click", () => {
+        routeContractId = "";
         currentPage = 1;
         updateView();
       });
@@ -692,6 +723,7 @@ export async function renderList(context, config) {
 
       content.querySelector("#clearAllFiltersBtn")?.addEventListener("click", () => {
         searchQuery = "";
+        routeContractId = "";
         statusFilter = "ALL";
         buildingFilter = "ALL";
         currentPage = 1;
@@ -699,7 +731,7 @@ export async function renderList(context, config) {
       });
 
       // Create button opens sleek Modal Dialog
-      content.querySelector("#btnOpenCreate")?.addEventListener("click", () => {
+      if (!preserveToolbar) content.querySelector("#btnOpenCreate")?.addEventListener("click", () => {
         openCreateModal(config, async (body) => {
           const headers = typeof config.create.headers === "function" ? config.create.headers(body) : config.create.headers;
           await context.api.post(config.create.endpoint || config.endpoint, body, headers);

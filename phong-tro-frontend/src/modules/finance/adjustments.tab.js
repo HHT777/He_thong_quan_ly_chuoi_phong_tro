@@ -20,12 +20,12 @@ const billLabel = (bill) => `${roomOf(bill)} · ${tenantOf(bill)} · kỳ ${peri
 export default {
   id: "adjustments", route: "/finance/adjustments", title: "Điều chỉnh", tabLabel: "Điều chỉnh", group: "finance", order: 44, roles: ["CHU_TRO"],
   render(context) {
-    context.main.innerHTML = shellPage("Điều chỉnh phiếu thu", "Ghi nhận khoản tăng hoặc giảm trừ cho một phiếu thu, kèm lý do.");
+    context.main.innerHTML = shellPage("Điều chỉnh phiếu thu", "");
     const root = context.main.querySelector("[data-content]");
     root.classList.add("adjustment-page");
     root.innerHTML = `
         <form class="panel adjustment-form" data-adjustment-form>
-          <div class="adjustment-form__heading"><h2>Điều chỉnh một lần</h2><p>Điều chỉnh được ghi vào chi tiết phiếu và lưu lịch sử.</p></div>
+          <div class="adjustment-form__heading"><h2>Điều chỉnh một lần</h2></div>
           <div class="adjustment-form__grid">
             <label>Kỳ phiếu<input type="month" name="period" value="${escapeHtml(currentPeriod())}" required></label>
             <label>Phiếu thu<select name="billId" required><option value="">Đang tải phiếu…</option></select></label>

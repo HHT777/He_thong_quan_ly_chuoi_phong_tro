@@ -27,7 +27,7 @@
   font: inherit;
 }
 
-.inbox-filter { flex: 0 1 180px; }
+.inbox-filter { flex: 0 1 180px; display: grid; gap: 6px; color: #526887; font-size: 13px; }
 .inbox-count { margin-left: auto; color: #7182a0; font-size: 13px; white-space: nowrap; }
 .inbox-message { margin: 0; padding: 0 18px; color: #607399; }
 .inbox-message:not(:empty) { padding-top: 14px; padding-bottom: 14px; }
@@ -43,6 +43,8 @@
 }
 .inbox-item:last-child { border-bottom: 0; }
 .inbox-item:hover { background: #fafcff; }
+.inbox-item[role="link"] { cursor: pointer; }
+.inbox-item[role="link"]:focus-visible { outline: 2px solid #315bb2; outline-offset: -2px; }
 .inbox-item--unread { background: #f7faff; }
 .inbox-item__marker { width: 8px; height: 8px; border-radius: 50%; background: transparent; }
 .inbox-item--unread .inbox-item__marker { background: #315bb2; box-shadow: 0 0 0 4px #e7efff; }

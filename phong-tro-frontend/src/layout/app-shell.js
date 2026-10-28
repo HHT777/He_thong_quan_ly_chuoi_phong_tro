@@ -285,6 +285,23 @@ export function mountShell(root, currentUser) {
     }
   });
 
+  // Forward quick search to the search field of the open screen.
+  const globalSearch = root.querySelector("#globalSearchInput");
+  globalSearch?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    const workspace = root.querySelector("#module-root");
+    const localSearch = workspace?.querySelector(
+      '#mgmtSearchInput, input[name="search"], input[data-search], input[type="search"]'
+    );
+    if (!localSearch || localSearch === globalSearch) return;
+    event.preventDefault();
+    localSearch.value = globalSearch.value;
+    localSearch.dispatchEvent(new Event("input", { bubbles: true }));
+    const applyButton = localSearch.closest("form")?.querySelector('button[type="submit"]');
+    if (applyButton) applyButton.click();
+    else localSearch.focus();
+  });
+
   // Dropdown items
   root.querySelector("#menuItemProfile")?.addEventListener("click", () => {
     toggleDropdown(false);

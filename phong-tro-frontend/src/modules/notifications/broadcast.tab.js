@@ -11,7 +11,7 @@ export default {
   id: "broadcast", route: "/notifications/broadcast", title: "Gửi thông báo",
   tabLabel: "Gửi thông báo", group: "notifications", order: 61, roles: ["CHU_TRO"],
   render(context) {
-    context.main.innerHTML = shellPage("Gửi thông báo", "Soạn thông báo trong ứng dụng cho khách thuê có tài khoản đang hoạt động.");
+    context.main.innerHTML = shellPage("Gửi thông báo", "Khách thuê có tài khoản hoạt động.");
     const content = context.main.querySelector("[data-content]");
     content.innerHTML = `
       <form class="broadcast-layout" data-broadcast-form>

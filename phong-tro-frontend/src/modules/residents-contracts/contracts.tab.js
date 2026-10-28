@@ -152,6 +152,11 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   buildingScope: loadBuildingScope,
   buildingScopeInToolbar: true,
   buildingMatch: (row, scope) => scope.matchesContract(row),
+  routeContractFilter: {
+    param: "contract",
+    id: (row) => row.ma_hop_dong,
+    label: (row) => [row.khachThue?.ho_ten, row.phongTro?.canTro?.ten_can, row.phongTro?.so_phong ? `Phòng ${row.phongTro.so_phong}` : null].filter(Boolean).join(" · ") || "Hợp đồng thuê phòng",
+  },
   statusOptions: [
     { value: "DANG_HIEU_LUC", label: "Đang hiệu lực" },
     { value: "SAP_HET_HAN", label: "Sắp hết hạn" },

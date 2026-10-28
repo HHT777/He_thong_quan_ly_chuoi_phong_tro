@@ -74,9 +74,9 @@ function openResidentDetails(row) {
   document.body.appendChild(overlay);
 }
 
-export default listTab({ id: "residents", route: "/residents-contracts/residents", title: "Cư dân", tabLabel: "Cư dân", group: "residents-contracts", order: 30, roles: ["CHU_TRO"] }, {
+const residentsTab = listTab({ id: "residents", route: "/residents-contracts/residents", title: "Cư dân", tabLabel: "Cư dân", group: "residents-contracts", order: 30, roles: ["CHU_TRO"] }, {
   title: "Cư dân",
-  description: "Danh sách người đứng tên hợp đồng và người ở cùng trong các phòng đang thuê.",
+  description: "",
   endpoint: "/management/khach-thue",
   transform: residentRoster,
   buildingScope: loadBuildingScope,
@@ -127,3 +127,15 @@ export default listTab({ id: "residents", route: "/residents-contracts/residents
     },
   ],
 });
+
+export default {
+  ...residentsTab,
+  async render(context) {
+    const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
+    const requestId = params.get("coTenantRequestId");
+    if (requestId) window.history.replaceState(window.history.state, "", "#/residents-contracts/residents");
+
+    await residentsTab.render(context);
+    if (requestId) await openCoTenantsBox(context, () => residentsTab.render(context), { requestId });
+  },
+};

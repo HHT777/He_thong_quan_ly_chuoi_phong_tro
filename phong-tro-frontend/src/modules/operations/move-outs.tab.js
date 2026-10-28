@@ -66,7 +66,7 @@ function resultMarkup(result) {
 }
 
 async function render(context) {
-  context.main.innerHTML = shellPage("Trả phòng & thanh lý", "Chọn yêu cầu đã duyệt, kiểm tra context rồi quyết toán và hoàn cọc từng phần.");
+  context.main.innerHTML = shellPage("Trả phòng & thanh lý", "");
   const content = context.main.querySelector("[data-content]");
   try {
     const [response, contracts] = await Promise.all([

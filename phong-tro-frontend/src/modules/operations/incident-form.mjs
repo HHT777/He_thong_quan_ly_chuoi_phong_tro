@@ -91,7 +91,13 @@ export function isValidIncidentSelection({ buildings, rooms, buildingId, roomId,
 }
 
 export function buildCreateIncidentPayload(raw) {
-  return { roomId: raw.roomId, type: String(raw.type || "").trim(), priority: raw.priority, description: String(raw.description || "").trim() };
+  return {
+    roomId: raw.roomId,
+    type: String(raw.type || "").trim(),
+    priority: raw.priority,
+    ...(raw.responsible ? { responsible: raw.responsible } : {}),
+    description: String(raw.description || "").trim(),
+  };
 }
 
 export function buildCompletionPayload(raw) {
@@ -124,10 +130,34 @@ export async function loadAllPages(api, path) {
 }
 
 export async function loadIncidentFormData(api) {
-  const [rooms, contracts, members, categories, tenants] = await Promise.all([
-    loadAllPages(api, "/phong"), loadAllPages(api, "/hop-dong"), api.get("/v1/co-tenants"), api.get("/v1/incident-categories"), loadAllPages(api, "/management/khach-thue"),
+  const paths = ["/phong", "/hop-dong", "/v1/co-tenants", "/v1/incident-categories", "/management/khach-thue"];
+  const results = await Promise.allSettled([
+    loadAllPages(api, paths[0]),
+    loadAllPages(api, paths[1]),
+    api.get(paths[2]),
+    api.get(paths[3]),
+    loadAllPages(api, paths[4]),
   ]);
-  return { rooms, contracts, members: members.data || [], categories: categories.data || [], tenants };
+  const roomsResult = results[0];
+  if (roomsResult.status === "rejected") {
+    const reason = roomsResult.reason?.message || "Lỗi kết nối";
+    throw new Error(`Không tải được danh sách phòng (${reason}).`);
+  }
+  if (roomsResult.value.length === 0) {
+    throw new Error("Chưa có phòng để tạo sự cố.");
+  }
+  const valueAt = (index, fallback) => results[index].status === "fulfilled" ? results[index].value : fallback;
+  const warnings = results.flatMap((result, index) => result.status === "rejected"
+    ? [`${paths[index]}: ${result.reason?.message || "không tải được"}`]
+    : []);
+  return {
+    rooms: roomsResult.value,
+    contracts: valueAt(1, []),
+    members: valueAt(2, { data: [] }).data || [],
+    categories: valueAt(3, { data: [] }).data || [],
+    tenants: valueAt(4, []),
+    warnings,
+  };
 }
 
 function comboboxMarkup(field, label, hint = "Gõ để tìm") {
@@ -154,7 +184,7 @@ export function mountIncidentSelectors({ form, data, incidentRoomId = "", respon
   const state = { buildingId: "", roomId: "", tenantId: "" };
   const selectors = ["buildingId", "roomId", tenantFieldName];
   const fieldToState = (field) => field === tenantFieldName ? "tenantId" : field;
-  for (const name of selectors) replaceField(form, name, name === "buildingId" ? "Căn" : name === "roomId" ? "Phòng" : responsibleTenant ? "Khách chịu phí" : "Khách đang ở", name === "roomId" ? "Chọn căn trước" : name === tenantFieldName ? "Chọn phòng trước" : "Gõ tên căn");
+  for (const name of selectors) replaceField(form, name, name === "buildingId" ? "Căn" : name === "roomId" ? "Phòng" : responsibleTenant ? "Khách chịu phí" : "Khách đang ở", name === "roomId" ? "Chọn phòng" : name === tenantFieldName ? "Chọn phòng trước" : "Chọn căn");
   if (incidentRoomId) {
     const room = roomsById.get(String(incidentRoomId));
     if (room) { state.roomId = String(incidentRoomId); state.buildingId = buildingIdOf(room); }
@@ -170,7 +200,7 @@ export function mountIncidentSelectors({ form, data, incidentRoomId = "", respon
   const getRoomOptions = () => {
     let options = rooms.filter((room) => !state.buildingId || buildingIdOf(room) === state.buildingId);
     if (state.tenantChoices?.length) options = options.filter((room) => state.tenantChoices.includes(roomIdOf(room)));
-    return options.map((room) => ({ id: roomIdOf(room), label: formatEntityLabel("room", { so_phong: room.so_phong, ten_can: room.canTro?.ten_can }), detail: room.trang_thai || "" }));
+    return options.map((room) => ({ id: roomIdOf(room), label: room.so_phong ? `Phòng ${room.so_phong}` : "Phòng chưa đặt tên", detail: "" }));
   };
   const getTenantOptions = () => {
     const occupants = state.roomId
@@ -201,7 +231,12 @@ export function mountIncidentSelectors({ form, data, incidentRoomId = "", respon
       const selected = optionsFor(field).find((option) => option.id === state[stateName]);
       control.hidden.value = state[stateName];
       control.input.value = selected?.label || "";
+      control.input.placeholder = field === "buildingId" ? "Chọn căn" : field === "roomId" ? (state.buildingId ? "Chọn phòng" : "Chọn căn trước") : "Chọn phòng trước";
       control.input.disabled = field === "roomId" ? !state.buildingId : stateName === "tenantId" ? !state.roomId : false;
+      if (field === "buildingId" || field === "roomId") {
+        control.input.readOnly = true;
+        control.input.setAttribute("aria-haspopup", "listbox");
+      }
       control.root.querySelector(`#${field}-hint`).textContent = stateName === "tenantId" && state.roomId && !optionsFor(field).length ? "Phòng đang trống" : "";
       control.root.querySelector(`#${field}-error`).textContent = "";
     }

@@ -26,8 +26,8 @@ export async function loadBuildingScope(api, { contracts = false, roomFilter = f
   const stored = sessionStorage.getItem(STORAGE_KEY);
   const selected = buildings.some((building) => building.id === stored) ? stored : "ALL";
   const storedRoom = roomFilter ? sessionStorage.getItem(ROOM_STORAGE_KEY) : null;
-  const selectedRoom = roomFilter && rooms.some((room) => String(room.ma_phong) === storedRoom
-    && (selected === "ALL" || String(room.ma_can) === selected)) ? storedRoom : "ALL";
+  const selectedRoom = roomFilter && selected !== "ALL" && rooms.some((room) => String(room.ma_phong) === storedRoom
+    && String(room.ma_can) === selected) ? storedRoom : "ALL";
 
   const matchesRoom = (roomId) => {
     const room = roomById.get(String(roomId));
@@ -57,9 +57,9 @@ export async function loadBuildingScope(api, { contracts = false, roomFilter = f
     label.innerHTML = `${showBuildingLabel ? "Căn " : ""}<select class="mgmt-filter-select" aria-label="Lọc theo căn">
       <option value="ALL">Tất cả căn trọ</option>
       ${buildings.map((building) => `<option value="${escapeHtml(building.id)}" ${selected === building.id ? "selected" : ""}>${escapeHtml(building.name)}</option>`).join("")}
-    </select>${roomFilter ? `Phòng <select class="mgmt-filter-select" aria-label="Lọc theo phòng">
-      <option value="ALL">Tất cả phòng</option>
-      ${rooms.filter((room) => selected === "ALL" || String(room.ma_can) === selected).map((room) => `<option value="${escapeHtml(room.ma_phong)}" ${selectedRoom === String(room.ma_phong) ? "selected" : ""}>${escapeHtml(room.canTro?.ten_can || "Căn trọ")} · ${escapeHtml(room.so_phong || room.ma_phong)}</option>`).join("")}
+    </select>${roomFilter ? `Phòng <select class="mgmt-filter-select" aria-label="Lọc theo phòng" ${selected === "ALL" ? "disabled" : ""}>
+      <option value="ALL">${selected === "ALL" ? "Chọn căn trước" : "Tất cả phòng"}</option>
+      ${rooms.filter((room) => selected !== "ALL" && String(room.ma_can) === selected).map((room) => `<option value="${escapeHtml(room.ma_phong)}" ${selectedRoom === String(room.ma_phong) ? "selected" : ""}>Phòng ${escapeHtml(room.so_phong || room.ma_phong)}</option>`).join("")}
     </select>` : ""}`;
     label.querySelector("select").addEventListener("change", (event) => {
       sessionStorage.setItem(STORAGE_KEY, event.target.value);

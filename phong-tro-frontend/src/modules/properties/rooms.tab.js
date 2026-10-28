@@ -52,7 +52,7 @@ async function openRoomDetails(context, summary) {
 
 export default listTab({ id: "rooms", route: "/properties/rooms", title: "Phòng", tabLabel: "Phòng", group: "properties", order: 21, roles: ["CHU_TRO"] }, {
   title: "Phòng",
-  description: "Danh sách phòng, giá thuê, sức chứa và trạng thái sử dụng.",
+  description: "",
   endpoint: "/phong?limit=100",
   sortRows: (a, b) => new Intl.Collator("vi", { numeric: true, sensitivity: "base" }).compare(String(a.so_phong || ""), String(b.so_phong || "")),
   openDetail: openRoomDetails,

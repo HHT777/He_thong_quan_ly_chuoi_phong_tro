@@ -22,7 +22,7 @@ function validateImage(file, maxBytes) {
 export default {
   id: "meter-readings", route: "/operations/meter-readings", title: "Chỉ số điện", tabLabel: "Chỉ số điện", group: "meter-readings", order: 50, roles: ["CHU_TRO"],
   async render(context) {
-    context.main.innerHTML = shellPage("Chỉ số điện", "Ghi nhận và xác nhận chỉ số công tơ.");
+    context.main.innerHTML = shellPage("Chỉ số điện", "");
     const content = context.main.querySelector("[data-content]");
     try {
       const [rooms, configResult] = await Promise.all([loadRooms(context.api), context.api.get("/v1/system-config")]);

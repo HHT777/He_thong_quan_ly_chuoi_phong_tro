@@ -78,7 +78,7 @@ function renderRows(rows, selected, buildingId) {
 export default {
   id: "payments", route: "/finance/payments", title: "Thanh toán", tabLabel: "Thanh toán", group: "finance", order: 41, roles: ["CHU_TRO"],
   async render(context) {
-    context.main.innerHTML = shellPage("Thanh toán", "Quản lý thanh toán và xác nhận minh chứng.");
+    context.main.innerHTML = shellPage("Thanh toán", "");
     const content = context.main.querySelector("[data-content]");
     const selected = new Set();
 

@@ -1,5 +1,6 @@
 import { shellPage, escapeHtml, date } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
+import { go } from "../../core/router.js";
 import "./inbox.css";
 
 const TYPE_LABELS = {
@@ -36,14 +37,34 @@ function contractLabels(contracts = []) {
       contract.phongTro?.canTro?.ten_can,
       contract.phongTro?.so_phong ? `Phòng ${contract.phongTro.so_phong}` : null,
     ].filter(Boolean);
-    labels.set(id, parts.length ? parts.join(" · ") : "Hợp đồng thuê phòng");
+    labels.set(id, { ...contract, label: parts.length ? parts.join(" · ") : "Hợp đồng thuê phòng" });
   }
   return labels;
 }
 
+function notificationTarget(row, contracts, role) {
+  const raw = String(row.noi_dung || "");
+  if (["HOP_DONG", "THANH_LY_HOP_DONG"].includes(row.loai_thong_bao)) {
+    if (role === "KHACH_THUE") return "/tenant/rental-info";
+    const match = raw.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (match) {
+      const contract = contracts.get(match[0]);
+      const status = contract?.trang_thai || "ALL";
+      return `/residents-contracts/contracts?contract=${encodeURIComponent(match[0])}&status=${encodeURIComponent(status)}`;
+    }
+    return "/residents-contracts/contracts";
+  }
+  if (["PHIEU_THU", "CONG_NO", "THANH_TOAN"].includes(row.loai_thong_bao)) return "/finance/bills";
+  if (["SU_CO", "KET_QUA_SU_CO"].includes(row.loai_thong_bao)) return "/operations/incidents";
+  if (row.loai_thong_bao === "GIU_PHONG_QUA_HAN") return "/residents-contracts/reservations";
+  if (row.loai_thong_bao === "CHUYEN_PHONG") return "/residents-contracts/contracts";
+  if (row.loai_thong_bao === "KET_QUA_YEU_CAU") return "/residents-contracts/requests";
+  return null;
+}
+
 function readableContent(row, contracts) {
   let content = String(row.noi_dung || "");
-  for (const [id, label] of contracts) content = content.replaceAll(id, label);
+  for (const [id, contract] of contracts) content = content.replaceAll(id, contract.label);
   return content.replace(/\s+/g, " ").trim();
 }
 
@@ -57,7 +78,7 @@ export default {
       <section class="inbox-panel" aria-label="Hộp thư thông báo">
         <div class="inbox-toolbar">
           <label class="inbox-search"><span class="sr-only">Tìm thông báo</span><input type="search" data-search placeholder="Tìm thông báo..." /></label>
-          <label class="inbox-filter"><span class="sr-only">Lọc trạng thái</span><select data-filter><option value="ALL">Tất cả</option><option value="UNREAD">Chưa đọc</option><option value="READ">Đã đọc</option></select></label>
+          <label class="inbox-filter"><span>Trạng thái</span><select data-filter aria-label="Trạng thái"><option value="ALL">Tất cả</option><option value="UNREAD">Chưa đọc</option><option value="READ">Đã đọc</option></select></label>
           <span class="inbox-count" data-count role="status"></span>
         </div>
         <p class="inbox-message" data-message role="status" aria-live="polite">Đang tải thông báo...</p>
@@ -86,7 +107,7 @@ export default {
       count.textContent = `${notifications.length} thông báo · ${unread} chưa đọc`;
       message.textContent = "";
       list.innerHTML = filtered.length ? filtered.map((row) => `
-        <article class="inbox-item ${row.da_doc ? "" : "inbox-item--unread"}" aria-label="${row.da_doc ? "Đã đọc" : "Chưa đọc"}">
+        <article class="inbox-item ${row.da_doc ? "" : "inbox-item--unread"}" aria-label="${row.da_doc ? "Đã đọc" : "Chưa đọc"}" ${notificationTarget(row, contracts, context.user?.vai_tro) ? `role="link" tabindex="0" data-open-notification="${escapeHtml(row.ma_thong_bao)}"` : ""}>
           <span class="inbox-item__marker" aria-hidden="true"></span>
           <div class="inbox-item__body">
             <div class="inbox-item__meta"><span class="inbox-item__type">${escapeHtml(TYPE_LABELS[row.loai_thong_bao] || "Thông báo")}</span><time>${escapeHtml(date(row.thoi_diem_tao))}</time></div>
@@ -111,6 +132,33 @@ export default {
           if (connected()) renderRows();
         }
       }));
+      list.querySelectorAll("[data-open-notification]").forEach((item) => {
+        const open = async () => {
+          const row = notifications.find((entry) => String(entry.ma_thong_bao) === item.dataset.openNotification);
+          if (!row) return;
+          const target = notificationTarget(row, contracts, context.user?.vai_tro);
+          if (!target) return;
+          if (!row.da_doc) {
+            try {
+              await context.api.patch(`/v1/notifications/${encodeURIComponent(row.ma_thong_bao)}/read`, {});
+              row.da_doc = true;
+            } catch (error) {
+              showToast(error.message, "error");
+              return;
+            }
+          }
+          go(target);
+        };
+        item.addEventListener("click", (event) => {
+          if (event.target.closest("button")) return;
+          open();
+        });
+        item.addEventListener("keydown", (event) => {
+          if (event.target !== item || !["Enter", " "].includes(event.key)) return;
+          event.preventDefault();
+          open();
+        });
+      });
     };
 
     search.addEventListener("input", renderRows);

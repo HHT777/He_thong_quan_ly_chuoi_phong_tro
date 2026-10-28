@@ -61,11 +61,21 @@ function askReason(title) {
 const rowName = (row) => `${escapeHtml(row.hopDong?.phongTro?.so_phong || "Phòng")}`;
 const tenantName = (row) => escapeHtml(row.hopDong?.khachThue?.ho_ten || "Chưa rõ khách");
 
+const compareBillsByRoom = (left, right) => {
+  const leftRoom = String(left.hopDong?.phongTro?.so_phong || "");
+  const rightRoom = String(right.hopDong?.phongTro?.so_phong || "");
+  return leftRoom.localeCompare(rightRoom, "vi", { numeric: true, sensitivity: "base" })
+    || String(left.hopDong?.phongTro?.canTro?.ten_can || "").localeCompare(String(right.hopDong?.phongTro?.canTro?.ten_can || ""), "vi", { sensitivity: "base" })
+    || Number(right.nam) - Number(left.nam)
+    || Number(right.thang) - Number(left.thang)
+    || String(left.ma_thanh_toan || "").localeCompare(String(right.ma_thanh_toan || ""));
+};
+
 export async function renderBillsV2(context) {
-  context.main.innerHTML = shellPage("Phiếu thu", "Lập, gửi và theo dõi phiếu thu theo từng kỳ.");
+  context.main.innerHTML = shellPage("Phiếu thu", "");
   const root = context.main.querySelector("[data-content]");
   root.classList.add("bill-page");
-  root.innerHTML = `<section class="bill-hero"><div><span class="bill-eyebrow">TÀI CHÍNH / PHIẾU THU</span><h2>Quản lý phiếu thu</h2><p>Lập Nháp, kiểm tra số tiền và gửi đến khách trong ứng dụng.</p></div><div class="bill-hero__actions"><button class="btn btn--secondary" data-schedule>Thiết lập tự động</button><button class="btn btn--secondary" data-send>Gửi phiếu thu</button><button class="btn btn--primary" data-create>Lập phiếu thu</button></div></section>
+  root.innerHTML = `<section class="bill-hero"><div><span class="bill-eyebrow">TÀI CHÍNH / PHIẾU THU</span><h2>Quản lý phiếu thu</h2></div><div class="bill-hero__actions"><button class="btn btn--secondary" data-schedule>Thiết lập tự động</button><button class="btn btn--secondary" data-send>Gửi phiếu thu</button><button class="btn btn--primary" data-create>Lập phiếu thu</button></div></section>
     <form class="bill-filters" data-filter><label>Kỳ thu<select name="period">${periodOptions(currentPeriod())}</select></label><label>Căn<select name="building"><option value="">Tất cả căn</option></select></label><label>Trạng thái<select name="issuance"><option value="">Tất cả</option><option value="DRAFT">Nháp</option><option value="SENT">Đã gửi</option></select></label><label>Tìm phòng hoặc khách<input name="search" type="search" placeholder="Nhập để tìm"></label><button class="btn btn--primary">Áp dụng</button></form>
     <div class="bill-stats" data-stats aria-live="polite"></div><section class="panel"><div class="bill-section-head"><h3>Danh sách phiếu thu</h3><span data-count></span></div><div data-list aria-live="polite">Đang tải...</div><nav class="bill-pagination" data-pagination aria-label="Phân trang phiếu thu"></nav></section>
     <details class="panel bill-disclosure"><summary>Khoản điều chỉnh định kỳ</summary><div data-definitions></div></details>
@@ -105,7 +115,7 @@ export async function renderBillsV2(context) {
         context.api.get(`/khoan-phai-thu?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search, page, limit: 20 })}`),
         context.api.get(`/v1/bills/summary?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search })}`),
       ]);
-      bills = billResponse.data || []; pagination = billResponse.pagination || {};
+      bills = (billResponse.data || []).slice().sort(compareBillsByRoom); pagination = billResponse.pagination || {};
       const summary = summaryResponse.data || {};
       root.querySelector("[data-stats]").innerHTML = [
         ["Tổng phải thu", money(summary.totalDue)], ["Đã thu", money(summary.totalPaid)],
@@ -287,7 +297,7 @@ export async function renderBillsV2(context) {
     if (action === "paid") { if (!await confirmAction("Ghi nhận toàn bộ số tiền còn lại đã được khách đóng?")) return; const scope = `paid:${row.ma_thanh_toan}`; try { await context.api.post(`/v1/bills/${row.ma_thanh_toan}/mark-paid`, {}, { "Idempotency-Key": keys.keyFor(scope, { billId: row.ma_thanh_toan }) }); keys.complete(scope); showToast("Đã ghi nhận thu.", "success"); refresh(); } catch (error) { showToast(error.message, "error"); } return; }
     if (action === "adjust" || action === "pay") {
       const isPay = action === "pay";
-      const modal = dialog(isPay ? "Ghi nhận thu" : "Điều chỉnh phiếu", `<form class="bill-action-form"><p>${rowName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p>${isPay ? '<label>Ngày thu<input name="day" type="date" required></label><label>Số tiền<input name="amount" type="number" min="1" step="1" required></label><label>Phương thức<input name="method" required></label><label>Ghi chú<textarea name="note"></textarea></label>' : '<label>Chênh lệch VND<input name="delta" type="number" step="1" required></label><label>Lý do<textarea name="reason" required></textarea></label>'}<button class="btn btn--primary">Lưu</button><span data-message role="status"></span></form>`);
+      const modal = dialog(isPay ? "Ghi nhận thu" : "Điều chỉnh phiếu", `<form class="bill-action-form"><p>${rowName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p>${isPay ? '<label>Ngày thu<input name="day" type="date" required></label><label>Số tiền<input name="amount" type="number" min="1" step="1" required></label><label>Phương thức<select name="method" required><option value="" disabled selected>Chọn phương thức</option><option value="Tiền mặt">Tiền mặt</option><option value="Chuyển khoản">Chuyển khoản</option></select></label><label>Ghi chú<textarea name="note"></textarea></label>' : '<label>Chênh lệch VND<input name="delta" type="number" step="1" required></label><label>Lý do<textarea name="reason" required></textarea></label>'}<button class="btn btn--primary">Lưu</button><span data-message role="status"></span></form>`);
       modal.body.querySelector("form").onsubmit = async (event) => { event.preventDefault(); const form = event.currentTarget; const raw = Object.fromEntries(new FormData(form)); const button = form.querySelector("button"); button.disabled = true; try { if (isPay) { const scope = `pay:${row.ma_thanh_toan}`; const payload = { ma_khoan_phai_thu: row.ma_thanh_toan, ngay_thanh_toan: requiredText(raw.day, "Ngày thu"), so_tien: integerVnd(raw.amount, "Số tiền", { positive: true }), phuong_thuc: requiredText(raw.method, "Phương thức"), ghi_chu: raw.note?.trim() || undefined }; await context.api.post("/khoan-phai-thu/payment/create", payload, { "Idempotency-Key": keys.keyFor(scope, payload) }); keys.complete(scope); } else await context.api.post(`/v1/bills/${row.ma_thanh_toan}/adjustments`, { delta: Number(raw.delta), reason: requiredText(raw.reason, "Lý do") }); modal.close(); showToast("Đã lưu.", "success"); refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; button.disabled = false; } };
     }
   }
@@ -342,10 +352,45 @@ export async function renderBillsV2(context) {
   }
 
   async function loadPayments() {
-    const target = root.querySelector("[data-payments]"); loading(target);
-    try { const response = await context.api.get("/khoan-phai-thu/payment/list?limit=100"); const rows = (response.data || []).filter((row) => Number(row.so_tien) > 0);
-      target.innerHTML = `<div class="bill-room-list">${rows.map((row, i) => `<div><span><strong>${escapeHtml(row.thanhToan?.hopDong?.phongTro?.so_phong || "Phòng")} · ${escapeHtml(row.thanhToan?.hopDong?.khachThue?.ho_ten || "Khách thuê")}</strong><small>${date(row.thoi_diem_ghi_nhan)} · ${escapeHtml(paymentStatusLabels[row.trang_thai_xac_nhan] || "Trạng thái chưa xác định")}</small></span><span>${money(row.so_tien)} ${row.trang_thai_xac_nhan === "DA_XAC_NHAN" && row.nguon_thanh_toan !== "KHAU_TRU_COC" ? `<button class="btn btn--secondary" data-cancel="${i}">Hủy lần thu</button>` : ""}</span></div>`).join("") || "<p>Chưa có lần thu.</p>"}</div>`;
-      target.querySelectorAll("[data-cancel]").forEach((button) => button.onclick = async () => { const row = rows[Number(button.dataset.cancel)]; const reasonText = await askReason("Lý do hủy lần thu"); if (!reasonText || !await confirmAction("Xác nhận hủy lần thu này?")) return; try { const scope = `cancel:${row.ma_giao_dich}`; const payload = { reason: reasonText }; await context.api.post(`/v1/payments/${row.ma_giao_dich}/cancel`, payload, { "Idempotency-Key": keys.keyFor(scope, payload) }); keys.complete(scope); await loadPayments(); refresh(); } catch (error) { showToast(error.message, "error"); } });
+    const target = root.querySelector("[data-payments]");
+    const previous = target.querySelector("[data-payment-filters]")
+      ? Object.fromEntries(new FormData(target.querySelector("[data-payment-filters]")))
+      : {};
+    loading(target);
+    try {
+      const rows = [];
+      let pageNo = 1;
+      let hasNext = true;
+      while (hasNext) {
+        const response = await context.api.get(`/khoan-phai-thu/payment/list?limit=100&page=${pageNo}`);
+        rows.push(...(response.data || []).filter((row) => Number(row.so_tien) > 0));
+        hasNext = Boolean(response.pagination?.hasNext);
+        pageNo += 1;
+      }
+      target.innerHTML = `<form class="bill-payment-filters" data-payment-filters>
+        <label>Từ ngày<input type="date" name="from" value="${escapeHtml(previous.from || "")}"></label>
+        <label>Đến ngày<input type="date" name="to" value="${escapeHtml(previous.to || "")}"></label>
+        <label>Căn<select name="building"><option value="">Tất cả căn</option>${buildings.map((building) => `<option value="${escapeHtml(building.ma_can)}" ${previous.building === String(building.ma_can) ? "selected" : ""}>${escapeHtml(building.ten_can)}</option>`).join("")}</select></label>
+        <button class="btn btn--primary" type="submit">Lọc</button>
+        <button class="btn btn--secondary" type="reset">Xóa lọc</button>
+      </form><div data-payment-list></div>`;
+      const form = target.querySelector("[data-payment-filters]");
+      const list = target.querySelector("[data-payment-list]");
+      const render = () => {
+        const filters = Object.fromEntries(new FormData(form));
+        const filtered = rows.filter((row) => {
+          const paymentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(row.thoi_diem_ghi_nhan));
+          const buildingId = row.thanhToan?.hopDong?.phongTro?.ma_can;
+          return (!filters.from || paymentDate >= filters.from)
+            && (!filters.to || paymentDate <= filters.to)
+            && (!filters.building || String(buildingId) === filters.building);
+        });
+        list.innerHTML = `<div class="bill-room-list">${filtered.map((row, i) => `<div><span><strong>${escapeHtml(row.thanhToan?.hopDong?.phongTro?.so_phong || "Phòng")} · ${escapeHtml(row.thanhToan?.hopDong?.khachThue?.ho_ten || "Khách thuê")}</strong><small>${date(row.thoi_diem_ghi_nhan)} · ${escapeHtml(paymentStatusLabels[row.trang_thai_xac_nhan] || "Trạng thái chưa xác định")}</small></span><span>${money(row.so_tien)} ${row.trang_thai_xac_nhan === "DA_XAC_NHAN" && row.nguon_thanh_toan !== "KHAU_TRU_COC" ? `<button class="btn btn--secondary" data-cancel="${i}">Hủy lần thu</button>` : ""}</span></div>`).join("") || "<p>Không có lần thu phù hợp.</p>"}</div>`;
+        list.querySelectorAll("[data-cancel]").forEach((button) => button.onclick = async () => { const row = filtered[Number(button.dataset.cancel)]; const reasonText = await askReason("Lý do hủy lần thu"); if (!reasonText || !await confirmAction("Xác nhận hủy lần thu này?")) return; try { const scope = `cancel:${row.ma_giao_dich}`; const payload = { reason: reasonText }; await context.api.post(`/v1/payments/${row.ma_giao_dich}/cancel`, payload, { "Idempotency-Key": keys.keyFor(scope, payload) }); keys.complete(scope); await loadPayments(); refresh(); } catch (error) { showToast(error.message, "error"); } });
+      };
+      form.onsubmit = (event) => { event.preventDefault(); render(); };
+      form.onreset = () => setTimeout(render, 0);
+      render();
     } catch (error) { target.textContent = error.message; }
   }
 
