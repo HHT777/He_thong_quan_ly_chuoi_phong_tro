@@ -21,7 +21,6 @@
 .system-config-row__info p { line-height: 1.5; }
 .system-config-row__controls { min-width: 0; }
 .system-config-input span { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
-.system-config-row__controls small { display: block; color: var(--text-secondary); }
 .system-config-row__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .system-config-row__actions button { margin: 0; }
 .system-config-row [data-message] { min-height: 1.5em; color: var(--brand-primary); }
