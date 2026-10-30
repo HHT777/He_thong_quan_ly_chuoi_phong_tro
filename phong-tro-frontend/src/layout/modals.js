@@ -189,7 +189,7 @@ export function openSupportModal() {
     </div>
 
     <div class="modal-footer">
-      <a class="btn btn--secondary" href="./member.html" target="_blank" rel="noopener noreferrer" aria-label="Mở trang trợ giúp trong tab mới">${icons.help(18)} Trang trợ giúp</a>
+      <a class="btn btn--secondary" href="./member.html" target="_blank" rel="noopener noreferrer" aria-label="Mở trang Hỗ trợ trong tab mới">${icons.help(18)} Hỗ trợ</a>
       <button class="btn btn--secondary" data-modal-close>Đóng</button>
     </div>
   `;
