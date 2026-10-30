@@ -96,6 +96,22 @@ async function propose(tenantId, payload, actorId) {
   });
 }
 
+async function addByLandlord(user, payload) {
+  const details = validateProposal(payload);
+  if (!payload.roomId) throw fail(400, "Chọn phòng trước khi thêm người ở cùng", "ROOM_REQUIRED");
+  return sequelize.transaction(async (transaction) => {
+    await assertLandlordOwnsRoom(user, payload.roomId, { transaction });
+    const room = await PhongTro.findByPk(payload.roomId, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!room) throw fail(404, "Không tìm thấy phòng", "RESOURCE_NOT_FOUND");
+    const contract = await HopDong.findOne({ where: { ma_phong: payload.roomId, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, transaction, lock: transaction.LOCK.UPDATE });
+    if (!contract) throw fail(409, "Hãy lập hợp đồng trước", "ACTIVE_CONTRACT_NOT_FOUND");
+    await assertCapacityAndUniqueness(room, details.phone, transaction);
+    const member = await ThanhVienPhong.create({ ma_phong: room.ma_phong, ma_hop_dong: contract.ma_hop_dong, ho_ten: details.name, so_dien_thoai: details.phone, cccd_giay_to: details.identity, ngay_sinh: details.birthDate, gioi_tinh: details.gender, dia_chi_thuong_tru: details.address, quan_he: details.relationship, ngay_vao: details.startDate, trang_thai_cu_tru: "DANG_O" }, { transaction });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "CO_TENANT_ADMITTED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, after: { roomId: room.ma_phong, contractId: contract.ma_hop_dong } });
+    return member;
+  });
+}
+
 async function approve(request, transaction, actorId) {
   const proposal = await DeXuatBanCungPhong.findByPk(request.ma_yeu_cau, {
     transaction,
@@ -151,4 +167,4 @@ async function getProposal(id, user) {
   };
 }
 
-module.exports = { propose, approve, validateProposal, getProposal };
+module.exports = { propose, approve, validateProposal, getProposal, addByLandlord };

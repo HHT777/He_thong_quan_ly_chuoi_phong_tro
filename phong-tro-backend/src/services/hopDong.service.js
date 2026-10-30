@@ -19,24 +19,26 @@ const ownerUser = (actorId) => ({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId });
 class HopDongService {
   async createHopDong(data, actorId) {
     return sequelize.transaction(async (transaction) => {
-    // Verify customer exists
-    const khachThue = await KhachThue.findByPk(data.ma_khach_thue, { transaction });
-    if (!khachThue) {
-      throw {
-        status: 404,
-        message: "Khách thuê không tồn tại",
-      };
-    }
-
     // Verify room exists
     const phong = await PhongTro.findByPk(data.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
     await assertOwned(ownerUser(actorId), "room", data.ma_phong, { transaction });
-    await assertOwned(ownerUser(actorId), "tenant", data.ma_khach_thue, { transaction });
     if (!phong) {
       throw {
         status: 404,
         message: "Phòng trọ không tồn tại",
       };
+    }
+    let khachThue;
+    if (data.khachThue) {
+      const tenantData = { ...data.khachThue, so_dien_thoai: data.khachThue.so_dien_thoai.trim(), cccd_giay_to: data.khachThue.cccd_giay_to.trim() };
+      const duplicate = await KhachThue.findOne({ where: { [Op.or]: [{ so_dien_thoai: tenantData.so_dien_thoai }, { cccd_giay_to: tenantData.cccd_giay_to }] }, transaction });
+      if (duplicate) throw { status: 409, code: duplicate.so_dien_thoai === tenantData.so_dien_thoai ? "TENANT_PHONE_EXISTS" : "TENANT_IDENTITY_EXISTS", message: "Khách này đã có hồ sơ — dùng hồ sơ có sẵn?" };
+      try { khachThue = await KhachThue.create(tenantData, { transaction }); }
+      catch (error) { if (error.name === "SequelizeUniqueConstraintError") throw { status: 409, code: "TENANT_IDENTITY_EXISTS", message: "Giấy tờ đã có hồ sơ — dùng hồ sơ có sẵn?" }; throw error; }
+    } else {
+      khachThue = await KhachThue.findByPk(data.ma_khach_thue, { transaction });
+      if (!khachThue) throw { status: 404, message: "Khách thuê không tồn tại" };
+      await assertOwned(ownerUser(actorId), "tenant", data.ma_khach_thue, { transaction });
     }
 
     // Check if there's a valid active contract on this room
@@ -65,8 +67,8 @@ class HopDongService {
     }
 
     // Create contract
-    const { tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, chi_so_dien_ban_dau: initialElectricityReading, ...contractData } = data;
-    const hopDong = await HopDong.create({ ...contractData, trang_thai: "DANG_HIEU_LUC" }, { transaction });
+    const { khachThue: _newTenant, tien_coc: tienCoc, ngay_nhan_coc: ngayNhanCoc, chi_so_dien_ban_dau: initialElectricityReading, ...contractData } = data;
+    const hopDong = await HopDong.create({ ...contractData, ma_khach_thue: khachThue.ma_khach_thue, trang_thai: "DANG_HIEU_LUC" }, { transaction });
     const start = new Date(`${hopDong.ngay_bat_dau}T00:00:00Z`);
     await ChiSoDien.create({
       ma_phong: hopDong.ma_phong,

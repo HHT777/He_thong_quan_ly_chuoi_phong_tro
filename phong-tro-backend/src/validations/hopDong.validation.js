@@ -2,7 +2,12 @@ const Joi = require("joi");
 
 const hopDongValidation = {
   createHopDong: Joi.object({
-    ma_khach_thue: Joi.string().max(36).required(),
+    ma_khach_thue: Joi.string().max(36),
+    khachThue: Joi.object({
+      ho_ten: Joi.string().trim().max(100).required(),
+      so_dien_thoai: Joi.string().trim().pattern(/^\d{9,15}$/).required(),
+      cccd_giay_to: Joi.string().trim().max(20).required(),
+    }).unknown(false),
     ma_phong: Joi.string().max(36).required(),
     ngay_bat_dau: Joi.date().required(),
     ngay_ket_thuc: Joi.date().required(),
@@ -17,7 +22,7 @@ const hopDongValidation = {
     goi_gia_han_cho_phep: Joi.string().valid("6", "12", "6,12").allow(null),
     ngay_nhan_coc: Joi.date().allow(null),
     ma_dat_giu: Joi.string().max(36).allow(null),
-  }),
+  }).xor("ma_khach_thue", "khachThue"),
 
   updateHopDong: Joi.object({
     ngay_ket_thuc: Joi.date(),

@@ -410,8 +410,10 @@ router.get("/co-tenant-proposals/:id", async (req, res, next) => {
     return data(res, await coTenantService.getProposal(value, req.user));
   } catch (error) { next(error); }
 });
-router.post("/co-tenants", tenant, async (req, res, next) => {
+router.post("/co-tenants", async (req, res, next) => {
   try {
+    if (req.user.vai_tro === "CHU_TRO") return data(res, await coTenantService.addByLandlord(req.user, req.body), 201);
+    if (req.user.vai_tro !== "KHACH_THUE") throw fail(403, "Không có quyền thêm người ở cùng", "FORBIDDEN");
     return data(res, await coTenantService.propose(
       req.user.ma_khach_thue,
       req.body,
