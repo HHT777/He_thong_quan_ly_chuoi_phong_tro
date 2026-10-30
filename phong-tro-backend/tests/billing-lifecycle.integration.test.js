@@ -255,3 +255,34 @@ test("FR-200 configuration changes apply without restart and named lock admits o
   await request("/api/v1/system-config/billScheduleHour", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: 8 }) });
   await request("/api/v1/system-config/billScheduleEnabled", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ value: false }) });
 });
+
+test("FR-151 enabled automatic schedule creates one July draft and disabled schedule does not run", async () => {
+  const landlord = await login(integration.landlord);
+  const fresh = await createFreshRental(landlord, "billing-auto-schedule");
+  await confirmedReading(fresh, "2027-06", 80);
+  const original = await request("/api/v1/bills/schedule", { headers: headers(landlord) });
+  assert.equal(original.response.status, 200, JSON.stringify(original.body));
+  const putSchedule = (enabled) => request("/api/v1/bills/schedule", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ enabled, day: 2, hour: 8, buildingIds: [fresh.building.ma_can] }) });
+  try {
+    assert.equal((await putSchedule(false)).response.status, 200);
+    const dueTime = new Date("2027-07-02T08:00:00+07:00");
+    assert.equal((await billingCronService.run({ now: dueTime })).due, false);
+    assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2027, thang: 7 } }), 0);
+    assert.equal((await putSchedule(true)).response.status, 200);
+    assert.equal((await billingCronService.run({ now: new Date("2027-07-02T07:00:00+07:00") })).due, false);
+    const first = await billingCronService.run({ now: dueTime });
+    assert.equal(first.due, true);
+    assert.ok(first.created >= 1);
+    assert.equal(first.sent, 0);
+    const bill = await ThanhToan.findOne({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2027, thang: 7, loai_thanh_toan: "DINH_KY" } });
+    assert.ok(bill);
+    assert.equal(bill.da_gui, false);
+    const repeat = await billingCronService.run({ now: dueTime });
+    assert.equal(repeat.alreadyRan, true);
+    assert.equal(repeat.created, 0);
+    assert.equal(await ThanhToan.count({ where: { ma_hop_dong: fresh.contract.ma_hop_dong, nam: 2027, thang: 7 } }), 1);
+  } finally {
+    const before = original.body.data;
+    await request("/api/v1/bills/schedule", { method: "PUT", headers: headers(landlord), body: JSON.stringify({ enabled: before.enabled, day: before.day, hour: before.hour, buildingIds: before.buildingIds }) });
+  }
+});

@@ -213,7 +213,7 @@ export async function renderBillsV2(context) {
       const scoped = Boolean(schedule.buildingIds?.length);
       modal.body.innerHTML = `<p class="bill-hint">Lịch này chỉ tạo phiếu Nháp. Bạn xem số tiền và gửi phiếu cho khách sau khi lập.</p>
         <form data-schedule-form class="bill-schedule-form">
-          <label class="bill-switch"><input type="checkbox" name="enabled" ${schedule.enabled ? "checked" : ""}> Tự động lập phiếu hằng tháng</label>
+          <label class="bill-schedule-toggle"><input type="checkbox" name="enabled" role="switch" aria-checked="${Boolean(schedule.enabled)}" ${schedule.enabled ? "checked" : ""}><span class="bill-schedule-toggle__track" aria-hidden="true"></span><span class="bill-schedule-toggle__copy"><strong>Tự động lập phiếu hằng tháng</strong><small data-enabled-state>${schedule.enabled ? "Đang bật" : "Đang tắt"}</small></span></label>
           <div class="bill-schedule-time"><label>Ngày trong tháng <input name="day" type="number" min="1" max="28" required value="${escapeHtml(schedule.day)}"><small>Chọn từ ngày 1 đến 28</small></label><label>Giờ chạy (giờ Việt Nam) <input name="hour" type="number" min="0" max="23" required value="${escapeHtml(schedule.hour)}"><small>0–23 giờ</small></label></div>
           <fieldset class="bill-schedule-scope"><legend>Áp dụng cho căn</legend><label><input type="radio" name="scope" value="all" ${scoped ? "" : "checked"}> Tất cả căn</label><label><input type="radio" name="scope" value="selected" ${scoped ? "checked" : ""}> Chỉ các căn được chọn</label><div class="bill-schedule-buildings" data-buildings>${buildings.map((row) => `<label><input type="checkbox" name="building" value="${escapeHtml(row.ma_can)}" ${(schedule.buildingIds || []).includes(row.ma_can) ? "checked" : ""}> ${escapeHtml(row.ten_can)}</label>`).join("") || "Chưa có căn nào."}</div></fieldset>
           <p class="bill-hint">Phòng cần có hợp đồng hiệu lực, chỉ số điện kỳ trước đã xác nhận (kỳ đầu tính 0 đ) và chưa có phiếu của kỳ. Lịch đã lỡ được bỏ qua.</p>
@@ -229,7 +229,17 @@ export async function renderBillsV2(context) {
          buildingIds: form.elements.namedItem("scope").value === "all" ? [] : [...form.querySelectorAll('[name="building"]:checked')].map((input) => input.value),
       });
       let saved = JSON.stringify(values());
-       const updateSave = () => { const selectedScope = form.elements.namedItem("scope").value === "selected"; form.querySelector("[data-buildings]").hidden = !selectedScope; form.querySelector("[data-save]").disabled = JSON.stringify(values()) === saved || (selectedScope && values().buildingIds.length === 0); };
+       const updateSave = () => {
+         const selectedScope = form.elements.namedItem("scope").value === "selected";
+         const enabled = form.elements.namedItem("enabled");
+         const pending = enabled.checked !== JSON.parse(saved).enabled;
+         const state = form.querySelector("[data-enabled-state]");
+         state.textContent = pending ? `Chưa lưu · sẽ ${enabled.checked ? "bật" : "tắt"}` : `Đang ${enabled.checked ? "bật" : "tắt"}`;
+         state.dataset.pending = String(pending);
+         enabled.setAttribute("aria-checked", String(enabled.checked));
+         form.querySelector("[data-buildings]").hidden = !selectedScope;
+         form.querySelector("[data-save]").disabled = JSON.stringify(values()) === saved || (selectedScope && values().buildingIds.length === 0);
+       };
       form.addEventListener("input", updateSave);
       form.addEventListener("change", updateSave);
        updateSave();
@@ -243,6 +253,7 @@ export async function renderBillsV2(context) {
            form.querySelector("[data-message]").textContent = `Đã lưu. Lần kế tiếp: ${nextRunLabel(response.data.nextRun)}`;
            modal.body.querySelector("[data-next-run]").textContent = nextRunLabel(response.data.nextRun);
           saved = JSON.stringify(values());
+           updateSave();
           showToast("Đã lưu lịch lập phiếu.", "success");
         } catch (error) { form.querySelector("[data-message]").textContent = error.message; updateSave(); }
       };

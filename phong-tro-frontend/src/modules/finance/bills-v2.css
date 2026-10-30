@@ -96,7 +96,16 @@
 .bill-hint--warning { background: #fff3d8; color: #8c5600; }
 .bill-action-form, .bill-schedule-form { display: grid; gap: 13px; }
 .bill-action-form p { margin: 0; }
-.bill-switch { display: flex; gap: 9px; align-items: center; font-weight: 750; }
+.bill-schedule-toggle { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #cdd9e8; border-radius: 10px; cursor: pointer; }
+.bill-schedule-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.bill-schedule-toggle__track { position: relative; width: 46px; height: 26px; flex: 0 0 46px; border-radius: 16px; background: #8997aa; transition: background .15s; }
+.bill-schedule-toggle__track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.bill-schedule-toggle input:checked + .bill-schedule-toggle__track { background: #1767df; }
+.bill-schedule-toggle input:checked + .bill-schedule-toggle__track::after { transform: translateX(20px); }
+.bill-schedule-toggle input:focus-visible + .bill-schedule-toggle__track { outline: 3px solid #83a9ed; outline-offset: 3px; }
+.bill-schedule-toggle__copy { display: grid; gap: 2px; }
+.bill-schedule-toggle__copy small { color: #526b90; font-size: 12px; }
+.bill-schedule-toggle__copy small[data-pending="true"] { color: #955b00; }
 .bill-schedule-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .bill-schedule-time label { display: grid; gap: 6px; color: #455875; font-size: 13px; font-weight: 700; }
 .bill-schedule-time small { font-weight: 400; color: #61718a; }
