@@ -2,7 +2,7 @@ import "./bills-v2.css";
 import { shellPage, escapeHtml, money, datePadded as date, confirmAction } from "../../shared/components/view.js";
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
-import { billStatus, billPrimaryAction, billStatusTone, billMenuActions, paymentStatusLabels } from "./billPresentation.js";
+import { billStatus, billPrimaryAction, billStatusTone, billMenuActions, billAdjustmentPreview, paymentStatusLabels } from "./billPresentation.js";
 import { billLineLabels, renderBillInvoice } from "./billInvoice.js";
 import { fetchBillPage } from "./billRequests.js";
 
@@ -315,10 +315,35 @@ export async function renderBillsV2(context) {
     if (action === "resend") return sendDialog([row.ma_thanh_toan], true);
     if (action === "detail") { dialog("Chi tiết phiếu thu", renderBillInvoice(row, status(row), date(row.ngay_gui))); return; }
     if (action === "paid") { if (!await confirmAction("Ghi nhận toàn bộ số tiền còn lại đã được khách đóng?")) return; const scope = `paid:${row.ma_thanh_toan}`; try { await context.api.post(`/v1/bills/${row.ma_thanh_toan}/mark-paid`, {}, { "Idempotency-Key": keys.keyFor(scope, { billId: row.ma_thanh_toan }) }); keys.complete(scope); showToast("Đã ghi nhận thu.", "success"); refresh(); } catch (error) { showToast(error.message, "error"); } return; }
-    if (action === "adjust" || action === "pay") {
-      const isPay = action === "pay";
-      const modal = dialog(isPay ? "Ghi nhận thu" : "Điều chỉnh phiếu", `<form class="bill-action-form"><p>${rowName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p>${isPay ? '<label>Ngày thu<input name="day" type="date" required></label><label>Số tiền<input name="amount" type="number" min="1" step="1" required></label><label>Phương thức<select name="method" required><option value="" disabled selected>Chọn phương thức</option><option value="Tiền mặt">Tiền mặt</option><option value="Chuyển khoản">Chuyển khoản</option></select></label><label>Ghi chú<textarea name="note"></textarea></label>' : '<label>Chênh lệch VND<input name="delta" type="number" step="1" required></label><label>Lý do<textarea name="reason" required></textarea></label>'}<button class="btn btn--primary">Lưu</button><span data-message role="status"></span></form>`);
-      modal.body.querySelector("form").onsubmit = async (event) => { event.preventDefault(); const form = event.currentTarget; const raw = Object.fromEntries(new FormData(form)); const button = form.querySelector("button"); button.disabled = true; try { if (isPay) { const scope = `pay:${row.ma_thanh_toan}`; const payload = { ma_khoan_phai_thu: row.ma_thanh_toan, ngay_thanh_toan: requiredText(raw.day, "Ngày thu"), so_tien: integerVnd(raw.amount, "Số tiền", { positive: true }), phuong_thuc: requiredText(raw.method, "Phương thức"), ghi_chu: raw.note?.trim() || undefined }; await context.api.post("/khoan-phai-thu/payment/create", payload, { "Idempotency-Key": keys.keyFor(scope, payload) }); keys.complete(scope); } else await context.api.post(`/v1/bills/${row.ma_thanh_toan}/adjustments`, { delta: Number(raw.delta), reason: requiredText(raw.reason, "Lý do") }); modal.close(); showToast("Đã lưu.", "success"); refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; button.disabled = false; } };
+    if (action === "adjust") {
+      const modal = dialog("Điều chỉnh phiếu", `<form class="bill-action-form"><p>Phòng ${rowName(row)} · ${tenantName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p><label>Loại điều chỉnh<select name="direction"><option value="decrease">Giảm trừ</option><option value="increase">Khoản tăng</option></select></label><label>Số tiền (VND)<input name="amount" type="number" min="1" step="1" inputmode="numeric" required></label><label>Lý do<textarea name="reason" rows="3" required></textarea></label><div class="bill-adjustment-preview" data-preview aria-live="polite"></div><button class="btn btn--primary" type="submit" disabled>Ghi nhận điều chỉnh</button><span data-message role="status"></span></form>`);
+      const form = modal.body.querySelector("form");
+      const updatePreview = () => {
+        const result = billAdjustmentPreview(row, form.elements.namedItem("direction").value, form.elements.namedItem("amount").value);
+        const preview = form.querySelector("[data-preview]");
+        preview.innerHTML = `<div><span>Phải thu hiện tại</span><strong>${escapeHtml(money(row.tong_phai_tra))}</strong></div><div><span>Đã thu</span><strong>${escapeHtml(money(result.paid))}</strong></div><div><span>Còn nợ hiện tại</span><strong>${escapeHtml(money(row.so_tien_con_no))}</strong></div><div><span>Sau điều chỉnh</span><strong>${result.error ? "—" : `${escapeHtml(money(result.total))} phải thu · ${escapeHtml(money(result.remaining))} còn nợ`}</strong></div><p data-preview-error></p>`;
+        preview.querySelector("[data-preview-error]").textContent = result.error;
+        form.querySelector('[type="submit"]').disabled = Boolean(result.error) || !form.elements.namedItem("reason").value.trim();
+      };
+      form.addEventListener("input", updatePreview);
+      form.addEventListener("change", updatePreview);
+      form.onsubmit = async (event) => {
+        event.preventDefault();
+        const button = form.querySelector('[type="submit"]'); button.disabled = true;
+        try {
+          const amount = integerVnd(form.elements.namedItem("amount").value, "Số tiền", { positive: true });
+          const result = billAdjustmentPreview(row, form.elements.namedItem("direction").value, amount);
+          if (result.error) return updatePreview();
+          await context.api.post(`/v1/bills/${encodeURIComponent(row.ma_thanh_toan)}/adjustments`, { delta: result.delta, reason: requiredText(form.elements.namedItem("reason").value, "Lý do") });
+          modal.close(); showToast("Đã ghi nhận điều chỉnh.", "success"); refresh();
+        } catch (error) { form.querySelector("[data-message]").textContent = error.message; updatePreview(); }
+      };
+      updatePreview();
+      return;
+    }
+    if (action === "pay") {
+      const modal = dialog("Ghi nhận thu", `<form class="bill-action-form"><p>${rowName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p><label>Ngày thu<input name="day" type="date" required></label><label>Số tiền<input name="amount" type="number" min="1" step="1" required></label><label>Phương thức<select name="method" required><option value="" disabled selected>Chọn phương thức</option><option value="Tiền mặt">Tiền mặt</option><option value="Chuyển khoản">Chuyển khoản</option></select></label><label>Ghi chú<textarea name="note"></textarea></label><button class="btn btn--primary">Lưu</button><span data-message role="status"></span></form>`);
+      modal.body.querySelector("form").onsubmit = async (event) => { event.preventDefault(); const form = event.currentTarget; const raw = Object.fromEntries(new FormData(form)); const button = form.querySelector("button"); button.disabled = true; try { const scope = `pay:${row.ma_thanh_toan}`; const payload = { ma_khoan_phai_thu: row.ma_thanh_toan, ngay_thanh_toan: requiredText(raw.day, "Ngày thu"), so_tien: integerVnd(raw.amount, "Số tiền", { positive: true }), phuong_thuc: requiredText(raw.method, "Phương thức"), ghi_chu: raw.note?.trim() || undefined }; await context.api.post("/khoan-phai-thu/payment/create", payload, { "Idempotency-Key": keys.keyFor(scope, payload) }); keys.complete(scope); modal.close(); showToast("Đã lưu.", "success"); refresh(); } catch (error) { form.querySelector("[data-message]").textContent = error.message; button.disabled = false; } };
     }
   }
 

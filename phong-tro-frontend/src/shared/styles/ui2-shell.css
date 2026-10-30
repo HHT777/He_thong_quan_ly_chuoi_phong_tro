@@ -73,13 +73,11 @@ body, button, input, select, textarea { font-family: var(--font-sans); }
 #module-root:has(.payment-list-panel),
 #module-root:has(.debt-toolbar),
 #module-root:has(.bill-page),
-#module-root:has(.adjustment-page),
 #module-root:has(.cashflow-panel),
 #module-root:has(.report-page) { padding-top: 20px; padding-bottom: 24px; }
 .module-page:has(.payment-list-panel) > .module-page__heading,
 .module-page:has(.debt-toolbar) > .module-page__heading,
 .module-page:has(.bill-page) > .module-page__heading,
-.module-page:has(.adjustment-page) > .module-page__heading,
 .module-page:has(.cashflow-panel) > .module-page__heading,
 .module-page:has(.report-page) > .module-page__heading { display: none; }
 .btn--primary, .module-tab.is-active { background: var(--ui2-navy); color: #fff; }

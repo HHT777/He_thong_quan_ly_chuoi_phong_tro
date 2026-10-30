@@ -10,6 +10,7 @@ export function defaultRoute(currentUser) {
 
 export async function renderRoute(context) {
   const route = currentRoute();
+  if (route === "/finance/adjustments" && context.user?.vai_tro === "CHU_TRO") { go("/finance/bills"); return; }
   const tab = findTab(route, context.user) || findTab(defaultRoute(context.user), context.user);
   if (!tab) return;
   context.setActive(tab);

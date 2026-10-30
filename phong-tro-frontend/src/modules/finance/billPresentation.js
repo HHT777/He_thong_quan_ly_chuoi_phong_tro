@@ -28,6 +28,24 @@ export function billMenuActions(row) {
   return actions;
 }
 
+export function billAdjustmentPreview(row, direction, rawAmount) {
+  const amount = Number(rawAmount);
+  const current = Number(row.tong_phai_tra) || 0;
+  const paid = Number(row.tong_da_thanh_toan) || 0;
+  const outstanding = Number(row.so_tien_con_no) || 0;
+  const delta = direction === "decrease" ? -amount : amount;
+  const total = current + delta;
+  const remaining = total - paid;
+  const error = !Number.isSafeInteger(amount) || amount <= 0
+    ? "Nhập số tiền nguyên dương."
+    : delta < 0 && amount > outstanding
+      ? "Mức giảm vượt số còn nợ của phiếu."
+      : total < paid || total < 0
+        ? "Tổng mới không được thấp hơn số đã thu."
+        : "";
+  return { delta, total, paid, remaining, error };
+}
+
 export const paymentStatusLabels = {
   CHO_XAC_NHAN: "Chờ xác nhận",
   DA_XAC_NHAN: "Đã xác nhận",

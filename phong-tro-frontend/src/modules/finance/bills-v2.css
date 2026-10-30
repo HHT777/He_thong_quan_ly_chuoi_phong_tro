@@ -118,6 +118,11 @@
 .bill-hint--warning { background: #fff3d8; color: #8c5600; }
 .bill-action-form, .bill-schedule-form { display: grid; gap: 13px; }
 .bill-action-form p { margin: 0; }
+.bill-adjustment-preview { display: grid; gap: 8px; padding: 12px; border-radius: 9px; background: #f1f6ff; }
+.bill-adjustment-preview > div { display: flex; justify-content: space-between; gap: 12px; }
+.bill-adjustment-preview > div:last-of-type { padding-top: 8px; border-top: 1px solid #cdd9e8; }
+.bill-adjustment-preview [data-preview-error] { color: #b42318; }
+.bill-adjustment-preview [data-preview-error]:empty { display: none; }
 .bill-schedule-toggle { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #cdd9e8; border-radius: 10px; cursor: pointer; }
 .bill-schedule-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .bill-schedule-toggle__track { position: relative; width: 46px; height: 26px; flex: 0 0 46px; border-radius: 16px; background: #8997aa; transition: background .15s; }

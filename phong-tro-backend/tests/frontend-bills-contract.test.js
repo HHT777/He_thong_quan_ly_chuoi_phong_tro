@@ -15,8 +15,8 @@ test("FR-144..157/164/175/176 bill screen uses preview, manual sending and serve
   assert.match(source, /`\/v1\/bills\/summary\?\$\{query/);
   assert.match(source, /get\("\/v1\/bills\/schedule"\)/);
   assert.match(source, /put\("\/v1\/bills\/schedule"/);
-  assert.match(source, /\/v1\/bills\/\$\{row\.ma_thanh_toan\}\/adjustments/);
-  assert.match(source, /reason: requiredText\(raw\.reason/);
+  assert.match(source, /\/v1\/bills\/\$\{encodeURIComponent\(row\.ma_thanh_toan\)\}\/adjustments/);
+  assert.match(source, /reason: requiredText\(form\.elements\.namedItem\("reason"\)\.value/);
   assert.match(source, /"Idempotency-Key": keys\.keyFor\(scope, payload\)/);
   for (const scope of ["resend:", "pay:", "cancel:"]) assert.ok(source.includes(`scope = \`${scope}`));
   assert.match(source, /keys\.complete\(scope\)/);
@@ -35,6 +35,20 @@ test("bill drafts stay visible and schedule scope is explicit", () => {
   assert.match(source, /name="scope" value="all"/);
   assert.match(source, /name="scope" value="selected"/);
   assert.match(source, /buildingIds: form\.elements\.namedItem\("scope"\)\.value === "all" \? \[\]/);
+});
+
+test("bill adjustment dialog previews signed totals and blocks over-reduction", async () => {
+  const url = pathToFileURL(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/finance/billPresentation.js")).href;
+  const { billAdjustmentPreview } = await import(url);
+  const bill = { tong_phai_tra: 1000, tong_da_thanh_toan: 300, so_tien_con_no: 700 };
+  assert.deepEqual(billAdjustmentPreview(bill, "decrease", 200), { delta: -200, total: 800, paid: 300, remaining: 500, error: "" });
+  assert.deepEqual(billAdjustmentPreview(bill, "increase", 200), { delta: 200, total: 1200, paid: 300, remaining: 900, error: "" });
+  assert.match(billAdjustmentPreview(bill, "decrease", 701).error, /vượt số còn nợ/);
+  assert.match(billAdjustmentPreview(bill, "increase", 1.5).error, /số tiền nguyên/);
+  const source = read("modules/finance/bills-v2.js");
+  assert.match(source, /billAdjustmentPreview\(row/);
+  assert.equal(fs.existsSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/finance/adjustments.tab.js")), false);
+  assert.match(read("core/router.js"), /route === "\/finance\/adjustments".*go\("\/finance\/bills"\)/);
 });
 
 test("a failed summary request does not hide the bill list", async () => {
