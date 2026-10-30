@@ -15,6 +15,11 @@ test("FR-200 configuration client validates server domains and groups without in
   for (const invalid of ["", "  ", "-1", "1.5", "29", "abc"]) assert.throws(() => model.validateSetting(number, invalid));
   assert.equal(model.validateSetting(zone, "Asia/Ho_Chi_Minh"), "Asia/Ho_Chi_Minh");
   assert.throws(() => model.validateSetting(zone, "UTC"));
+  const imageSize = { key: "maxFileSizeBytes", type: "integer", domain: { min: 1, max: 100 * 1048576 } };
+  assert.equal(model.validateDisplaySetting(imageSize, "10"), 10 * 1048576);
+  assert.equal(model.validateDisplaySetting(imageSize, "1.5"), 1572864);
+  assert.throws(() => model.validateDisplaySetting(imageSize, "101"));
+  assert.throws(() => model.validateDisplaySetting(imageSize, "abc"));
   assert.deepEqual([...model.groupSettings([number, zone]).keys()], ["Công nợ", "Chung"]);
 });
 

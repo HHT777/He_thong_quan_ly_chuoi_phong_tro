@@ -12,6 +12,17 @@ export function validateSetting(row, raw) {
   return value;
 }
 
+export function validateDisplaySetting(row, raw) {
+  if (row.key !== "maxFileSizeBytes") return validateSetting(row, raw);
+  const text = String(raw).trim();
+  if (!/^(0|[1-9]\d*)(\.\d+)?$/.test(text)) throw new Error("Vui lòng nhập dung lượng bằng MB.");
+  const bytes = Math.round(Number(text) * 1048576);
+  if (!Number.isSafeInteger(bytes) || bytes < row.domain.min || bytes > row.domain.max) {
+    throw new Error(`Dung lượng phải từ ${row.domain.min / 1048576} đến ${row.domain.max / 1048576} MB.`);
+  }
+  return bytes;
+}
+
 export function groupSettings(rows) {
   const grouped = new Map();
   for (const row of rows) {

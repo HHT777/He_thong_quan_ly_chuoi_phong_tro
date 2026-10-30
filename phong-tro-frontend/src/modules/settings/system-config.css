@@ -1,0 +1,34 @@
+.system-config-intro {
+  margin-bottom: 18px;
+  padding: 18px 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  background: var(--blue-surface);
+}
+.system-config-intro p,
+.system-config-schedule p { margin: 6px 0 0; color: var(--text-secondary); }
+.system-config-group { padding: 24px; }
+.system-config-group h2 { margin: 0; font-size: 22px; }
+.system-config-schedule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.system-config-schedule__state { margin-top: 10px !important; }
+.system-config-row { grid-template-columns: minmax(0, 1.4fr) minmax(270px, 1fr); }
+.system-config-row__info label { display: block; font-size: 17px; font-weight: 700; }
+.system-config-row__info p { line-height: 1.5; }
+.system-config-row__controls { min-width: 0; }
+.system-config-input span { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.system-config-row__controls small { display: block; color: var(--text-secondary); }
+.system-config-row__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.system-config-row__actions button { margin: 0; }
+.system-config-row [data-message] { min-height: 1.5em; color: var(--brand-primary); }
+.system-config-details { margin-top: 12px; color: var(--text-secondary); font-size: 13px; }
+.system-config-details summary { cursor: pointer; }
+.system-config-details code { color: var(--text-muted); }
+@media (max-width: 680px) {
+  .system-config-schedule { align-items: flex-start; flex-direction: column; }
+  .system-config-row { grid-template-columns: 1fr; }
+}
