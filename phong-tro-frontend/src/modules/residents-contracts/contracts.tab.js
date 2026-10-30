@@ -2,6 +2,7 @@ import { listTab } from "../../shared/components/tab-factory.js";
 import { date, money, openFormModal, escapeHtml, confirmAction } from "../../shared/components/view.js";
 import { statusLabel } from "../../shared/components/status-labels.mjs";
 import { integerVnd, requiredText } from "../../core/idempotency.js";
+import { CONTRACT_MONEY_FIELDS, formatVnd, parseVnd, contractDraftFeedback, contractServerErrors } from "./contract-form.js";
 import { loadBuildingScope } from "./building-scope.js";
 import { defaultContractTerms } from "./contract-terms.js";
 import "./contracts.css";
@@ -21,11 +22,11 @@ const safeHistory = (item) => {
 };
 const numericContractValues = (raw) => ({
   ...raw,
-  gia_thue: Number(raw.gia_thue),
-  tien_coc: Number(raw.tien_coc),
-  don_gia_dien: Number(raw.don_gia_dien),
+  gia_thue: parseVnd(raw.gia_thue, "gia_thue", { positive: true }),
+  tien_coc: parseVnd(raw.tien_coc, "tien_coc"),
+  don_gia_dien: parseVnd(raw.don_gia_dien, "don_gia_dien"),
   chi_so_dien_ban_dau: Number(raw.chi_so_dien_ban_dau),
-  don_gia_nuoc: Number(raw.don_gia_nuoc),
+  don_gia_nuoc: parseVnd(raw.don_gia_nuoc, "don_gia_nuoc"),
   da_co_ban_giay_ky: raw.da_co_ban_giay_ky === "true",
   ngay_nhan_coc: raw.ngay_nhan_coc || null,
 });
@@ -168,6 +169,19 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
   create: {
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
+    fieldErrors: true,
+    validate: contractDraftFeedback,
+    onError: contractServerErrors,
+    onOpen: ({ form }) => {
+      for (const name of CONTRACT_MONEY_FIELDS) {
+        const input = form.elements.namedItem(name);
+        input.value = formatVnd(input.value);
+        input.addEventListener("beforeinput", (event) => { if (event.data && !/^\d+$/.test(event.data)) event.preventDefault(); });
+        input.addEventListener("paste", (event) => { if (!/^\d+$/.test(event.clipboardData.getData("text"))) event.preventDefault(); });
+        input.addEventListener("input", () => { input.value = formatVnd(input.value); });
+      }
+      form.addEventListener("input", () => { form.querySelector("[data-form-warnings]").textContent = contractDraftFeedback(Object.fromEntries(new FormData(form))).warnings.join(" "); });
+    },
     onCreated: () => sessionStorage.removeItem("qlpt:contract-reservation"),
     initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "", dieu_khoan: "Áp dụng 8 điều khoản mặc định về sử dụng phòng và tài sản." }),
     fields: (scope) => [
@@ -176,12 +190,12 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
       { name: "ma_phong", label: "Phòng", options: [{ value: "", label: "Chọn phòng" }, ...scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && ["TRONG", "DA_GIU"].includes(room.trang_thai)).map((room) => ({ value: room.ma_phong, label: `${room.canTro?.ten_can || "Căn trọ"} · ${room.so_phong}` }))], required: true },
       { name: "ngay_bat_dau", label: "Ngày bắt đầu", type: "date", required: true },
       { name: "ngay_ket_thuc", label: "Ngày kết thúc", type: "date", required: true },
-      { name: "gia_thue", label: "Giá thuê", type: "number", required: true },
-      { name: "tien_coc", label: "Tiền cọc", type: "number", required: true },
+      { name: "gia_thue", label: "Giá thuê", type: "text", currency: true, required: true },
+      { name: "tien_coc", label: "Tiền cọc", type: "text", currency: true, required: true },
       { name: "ngay_nhan_coc", label: "Ngày nhận cọc", type: "date" },
-      { name: "don_gia_dien", label: "Đơn giá điện", type: "number", required: true },
+      { name: "don_gia_dien", label: "Đơn giá điện", type: "text", currency: true, required: true },
       { name: "chi_so_dien_ban_dau", label: "Chỉ số điện ban đầu", type: "number", required: true },
-      { name: "don_gia_nuoc", label: "Đơn giá nước/người", type: "number", required: true },
+      { name: "don_gia_nuoc", label: "Đơn giá nước/người", type: "text", currency: true, required: true },
       { name: "dieu_khoan", label: "Điều khoản bổ sung riêng", type: "textarea", required: true },
       { name: "da_co_ban_giay_ky", label: "Đã có bản giấy ký", type: "checkbox", required: true },
     ],

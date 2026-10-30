@@ -84,10 +84,10 @@ function fieldControl(field, value = "") {
   if (field.type === "textarea") {
     return `<textarea class="form-control" name="${field.name}" ${field.required ? "required" : ""}>${escapeHtml(value)}</textarea>`;
   }
-  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>`;
+  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.currency ? 'inputmode="numeric"' : ""} ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>${field.currency ? "<span>đ</span>" : ""}`;
 }
 
-export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit, onOpen }) {
+export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit, onOpen, validate, onError, fieldErrors = false }) {
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
   overlay.innerHTML = `
@@ -103,12 +103,14 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
       </div>
       <div class="modal-body">
         <form class="panel form-grid" data-create-form style="box-shadow:none;border:none;padding:0;margin:0;max-width:100%;">
+          ${fieldErrors ? '<p data-form-message role="alert"></p><p data-form-warnings role="status"></p>' : ""}
           ${fields
             .map(
               (field) => `
             <label class="modal-field">
               <span>${escapeHtml(field.label)}</span>
               ${fieldControl(field, initial[field.name] ?? field.value ?? "")}
+              ${fieldErrors ? `<small data-field-error="${escapeHtml(field.name)}" role="alert"></small>` : ""}
             </label>
           `
             )
@@ -132,22 +134,41 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
   });
 
   const form = overlay.querySelector("[data-create-form]");
+  const showErrors = (errors) => {
+    if (!fieldErrors) return;
+    form.querySelectorAll("[data-field-error]").forEach((node) => {
+      const input = form.elements.namedItem(node.dataset.fieldError);
+      node.textContent = errors[node.dataset.fieldError] || "";
+      input?.setAttribute("aria-invalid", node.textContent ? "true" : "false");
+      if (node.textContent) { node.id = `error-${node.dataset.fieldError}`; input?.setAttribute("aria-describedby", node.id); }
+      else input?.removeAttribute("aria-describedby");
+    });
+    form.querySelector("[data-form-message]").textContent = errors.form || "";
+    const first = Object.keys(errors).find((name) => name !== "form" && form.elements.namedItem(name));
+    if (first) form.elements.namedItem(first).focus();
+  };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = form.querySelector("[data-create-message]");
     const submitBtn = form.querySelector("button[type='submit']");
     submitBtn.disabled = true;
-    message.textContent = "Đang lưu...";
+    message.textContent = fieldErrors ? "" : "Đang lưu...";
     try {
       const raw = Object.fromEntries(new FormData(form));
       for (const field of fields) if (field.readOnly) delete raw[field.name];
+      const feedback = validate?.(raw);
+      if (fieldErrors) {
+        showErrors(feedback?.errors || {});
+        form.querySelector("[data-form-warnings]").textContent = feedback?.warnings?.join(" ") || "";
+      }
+      if (feedback && Object.keys(feedback.errors || {}).length) return;
       const result = await submit(raw);
       if (result === false) return;
       showToast("Đã lưu thành công!", "success");
       close();
     } catch (err) {
-      message.textContent = err.message;
-      showToast(err.message, "error");
+      if (fieldErrors) { message.textContent = ""; showErrors(onError?.(err) || { form: err.message }); }
+      else { message.textContent = err.message; showToast(err.message, "error"); }
     } finally {
       submitBtn.disabled = false;
     }
@@ -166,6 +187,9 @@ function openCreateModal(config, onCreated, buildingScope, context) {
     submitLabel: config.create.label || "Thêm mới",
     submit: (raw) => onCreated(config.create.map ? config.create.map(raw) : raw),
     onOpen: config.create.onOpen ? ({ overlay, form }) => config.create.onOpen({ context, overlay, form }) : undefined,
+    validate: config.create.validate,
+    onError: config.create.onError,
+    fieldErrors: config.create.fieldErrors,
   });
 }
 
