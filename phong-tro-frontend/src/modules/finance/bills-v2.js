@@ -3,6 +3,7 @@ import { shellPage, escapeHtml, money, datePadded as date, confirmAction } from 
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 import { billStatus, billPrimaryAction, billStatusTone, billMenuActions, paymentStatusLabels } from "./billPresentation.js";
+import { fetchBillPage } from "./billRequests.js";
 
 const keys = createRequestKeyStore();
 const currentPeriod = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
@@ -111,10 +112,9 @@ export async function renderBillsV2(context) {
     const f = state(); const list = root.querySelector("[data-list]");
     loading(list); selected.clear(); updateSelection();
     try {
-      const [billResponse, summaryResult] = await Promise.all([
-        context.api.get(`/khoan-phai-thu?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search, page, limit: 20 })}`),
-        context.api.get(`/v1/bills/summary?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search })}`).then((value) => ({ value }), (error) => ({ error })),
-      ]);
+      const { billResponse, summaryResult } = await fetchBillPage(context.api,
+        `/khoan-phai-thu?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search, page, limit: 20 })}`,
+        `/v1/bills/summary?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search })}`);
       bills = (billResponse.data || []).slice().sort(compareBillsByRoom); pagination = billResponse.pagination || {};
       const summary = summaryResult.value?.data;
       root.querySelector("[data-stats]").innerHTML = summary ? [

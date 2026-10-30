@@ -53,6 +53,10 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   const draftSummary = await request("/api/v1/bills/summary?ky=2026-10&issuance=DRAFT", { headers: headers(landlord) });
   assert.equal(draftSummary.response.status, 200, JSON.stringify(draftSummary.body));
   assert.ok(draftSummary.body.data.unsent >= 1);
+  const allList = await request("/api/khoan-phai-thu?ky=2026-10&page=1&limit=20", { headers: headers(landlord) });
+  assert.equal(allList.response.status, 200, JSON.stringify(allList.body));
+  const allSummary = await request("/api/v1/bills/summary?ky=2026-10", { headers: headers(landlord) });
+  assert.equal(allSummary.response.status, 200, JSON.stringify(allSummary.body));
   assert.equal(bill.chiTiets.filter((line) => line.loai_khoan === "GIAM_TRU").length, 1);
   const edited = await request(`/api/v1/billing-adjustments/${fixed.body.data.ma_khoan_dieu_chinh}`, { method: "PATCH", headers: headers(landlord), body: JSON.stringify({ amount: 200000 }) });
   assert.equal(edited.response.status, 200, JSON.stringify(edited.body));
