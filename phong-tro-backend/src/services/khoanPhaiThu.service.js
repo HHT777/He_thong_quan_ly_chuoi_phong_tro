@@ -119,7 +119,6 @@ class KhoanPhaiThuService {
       limit: pagination.limit,
       offset: pagination.offset,
       order: [
-        [{ model: HopDong, as: "hopDong" }, { model: PhongTro, as: "phongTro" }, "so_phong", "ASC"],
         ["nam", "DESC"],
         ["thang", "DESC"],
         ["ma_thanh_toan", "DESC"],
