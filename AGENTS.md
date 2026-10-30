@@ -6,6 +6,11 @@
 - Frontend test 53 đạt, 1 live DB bỏ qua; bộ quét `innerHTML` 2 đạt, 0 vi phạm. Phép thử phủ định đổi tỷ lệ cột lỗ làm test đỏ, khôi phục thì xanh. Chưa build hoặc kiểm tra UI với DB thật trong lượt này; người dùng tự kiểm tra. Không kết nối DB thật, không push. Giữ nguyên `management.css` đang sửa và các file untracked chủ ý.
 - So sánh theo tháng chưa có endpoint tổng hợp; không bật vì cần nhiều request. API chi tiết báo cáo chưa trả ghi chú và trạng thái từng khoản chi.
 
+## UI-3 Thanh toán (30/10/2026)
+
+- Nhánh `ui-3-thanh-toan` từ `sua-luong-hop-dong-cu-dan`; chỉ sửa frontend màn Thanh toán; người dùng tự build.
+- `docs/PAYMENT_SCREEN.md` nối giao diện với API. API thiếu lọc trạng thái/từ khóa/kỳ, số đếm theo trạng thái, tổng tiền chờ, tên người ghi nhận, lịch sử và đường tải minh chứng an toàn.
+
 ## Điểm dừng UI-2c-1 Báo cáo (26/10/2026; ưu tiên hiện hành)
 
 - Nhánh `ui-2c-bao-cao` tạo từ `origin/main` đã chứa UI-2a; tag local `checkpoint-before-ui-2c-1`. Các commit UI-2c-1: `6a51061` (kỳ/query), `2419186` (hình học/biểu đồ), `34d92b8` (giao diện, token, test), `e5ff62b` (tài liệu và bộ quét HTML), `4a102ce` (nhãn số, thao tác chạm). `docs/REPORT_SCREEN.md` nối phần tử với API và ghi rõ phần để UI-2c-2.
