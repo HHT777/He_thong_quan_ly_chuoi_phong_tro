@@ -111,18 +111,18 @@ export async function renderBillsV2(context) {
     const f = state(); const list = root.querySelector("[data-list]");
     loading(list); selected.clear(); updateSelection();
     try {
-      const [billResponse, summaryResponse] = await Promise.all([
+      const [billResponse, summaryResult] = await Promise.all([
         context.api.get(`/khoan-phai-thu?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search, page, limit: 20 })}`),
-        context.api.get(`/v1/bills/summary?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search })}`),
+        context.api.get(`/v1/bills/summary?${query({ ky: f.period, ma_can: f.building, issuance: f.issuance, search: f.search })}`).then((value) => ({ value }), (error) => ({ error })),
       ]);
       bills = (billResponse.data || []).slice().sort(compareBillsByRoom); pagination = billResponse.pagination || {};
-      const summary = summaryResponse.data || {};
-      root.querySelector("[data-stats]").innerHTML = [
+      const summary = summaryResult.value?.data;
+      root.querySelector("[data-stats]").innerHTML = summary ? [
         ["Tổng phải thu", money(summary.totalDue)], ["Đã thu", money(summary.totalPaid)],
         ["Còn nợ", money(summary.totalDebt)],
       ].map(([label, value]) => `<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`).join("")
-        + `<button type="button" class="bill-stat-unsent" data-show-unsent><span>Chưa gửi</span><strong>${Number(summary.unsent || 0).toLocaleString("vi-VN")} phiếu</strong></button>`;
-      root.querySelector("[data-show-unsent]").onclick = () => { root.querySelector('[name="issuance"]').value = "DRAFT"; page = 1; refresh(); };
+        + `<button type="button" class="bill-stat-unsent" data-show-unsent><span>Chưa gửi</span><strong>${Number(summary.unsent || 0).toLocaleString("vi-VN")} phiếu</strong></button>` : `<p role="status">Không tải được thống kê: ${escapeHtml(summaryResult.error.message)}</p>`;
+      root.querySelector("[data-show-unsent]")?.addEventListener("click", () => { root.querySelector('[name="issuance"]').value = "DRAFT"; page = 1; refresh(); });
       root.querySelector("[data-count]").textContent = `${pagination.total || 0} phiếu`;
       const actionLabels = { detail: "Chi tiết", adjust: "Điều chỉnh", resend: "Gửi lại" };
       const rows = bills.map((row, index) => {
@@ -171,7 +171,8 @@ export async function renderBillsV2(context) {
       try {
         const response = await context.api.post("/v1/bills/preview", { period, buildingIds: building ? [building] : [] });
         if (requestId !== previewRequest || !modal.overlay.isConnected) return;
-        rows = response.data?.rooms || [];
+        const previews = new Map((response.data?.previews || []).map((item) => [item.contractId, item]));
+        rows = (response.data?.rooms || []).map((room) => ({ ...room, preview: previews.get(room.contractId) }));
         draw();
       } catch (error) { if (requestId === previewRequest && modal.overlay.isConnected) target.textContent = error.message; }
     }
@@ -179,7 +180,7 @@ export async function renderBillsV2(context) {
       const term = modal.body.querySelector("[data-search]").value.trim().toLocaleLowerCase("vi-VN");
       const visible = rows.filter((row) => !term || [row.roomName, row.tenantName, row.buildingName].some((value) => value?.toLocaleLowerCase("vi-VN").includes(term)));
       modal.body.querySelector("[data-eligible-count]").textContent = String(visible.filter((row) => row.eligible).length);
-      modal.body.querySelector("[data-preview]").innerHTML = `<div class="bill-room-list">${visible.map((row) => `<label class="${row.eligible ? "" : "is-disabled"}"><input type="checkbox" data-room="${escapeHtml(row.roomId)}" ${row.eligible ? "" : "disabled"} ${checked.has(row.contractId) ? "checked" : ""}><span><strong>${escapeHtml(row.roomName)}</strong><small>${escapeHtml(row.buildingName)} · ${escapeHtml(row.tenantName || "Chưa có khách")}</small></span><span>${row.eligible ? money(row.estimatedTotal) : escapeHtml(reason[row.reasonCode] || "Không đủ điều kiện")}</span></label>`).join("") || "<p>Không có phòng phù hợp.</p>"}</div>`;
+      modal.body.querySelector("[data-preview]").innerHTML = `<div class="bill-room-list">${visible.map((row) => `<label class="${row.eligible ? "" : "is-disabled"}"><input type="checkbox" data-room="${escapeHtml(row.roomId)}" ${row.eligible ? "" : "disabled"} ${checked.has(row.contractId) ? "checked" : ""}><span><strong>${escapeHtml(row.roomName)}</strong><small>${escapeHtml(row.buildingName)} · ${escapeHtml(row.tenantName || "Chưa có khách")}</small></span><span>${row.eligible ? money(row.estimatedTotal) : escapeHtml(reason[row.reasonCode] || "Không đủ điều kiện")}${row.preview ? `<small class="bill-preview-lines">${row.preview.lines.map((line) => `${escapeHtml(lineTypeLabels[line.type] || line.type)} ${money(line.amount)}`).join(" · ")}</small>` : ""}</span></label>`).join("") || "<p>Không có phòng phù hợp.</p>"}</div>`;
       modal.body.querySelectorAll("[data-room]").forEach((input) => input.onchange = () => { const row = rows.find((item) => item.roomId === input.dataset.room); if (input.checked) checked.add(row.contractId); else checked.delete(row.contractId); updateTotal(); });
       updateTotal();
     }
@@ -190,7 +191,7 @@ export async function renderBillsV2(context) {
     modal.body.querySelector("[data-search]").oninput = draw;
     modal.body.querySelector("[data-submit]").onclick = async (event) => {
       const button = event.currentTarget; button.disabled = true;
-      try { const response = await context.api.post("/v1/bills/generate", { period: modal.body.querySelector("[data-period]").value, contractIds: [...checked] }); const result = response.data || {}; const skipped = (result.skipped || []).map((item) => { const room = rows.find((row) => row.roomId === item.roomId); return `${room?.roomName || "Phòng"}: ${reason[item.reason] || "Không lập được"}`; }); modal.close(); showToast(`Đã lập ${result.created?.length || 0} phiếu Nháp.${skipped.length ? ` Bỏ qua ${skipped.join("; ")}.` : ""}`, "success"); await refresh(); }
+      try { const period = modal.body.querySelector("[data-period]").value; const response = await context.api.post("/v1/bills/generate", { period, contractIds: [...checked] }); const result = response.data || {}; const skipped = (result.skipped || []).map((item) => { const room = rows.find((row) => row.roomId === item.roomId); return `${room?.roomName || "Phòng"}: ${reason[item.reason] || "Không lập được"}`; }); modal.close(); showToast(`Đã lập ${result.created?.length || 0} phiếu Nháp.${skipped.length ? ` Bỏ qua ${skipped.join("; ")}.` : ""}`, "success"); if (result.created?.length) { root.querySelector('[name="period"]').value = period; root.querySelector('[name="issuance"]').value = "DRAFT"; root.querySelector('[name="building"]').value = ""; root.querySelector('[name="search"]').value = ""; page = 1; } await refresh(); }
       catch (error) { modal.body.querySelector("[data-result]").textContent = error.message; }
       finally { button.disabled = false; }
     };
@@ -205,12 +206,14 @@ export async function renderBillsV2(context) {
       const latest = schedule.latestRun;
       const runTime = latest?.bat_dau ? new Date(latest.bat_dau).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "";
       const outcomes = (latest?.chiTiets || []).map((item) => `<li>${escapeHtml(item.phongTro?.so_phong || "Phòng")} · ${item.ket_qua === "DA_LAP" ? "Đã lập" : item.ket_qua === "BO_QUA" ? "Bỏ qua" : "Lỗi"} · ${escapeHtml(reason[item.ma_ly_do] || "Không đủ điều kiện")}</li>`).join("");
-      modal.body.innerHTML = `<p class="bill-hint">Hệ thống tự lập phiếu Nháp mỗi tháng cho phòng đủ điều kiện.</p>
+      const scoped = Boolean(schedule.buildingIds?.length);
+      modal.body.innerHTML = `<p class="bill-hint">Lịch này chỉ tạo phiếu Nháp. Bạn xem số tiền và gửi phiếu cho khách sau khi lập.</p>
         <form data-schedule-form class="bill-schedule-form">
           <label class="bill-switch"><input type="checkbox" name="enabled" ${schedule.enabled ? "checked" : ""}> Tự động lập phiếu hằng tháng</label>
-          <div class="bill-dialog-filters"><label>Ngày lập mỗi tháng (1–28)<input name="day" type="number" min="1" max="28" value="${escapeHtml(schedule.day)}"></label><label>Giờ Việt Nam<input name="hour" type="number" min="0" max="23" value="${escapeHtml(schedule.hour)}"></label><label>Phạm vi (trống = tất cả căn)<select name="building" multiple size="4">${options(schedule.buildingIds || [])}</select></label></div>
-          <div class="bill-hint"><strong>Phòng đủ điều kiện khi:</strong><br>✓ Hợp đồng hiệu lực trong kỳ<br>✓ Có chỉ số điện kỳ trước đã xác nhận (kỳ đầu hợp đồng tính 0 đ điện)<br>✓ Chưa có phiếu thu của kỳ<br>Phiếu được lập ở dạng Nháp; bạn cần xem lại và bấm gửi. Kỳ đã lỡ được bỏ qua.</div>
-          <p>Lần chạy tiếp theo: <strong data-next-run>${escapeHtml(schedule.nextRun || "Đang tắt")}</strong></p>
+          <div class="bill-schedule-time"><label>Ngày trong tháng <input name="day" type="number" min="1" max="28" required value="${escapeHtml(schedule.day)}"><small>Chọn từ ngày 1 đến 28</small></label><label>Giờ chạy (giờ Việt Nam) <input name="hour" type="number" min="0" max="23" required value="${escapeHtml(schedule.hour)}"><small>0–23 giờ</small></label></div>
+          <fieldset class="bill-schedule-scope"><legend>Áp dụng cho căn</legend><label><input type="radio" name="scope" value="all" ${scoped ? "" : "checked"}> Tất cả căn</label><label><input type="radio" name="scope" value="selected" ${scoped ? "checked" : ""}> Chỉ các căn được chọn</label><div class="bill-schedule-buildings" data-buildings>${buildings.map((row) => `<label><input type="checkbox" name="building" value="${escapeHtml(row.ma_can)}" ${(schedule.buildingIds || []).includes(row.ma_can) ? "checked" : ""}> ${escapeHtml(row.ten_can)}</label>`).join("") || "Chưa có căn nào."}</div></fieldset>
+          <p class="bill-hint">Phòng cần có hợp đồng hiệu lực, chỉ số điện kỳ trước đã xác nhận (kỳ đầu tính 0 đ) và chưa có phiếu của kỳ. Lịch đã lỡ được bỏ qua.</p>
+          <p class="bill-schedule-next">Lần chạy tiếp theo: <strong data-next-run>${escapeHtml(schedule.nextRun || "Đang tắt")}</strong></p>
           <footer><span data-message role="status"></span><div class="bill-footer-actions"><button class="btn btn--secondary" type="button" data-cancel>Hủy</button><button class="btn btn--primary" type="submit" data-save disabled>Lưu thiết lập</button></div></footer>
         </form>
         <section class="bill-run-log"><h3>Lần chạy gần nhất</h3>${latest ? `<p>${escapeHtml(runTime)} · ${escapeHtml(runStatusLabels[latest.trang_thai] || "Trạng thái chưa xác định")} · Lập ${Number(latest.so_phieu_lap)} phiếu, bỏ qua ${Number(latest.so_phong_bo_qua)} phòng, lỗi ${Number(latest.so_phong_loi)} phòng</p><details><summary>Xem chi tiết</summary><ul>${outcomes || "<li>Không có chi tiết.</li>"}</ul></details>` : "<p>Chưa có lần chạy.</p>"}</section>`;
@@ -219,12 +222,13 @@ export async function renderBillsV2(context) {
         enabled: form.elements.namedItem("enabled").checked,
         day: Number(form.elements.namedItem("day").value),
         hour: Number(form.elements.namedItem("hour").value),
-        buildingIds: [...form.elements.namedItem("building").selectedOptions].map((option) => option.value),
+         buildingIds: form.elements.namedItem("scope").value === "all" ? [] : [...form.querySelectorAll('[name="building"]:checked')].map((input) => input.value),
       });
       let saved = JSON.stringify(values());
-      const updateSave = () => { form.querySelector("[data-save]").disabled = JSON.stringify(values()) === saved; };
+       const updateSave = () => { const selectedScope = form.elements.namedItem("scope").value === "selected"; form.querySelector("[data-buildings]").hidden = !selectedScope; form.querySelector("[data-save]").disabled = JSON.stringify(values()) === saved || (selectedScope && values().buildingIds.length === 0); };
       form.addEventListener("input", updateSave);
       form.addEventListener("change", updateSave);
+       updateSave();
       form.querySelector("[data-cancel]").onclick = modal.requestClose;
       form.onsubmit = async (event) => {
         event.preventDefault();

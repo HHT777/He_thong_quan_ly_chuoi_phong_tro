@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.resolve(__dirname, "../../phong-tro-
 test("FR-144..157/164/175/176 bill screen uses preview, manual sending and server totals", () => {
   const source = read("modules/finance/bills-v2.js");
   assert.match(source, /post\("\/v1\/bills\/preview", \{ period, buildingIds:/);
-  assert.match(source, /post\("\/v1\/bills\/generate", \{ period: .* contractIds:/s);
+  assert.match(source, /post\("\/v1\/bills\/generate", \{ period, contractIds:/);
   assert.match(source, /post\("\/v1\/bills\/send-preview", \{ billIds:/);
   assert.match(source, /post\("\/v1\/bills\/send", payload/);
   assert.match(source, /get\(`\/v1\/bills\/summary\?/);
@@ -24,6 +24,16 @@ test("FR-144..157/164/175/176 bill screen uses preview, manual sending and serve
   assert.match(source, /\/v1\/billing-adjustments/);
   assert.match(source, /escapeHtml/);
   assert.match(source, /button\.disabled = true/);
+});
+
+test("bill drafts stay visible and schedule scope is explicit", () => {
+  const source = read("modules/finance/bills-v2.js");
+  assert.match(source, /summaryResult\.value\?\.data/);
+  assert.match(source, /if \(result\.created\?\.length\) \{ root\.querySelector\('\[name="period"\]'\)\.value = period; root\.querySelector\('\[name="issuance"\]'\)\.value = "DRAFT"/);
+  assert.match(source, /row\.preview\.lines\.map/);
+  assert.match(source, /name="scope" value="all"/);
+  assert.match(source, /name="scope" value="selected"/);
+  assert.match(source, /buildingIds: form\.elements\.namedItem\("scope"\)\.value === "all" \? \[\]/);
 });
 
 test("F.5 shared API client exposes status and server error code", () => {

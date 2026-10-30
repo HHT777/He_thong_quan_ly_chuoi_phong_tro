@@ -87,6 +87,7 @@
 .bill-room-list > label input { width: 17px; height: 17px; flex: none; }
 .bill-room-list > label span:nth-child(2) { flex: 1; }
 .bill-room-list .is-disabled { color: #8a96a8; background: #fafbfd; cursor: not-allowed; }
+.bill-preview-lines { max-width: 310px; white-space: normal; text-align: right; line-height: 1.45; }
 .bill-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 10px; border-top: 1px solid #e9eef6; }
 .bill-dialog footer span { font-weight: 700; color: #2b486f; }
 .bill-footer-actions { display: flex; gap: 8px; }
@@ -96,6 +97,15 @@
 .bill-action-form, .bill-schedule-form { display: grid; gap: 13px; }
 .bill-action-form p { margin: 0; }
 .bill-switch { display: flex; gap: 9px; align-items: center; font-weight: 750; }
+.bill-schedule-time { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.bill-schedule-time label { display: grid; gap: 6px; color: #455875; font-size: 13px; font-weight: 700; }
+.bill-schedule-time small { font-weight: 400; color: #61718a; }
+.bill-schedule-scope { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid #cdd9e8; border-radius: 10px; }
+.bill-schedule-scope legend { padding: 0 5px; font-weight: 750; }
+.bill-schedule-scope label { display: flex; align-items: center; gap: 8px; }
+.bill-schedule-buildings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; border-radius: 8px; background: #f6f9fe; }
+.bill-schedule-buildings[hidden] { display: none; }
+.bill-schedule-next { margin: 0; }
 .bill-run-log { padding-top: 10px; border-top: 1px solid #e6edf5; }
 .bill-run-log h3 { margin: 0; font-size: 14px; }
 @media (max-width: 1050px) { .bill-hero { align-items: flex-start; flex-direction: column; } .bill-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bill-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -103,3 +113,4 @@
 @media (max-width: 600px) { .bill-filters, .bill-dialog-filters, .bill-stats { grid-template-columns: 1fr; } .bill-dialog > header, .bill-dialog__body { padding: 15px; } .bill-hero { padding: 18px; } .bill-hero__actions { width: 100%; } }
 @media (max-width: 600px) { .bill-payment-filters { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .bill-segments { grid-template-columns: 1fr; } .bill-page .table-wrap { overflow-x: auto; } .bill-dialog { max-height: calc(100vh - 32px); } }
+@media (max-width: 600px) { .bill-schedule-time, .bill-schedule-buildings { grid-template-columns: 1fr; } }
