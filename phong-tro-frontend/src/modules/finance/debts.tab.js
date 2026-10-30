@@ -125,6 +125,10 @@ async function render(context) {
   };
 
   const checkboxSet = (checked, id, selection) => checked ? selection.add(id) : selection.delete(id);
+  const revealPaymentForm = (workspace, field) => {
+    workspace.scrollIntoView({ block: "start" });
+    workspace.querySelector(field)?.focus({ preventScroll: true });
+  };
 
   const openBulkPayment = (selectedDebtIds) => {
     const selectedRows = debts.filter((row) => selectedDebtIds.has(String(row.ma_thanh_toan)));
@@ -145,6 +149,7 @@ async function render(context) {
     </form>`;
     const form = workspace.querySelector("[data-bulk-payment-form]");
     form.querySelector("[data-cancel-bulk]").addEventListener("click", () => workspace.replaceChildren());
+    revealPaymentForm(workspace, 'input[name="amount"]');
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const message = form.querySelector("[data-bulk-payment-message]");
@@ -202,12 +207,14 @@ async function render(context) {
         <label>Số tiền<input name="so_tien" type="number" min="1" step="1" required></label>
         <label>Phương thức<select name="phuong_thuc" required><option value="TIEN_MAT">Tiền mặt</option><option value="CHUYEN_KHOAN">Chuyển khoản</option></select></label>
         <label>Ghi chú<textarea name="ghi_chu"></textarea></label>
-        <button class="btn btn--primary">Ghi nhận thu</button><span data-payment-message></span>
+        <button type="button" class="btn btn--secondary" data-cancel-payment>Hủy</button><button type="submit" class="btn btn--primary">Ghi nhận thu</button><span data-payment-message role="status"></span>
       </form>`;
       const form = workspace.querySelector("form");
+      form.querySelector("[data-cancel-payment]").addEventListener("click", () => workspace.replaceChildren());
+      revealPaymentForm(workspace, 'input[name="so_tien"]');
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const submit = form.querySelector("button");
+        const submit = form.querySelector('button[type="submit"]');
         const message = form.querySelector("[data-payment-message]");
         submit.disabled = true;
         try {

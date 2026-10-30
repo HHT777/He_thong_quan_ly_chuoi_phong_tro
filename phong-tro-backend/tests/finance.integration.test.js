@@ -120,6 +120,9 @@ test("FR-143 partial payments use distinct keys, retry safely and serialize over
   const landlord = await login(integration.landlord);
   const rental = await createFreshRental(landlord, "partial-race");
   const bill = await ThanhToan.create({ ma_hop_dong: rental.contract.ma_hop_dong, nam: 2027, thang: 8, loai_thanh_toan: "DINH_KY", tong_phai_tra: 1000, tong_da_thanh_toan: 0, so_tien_con_no: 1000, trang_thai: "CHUA_THANH_TOAN" });
+  const sent = await request("/api/v1/bills/send", { method: "POST", headers: headers(landlord), body: JSON.stringify({ billIds: [bill.ma_thanh_toan] }) });
+  assert.equal(sent.response.status, 200, JSON.stringify(sent.body));
+  assert.equal(sent.body.data.sent, 1);
   const pay = (amount, key) => request("/api/khoan-phai-thu/payment/create", { method: "POST", headers: headers(landlord, { "Idempotency-Key": key }), body: JSON.stringify({ ma_khoan_phai_thu: bill.ma_thanh_toan, so_tien: amount, phuong_thuc: "CHUYEN_KHOAN", ngay_thanh_toan: "2026-10-17" }) });
   const keyA = `partial-a-${bill.ma_thanh_toan}`;
   const keyB = `partial-b-${bill.ma_thanh_toan}`;
