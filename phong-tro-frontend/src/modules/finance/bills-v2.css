@@ -7,7 +7,7 @@
 .bill-hero__actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .bill-filters, .bill-dialog-filters { display: grid; grid-template-columns: 1fr 1fr 1fr 1.5fr auto; gap: 12px; align-items: end; padding: 16px; }
 .bill-filters label, .bill-dialog-filters label, .bill-action-form label { display: grid; gap: 6px; color: #455875; font-size: 12px; font-weight: 700; }
-.bill-filters input, .bill-filters select, .bill-dialog input:not([type="checkbox"]), .bill-dialog select, .bill-dialog textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #cdd9e8; border-radius: 8px; background: #fff; color: #203654; font: inherit; }
+.bill-filters input, .bill-filters select, .bill-dialog input:not([type="checkbox"]):not([type="radio"]), .bill-dialog select, .bill-dialog textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #cdd9e8; border-radius: 8px; background: #fff; color: #203654; font: inherit; }
 .bill-filters input:focus-visible, .bill-filters select:focus-visible, .bill-dialog :focus-visible { outline: 3px solid #83a9ed; outline-offset: 2px; }
 .bill-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .bill-stats article { display: grid; gap: 8px; padding: 18px; background: #fff; border: 1px solid #dce5f1; border-radius: 12px; }
@@ -102,7 +102,10 @@
 .bill-schedule-time small { font-weight: 400; color: #61718a; }
 .bill-schedule-scope { display: grid; gap: 10px; margin: 0; padding: 14px; border: 1px solid #cdd9e8; border-radius: 10px; }
 .bill-schedule-scope legend { padding: 0 5px; font-weight: 750; }
-.bill-schedule-scope label { display: flex; align-items: center; gap: 8px; }
+.bill-schedule-scope label { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.bill-schedule-scope > label { padding: 7px 9px; border-radius: 8px; }
+.bill-schedule-scope > label:has(input:checked) { background: #edf4ff; font-weight: 700; }
+.bill-schedule-scope input[type="radio"], .bill-schedule-buildings input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; flex: 0 0 18px; accent-color: #1767df; }
 .bill-schedule-buildings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px; border-radius: 8px; background: #f6f9fe; }
 .bill-schedule-buildings[hidden] { display: none; }
 .bill-schedule-next { margin: 0; }

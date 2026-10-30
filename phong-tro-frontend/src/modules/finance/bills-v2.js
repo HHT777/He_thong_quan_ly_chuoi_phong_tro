@@ -25,6 +25,10 @@ const adjustmentModeLabels = { THEO_KY: "Theo kỳ", CO_DINH: "Cố định" };
 const adjustmentStateLabels = { DANG_AP_DUNG: "Đang áp dụng", NGUNG_AP_DUNG: "Đã tắt", DA_HUY: "Đã hủy" };
 const reason = { BILL_ALREADY_EXISTS: "Đã có phiếu kỳ này", MISSING_CONFIRMED_METER: "Thiếu chỉ số điện kỳ trước đã xác nhận", INITIAL_READING_REQUIRED: "Thiếu chỉ số đầu", NO_ACTIVE_CONTRACT: "Chưa có hợp đồng hiệu lực", RECIPIENT_UNAVAILABLE: "Chưa có tài khoản khách đang hoạt động", ALREADY_SENT: "Phiếu đã gửi", ALREADY_PROCESSED: "Yêu cầu đã được xử lý", SEND_FAILED: "Không gửi được", INVALID_ELECTRICITY_AMOUNT: "Số điện không hợp lệ" };
 const runStatusLabels = { DANG_CHAY: "Đang chạy", HOAN_TAT: "Hoàn tất", LOI: "Lỗi" };
+const nextRunLabel = (value) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(value || "");
+  return match ? `${match[3]}/${match[2]}/${match[1]} lúc ${match[4]} (giờ Việt Nam)` : value || "Đang tắt";
+};
 const query = (values) => new URLSearchParams(Object.entries(values).filter(([, value]) => value !== undefined && value !== null && value !== "")).toString();
 
 function dialog(title, body, onClose, confirmClose) {
@@ -213,7 +217,7 @@ export async function renderBillsV2(context) {
           <div class="bill-schedule-time"><label>Ngày trong tháng <input name="day" type="number" min="1" max="28" required value="${escapeHtml(schedule.day)}"><small>Chọn từ ngày 1 đến 28</small></label><label>Giờ chạy (giờ Việt Nam) <input name="hour" type="number" min="0" max="23" required value="${escapeHtml(schedule.hour)}"><small>0–23 giờ</small></label></div>
           <fieldset class="bill-schedule-scope"><legend>Áp dụng cho căn</legend><label><input type="radio" name="scope" value="all" ${scoped ? "" : "checked"}> Tất cả căn</label><label><input type="radio" name="scope" value="selected" ${scoped ? "checked" : ""}> Chỉ các căn được chọn</label><div class="bill-schedule-buildings" data-buildings>${buildings.map((row) => `<label><input type="checkbox" name="building" value="${escapeHtml(row.ma_can)}" ${(schedule.buildingIds || []).includes(row.ma_can) ? "checked" : ""}> ${escapeHtml(row.ten_can)}</label>`).join("") || "Chưa có căn nào."}</div></fieldset>
           <p class="bill-hint">Phòng cần có hợp đồng hiệu lực, chỉ số điện kỳ trước đã xác nhận (kỳ đầu tính 0 đ) và chưa có phiếu của kỳ. Lịch đã lỡ được bỏ qua.</p>
-          <p class="bill-schedule-next">Lần chạy tiếp theo: <strong data-next-run>${escapeHtml(schedule.nextRun || "Đang tắt")}</strong></p>
+          <p class="bill-schedule-next">Lần chạy tiếp theo: <strong data-next-run>${escapeHtml(nextRunLabel(schedule.nextRun))}</strong></p>
           <footer><span data-message role="status"></span><div class="bill-footer-actions"><button class="btn btn--secondary" type="button" data-cancel>Hủy</button><button class="btn btn--primary" type="submit" data-save disabled>Lưu thiết lập</button></div></footer>
         </form>
         <section class="bill-run-log"><h3>Lần chạy gần nhất</h3>${latest ? `<p>${escapeHtml(runTime)} · ${escapeHtml(runStatusLabels[latest.trang_thai] || "Trạng thái chưa xác định")} · Lập ${Number(latest.so_phieu_lap)} phiếu, bỏ qua ${Number(latest.so_phong_bo_qua)} phòng, lỗi ${Number(latest.so_phong_loi)} phòng</p><details><summary>Xem chi tiết</summary><ul>${outcomes || "<li>Không có chi tiết.</li>"}</ul></details>` : "<p>Chưa có lần chạy.</p>"}</section>`;
@@ -236,8 +240,8 @@ export async function renderBillsV2(context) {
         button.disabled = true;
         try {
           const response = await context.api.put("/v1/bills/schedule", values());
-          form.querySelector("[data-message]").textContent = `Đã lưu. Lần kế tiếp: ${response.data.nextRun || "Đang tắt"}`;
-          modal.body.querySelector("[data-next-run]").textContent = response.data.nextRun || "Đang tắt";
+           form.querySelector("[data-message]").textContent = `Đã lưu. Lần kế tiếp: ${nextRunLabel(response.data.nextRun)}`;
+           modal.body.querySelector("[data-next-run]").textContent = nextRunLabel(response.data.nextRun);
           saved = JSON.stringify(values());
           showToast("Đã lưu lịch lập phiếu.", "success");
         } catch (error) { form.querySelector("[data-message]").textContent = error.message; updateSave(); }
