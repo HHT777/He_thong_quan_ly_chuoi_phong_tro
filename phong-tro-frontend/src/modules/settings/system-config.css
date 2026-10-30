@@ -1,11 +1,3 @@
-.system-config-intro {
-  margin-bottom: 18px;
-  padding: 18px 22px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  background: var(--blue-surface);
-}
-.system-config-intro p,
 .system-config-schedule p { margin: 6px 0 0; color: var(--text-secondary); }
 .system-config-group { padding: 24px; }
 .system-config-group h2 { margin: 0; font-size: 22px; }
