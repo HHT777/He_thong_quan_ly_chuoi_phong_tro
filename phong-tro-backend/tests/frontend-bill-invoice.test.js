@@ -19,22 +19,9 @@ test("bill invoice shows stored charges and contract rates without inventing mis
   assert.ok(!html.includes("Tổng phiếu này còn số lẻ"));
 });
 
-test("old draft rounding uses the existing audited adjustment API and leaves sent bills alone", async () => {
-  const { roundOldDraftBills, roundingAdjustment } = await import(frontend("billRounding.js"));
-  assert.equal(roundingAdjustment(263226.29), -0.29);
-  assert.equal(roundingAdjustment(263226.8), 0.2);
-  const posted = [];
-  const api = {
-    get: async (url) => {
-      if (url.includes("page=1")) return { data: [{ ma_thanh_toan: "draft-1", da_gui: false, tong_phai_tra: 263226.29 }, { ma_thanh_toan: "sent-1", da_gui: true, tong_phai_tra: 123.45 }], pagination: { hasNext: true } };
-      if (url.includes("page=2")) return { data: [{ ma_thanh_toan: "draft-2", da_gui: false, tong_phai_tra: 100 }], pagination: { hasNext: false } };
-      return { data: { ma_thanh_toan: "draft-1", da_gui: false, tong_phai_tra: 263226.29 } };
-    },
-    post: async (url, body) => { posted.push({ url, body }); return { data: {} }; },
-  };
-  const result = await roundOldDraftBills(api, async () => true);
-  assert.deepEqual(result, { rounded: 1, failed: 0, found: 1 });
-  assert.deepEqual(posted, [{ url: "/v1/bills/draft-1/adjustments", body: { delta: -0.29, reason: "Làm tròn tổng phiếu thu đến đồng" } }]);
+test("bill management does not show the old draft rounding action", () => {
+  const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/finance/bills-v2.js"), "utf8");
+  assert.doesNotMatch(source, /data-round-old|Làm tròn Nháp cũ/);
 });
 
 test("tenant bill list opens the same invoice view", () => {

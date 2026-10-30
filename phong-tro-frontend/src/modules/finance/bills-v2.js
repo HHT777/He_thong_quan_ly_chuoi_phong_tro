@@ -4,7 +4,6 @@ import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 import { billStatus, billPrimaryAction, billStatusTone, billMenuActions, paymentStatusLabels } from "./billPresentation.js";
 import { billLineLabels, renderBillInvoice } from "./billInvoice.js";
-import { roundOldDraftBills } from "./billRounding.js";
 import { fetchBillPage } from "./billRequests.js";
 
 const keys = createRequestKeyStore();
@@ -82,7 +81,7 @@ export async function renderBillsV2(context) {
   context.main.innerHTML = shellPage("Phiếu thu", "");
   const root = context.main.querySelector("[data-content]");
   root.classList.add("bill-page");
-  root.innerHTML = `<section class="bill-hero"><div><span class="bill-eyebrow">TÀI CHÍNH / PHIẾU THU</span><h2>Quản lý phiếu thu</h2></div><div class="bill-hero__actions"><button class="btn btn--secondary" data-round-old>Làm tròn Nháp cũ</button><button class="btn btn--secondary" data-schedule>Thiết lập tự động</button><button class="btn btn--secondary" data-send>Gửi phiếu thu</button><button class="btn btn--primary" data-create>Lập phiếu thu</button></div></section>
+  root.innerHTML = `<section class="bill-hero"><div><span class="bill-eyebrow">TÀI CHÍNH / PHIẾU THU</span><h2>Quản lý phiếu thu</h2></div><div class="bill-hero__actions"><button class="btn btn--secondary" data-schedule>Thiết lập tự động</button><button class="btn btn--secondary" data-send>Gửi phiếu thu</button><button class="btn btn--primary" data-create>Lập phiếu thu</button></div></section>
     <form class="bill-filters" data-filter><label>Kỳ thu<select name="period">${periodOptions(currentPeriod())}</select></label><label>Căn<select name="building"><option value="">Tất cả căn</option></select></label><label>Trạng thái<select name="issuance"><option value="">Tất cả</option><option value="DRAFT">Nháp</option><option value="SENT">Đã gửi</option></select></label><label>Tìm phòng hoặc khách<input name="search" type="search" placeholder="Nhập để tìm"></label><button class="btn btn--primary">Áp dụng</button></form>
     <div class="bill-stats" data-stats aria-live="polite"></div><section class="panel"><div class="bill-section-head"><h3>Danh sách phiếu thu</h3><span data-count></span></div><div data-list aria-live="polite">Đang tải...</div><nav class="bill-pagination" data-pagination aria-label="Phân trang phiếu thu"></nav></section>
     <details class="panel bill-disclosure"><summary>Khoản điều chỉnh định kỳ</summary><div data-definitions></div></details>
@@ -421,16 +420,6 @@ export async function renderBillsV2(context) {
   root.querySelector('[data-filter] [name="search"]').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { page = 1; refresh(); }, 350); };
   root.querySelector("[data-create]").onclick = createDialog;
   root.querySelector("[data-schedule]").onclick = scheduleDialog;
-  root.querySelector("[data-round-old]").onclick = async (event) => {
-    const button = event.currentTarget; button.disabled = true;
-    try {
-      const result = await roundOldDraftBills(context.api, confirmAction);
-      if (result.cancelled) return;
-      showToast(result.found ? `Đã làm tròn ${result.rounded}/${result.found} phiếu Nháp.${result.failed ? ` ${result.failed} phiếu lỗi, hãy thử lại.` : ""}` : "Không có phiếu Nháp cũ cần làm tròn.", result.failed ? "warning" : "success");
-      await refresh();
-    } catch (error) { showToast(error.message, "error"); }
-    finally { button.disabled = false; }
-  };
   root.querySelector("[data-send]").onclick = () => sendDialog([...selected]);
   root.querySelectorAll(".bill-disclosure").forEach((details) => details.addEventListener("toggle", () => { if (details.open) (details.querySelector("[data-definitions]") ? loadDefinitions : loadPayments)(); }));
   await refresh();
