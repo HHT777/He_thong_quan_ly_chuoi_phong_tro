@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const {
   HopDong,
+  KhachThue,
   PhongTro,
   ThanhVienPhong,
   YeuCau,
@@ -28,12 +29,15 @@ async function roomMembers(roomId, transaction) {
   });
 }
 
-async function assertCapacityAndUniqueness(room, phone, transaction) {
+async function assertCapacityAndUniqueness(room, phone, transaction, contract) {
   const members = await roomMembers(room.ma_phong, transaction);
-  if (members.length >= Number(room.so_nguoi_toi_da)) {
+  const principal = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
+  const principalPhone = principal?.so_dien_thoai;
+  const principalAlreadyListed = members.some((member) => member.so_dien_thoai === principalPhone);
+  if (members.length + (principalAlreadyListed ? 0 : 1) >= Number(room.so_nguoi_toi_da)) {
     throw fail(409, "Phòng đã đủ người", "ROOM_CAPACITY_REACHED");
   }
-  if (members.some((member) => member.so_dien_thoai === phone)) {
+  if (phone === principalPhone || members.some((member) => member.so_dien_thoai === phone)) {
     throw fail(409, "Người được đề xuất đang ở trong phòng", "CO_TENANT_ALREADY_RESIDENT");
   }
 }
@@ -52,7 +56,7 @@ async function propose(tenantId, payload, actorId) {
     });
     if (!contract) throw fail(404, "Không có hợp đồng hiệu lực", "ACTIVE_CONTRACT_NOT_FOUND");
     const room = await PhongTro.findByPk(contract.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
-    await assertCapacityAndUniqueness(room, phone, transaction);
+    await assertCapacityAndUniqueness(room, phone, transaction, contract);
 
     const pendingRequests = await YeuCau.findAll({
       where: {
@@ -100,12 +104,12 @@ async function addByLandlord(user, payload) {
   const details = validateProposal(payload);
   if (!payload.roomId) throw fail(400, "Chọn phòng trước khi thêm người ở cùng", "ROOM_REQUIRED");
   return sequelize.transaction(async (transaction) => {
-    await assertLandlordOwnsRoom(user, payload.roomId, { transaction });
+    await assertLandlordOwnsRoom(user, payload.roomId, transaction);
     const room = await PhongTro.findByPk(payload.roomId, { transaction, lock: transaction.LOCK.UPDATE });
     if (!room) throw fail(404, "Không tìm thấy phòng", "RESOURCE_NOT_FOUND");
     const contract = await HopDong.findOne({ where: { ma_phong: payload.roomId, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, transaction, lock: transaction.LOCK.UPDATE });
     if (!contract) throw fail(409, "Hãy lập hợp đồng trước", "ACTIVE_CONTRACT_NOT_FOUND");
-    await assertCapacityAndUniqueness(room, details.phone, transaction);
+    await assertCapacityAndUniqueness(room, details.phone, transaction, contract);
     const member = await ThanhVienPhong.create({ ma_phong: room.ma_phong, ma_hop_dong: contract.ma_hop_dong, ho_ten: details.name, so_dien_thoai: details.phone, cccd_giay_to: details.identity, ngay_sinh: details.birthDate, gioi_tinh: details.gender, dia_chi_thuong_tru: details.address, quan_he: details.relationship, ngay_vao: details.startDate, trang_thai_cu_tru: "DANG_O" }, { transaction });
     await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "CO_TENANT_ADMITTED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, after: { roomId: room.ma_phong, contractId: contract.ma_hop_dong } });
     return member;
@@ -133,7 +137,7 @@ async function approve(request, transaction, actorId) {
   });
   if (!contract) throw fail(409, "Hợp đồng thuê phòng không còn hiệu lực", "ACTIVE_CONTRACT_NOT_FOUND");
   const room = await PhongTro.findByPk(proposal.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
-  await assertCapacityAndUniqueness(room, proposal.so_dien_thoai_nguoi_de_xuat, transaction);
+  await assertCapacityAndUniqueness(room, proposal.so_dien_thoai_nguoi_de_xuat, transaction, contract);
 
   const member = await ThanhVienPhong.create({
     ho_ten: proposal.ho_ten_nguoi_de_xuat,
