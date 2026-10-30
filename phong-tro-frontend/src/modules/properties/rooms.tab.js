@@ -33,6 +33,7 @@ async function openRoomDetails(context, summary) {
       .filter((contract) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(contract.trang_thai));
     const occupants = [...(room.nguoi_dang_o || []), ...activeContracts.map((contract) => contract.khachThue).filter(Boolean)];
     const uniqueOccupants = [...new Map(occupants.map((person) => [`${person.ho_ten}|${person.so_dien_thoai}`, person])).values()];
+    const assets = Array.isArray(room.taiSans) ? room.taiSans : [];
     overlay.querySelector("[data-room-detail]").innerHTML = `<dl class="room-detail-grid">
       <div><dt>Căn trọ</dt><dd>${escapeHtml(room.canTro?.ten_can)}</dd></div>
       <div><dt>Trạng thái</dt><dd>${formatStatusBadge(room.trang_thai)}</dd></div>
@@ -40,6 +41,9 @@ async function openRoomDetails(context, summary) {
       <div><dt>Giá thuê mỗi tháng</dt><dd>${escapeHtml(money(room.gia_thue))}</dd></div>
       <div><dt>Diện tích</dt><dd>${escapeHtml(room.dien_tich)} m²</dd></div>
       <div><dt>Số người tối đa</dt><dd>${escapeHtml(room.so_nguoi_toi_da)} người</dd></div>
+      <div class="room-detail-grid__wide"><dt>Nội thất & tài sản</dt><dd>${assets.length
+        ? `<ul class="room-assets">${assets.map((asset) => `<li><strong>${escapeHtml(asset.ten_tai_san)}</strong><span>Số lượng: ${escapeHtml(asset.so_luong)} · ${escapeHtml(asset.tinh_trang || "Chưa cập nhật tình trạng")}</span>${asset.ghi_chu ? `<small>${escapeHtml(asset.ghi_chu)}</small>` : ""}</li>`).join("")}</ul>`
+        : "Chưa có tài sản"}</dd></div>
       <div class="room-detail-grid__wide"><dt>Mô tả nội thất</dt><dd>${escapeHtml(room.noi_that_mo_ta || "Chưa có mô tả")}</dd></div>
       <div class="room-detail-grid__wide"><dt>\u004e\u0067\u01b0\u1eddi \u0111\u0061\u006e\u0067 \u1edf</dt><dd>${uniqueOccupants.length
         ? `<ul class="room-current-occupants">${uniqueOccupants.map((person) => `<li><span class="room-current-occupants__name">${escapeHtml(person.ho_ten)}</span><span class="room-current-occupants__phone">${escapeHtml(person.so_dien_thoai)}</span></li>`).join("")}</ul>`

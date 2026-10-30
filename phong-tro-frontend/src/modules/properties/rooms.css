@@ -26,3 +26,7 @@
   font-size: 13px;
   font-weight: 400;
 }
+
+.room-assets { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.room-assets li { display: grid; gap: 3px; padding: 9px 12px; border: 1px solid var(--border-subtle); border-radius: 10px; }
+.room-assets span, .room-assets small { color: var(--text-muted); }

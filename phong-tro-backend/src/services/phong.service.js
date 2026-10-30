@@ -1,4 +1,4 @@
-const { PhongTro, CanTro, ThanhVienPhong, HopDong, KhachThue } = require("../models");
+const { PhongTro, CanTro, ThanhVienPhong, HopDong, KhachThue, TaiSan } = require("../models");
 const { Op } = require("sequelize");
 const sequelize = require("../config/database");
 const { writeAuditLog } = require("./auditLog.service");
@@ -65,6 +65,13 @@ class PhongService {
         {
           model: CanTro,
           as: "canTro",
+        },
+        {
+          model: TaiSan,
+          as: "taiSans",
+          attributes: ["ten_tai_san", "so_luong", "tinh_trang", "ghi_chu"],
+          separate: true,
+          order: [["ten_tai_san", "ASC"]],
         },
         {
           model: ThanhVienPhong,
