@@ -163,3 +163,15 @@ Giai đoạn 0, B (lịch sử hợp đồng 010, chuyển phòng 011), C (rút 
 - Bằng chứng nghiệp vụ, mâu thuẫn tài liệu cũ, API hiện có/thiếu và giới hạn ghép người ở cùng được ghi trong `docs/INCIDENT_FORM.md`.
 - Test frontend trước sửa: 53 đạt, 1 bỏ qua live DB. Kết quả cuối cần là `node --test --test-concurrency=1 tests/*.test.mjs`; không build frontend, không truy cập DB `phong_tro*`/MariaDB 3306, không push. Người dùng tự build và xem UI.
 - Giữ nguyên các file untracked chủ ý và CSS nháp `phong-tro-frontend/src/shared/styles/management.css`; khi commit chỉ stage hunk/file thuộc phạm vi sự cố hoặc UUID audit.
+
+## Bản đồ luồng
+- Xem và duyệt: `phong-tro-frontend/src/modules/residents-contracts/co-tenants.tab.js` nạp `/v1/requests`, mở chi tiết qua `/v1/co-tenant-proposals/:id`, duyệt qua `PATCH /v1/requests/:id`.
+- Nút chỉ hiện khi `trang_thai === CHO_XU_LY`; thông báo lỗi tải chi tiết trước đây nằm sau bảng người ở cùng nên bấm nút trông như không phản hồi. Nay thông báo nằm cạnh yêu cầu.
+- Thêm cư dân: `phong-tro-frontend/src/modules/residents-contracts/residents.tab.js` cấu hình `POST /management/khach-thue`; `src/shared/components/view.js` nạp lại `GET /management/khach-thue` sau tạo.
+- `src/modules/residents-contracts/building-scope.js` lọc theo căn/phòng lưu trong phiên; cư dân chưa gắn hợp đồng không thuộc căn/phòng nên bị ẩn. Sau tạo, bộ lọc trở về tất cả căn/phòng; người ở cùng chỉ hiện khi `trang_thai_cu_tru === DANG_O`.
+
+## Việc nhỏ: tiết kiệm token
+- Đọc tối đa 60 dòng đầu `AGENTS.md`; grep từ khóa trước khi đọc file khác.
+- Giới hạn đầu ra mọi lệnh; chỉ mở đoạn mã liên quan.
+- Không chạy baseline, toàn bộ test, integration hay build cho việc nhỏ; chỉ chạy test của file đã sửa.
+- Dừng và báo khi vượt 25 lệnh.
