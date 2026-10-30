@@ -1,34 +1,62 @@
+.payment-page { display: grid; gap: 18px; }
+.payment-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 22px 24px; border: 1px solid var(--ui2-border); border-radius: 16px; background: #fff; }
+.payment-heading h2 { margin: 0; color: var(--ui2-ink); }
+.payment-heading p { margin: 5px 0 0; color: var(--ui2-subtext); }
 .payment-list-panel { overflow: hidden; }
-.payment-list-panel > .table-wrap {
-  overflow-x: auto;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-.payment-filter-label { color: var(--text-secondary, #52617a); font-weight: 700; }
-.payment-toolbar-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.payment-count { color: var(--text-muted, #7b8798); font-size: 13px; }
-.payment-table {
-  min-width: 1080px;
-  border-collapse: separate;
-  border-spacing: 0;
-  border-inline: 1px solid var(--ui2-border, #d8e2f2);
-  border-bottom: 1px solid var(--ui2-border, #d8e2f2);
-}
-.payment-table th:first-child,
-.payment-table td:first-child { width: 44px; text-align: center; }
-.payment-table th:nth-child(5),
-.payment-table td:nth-child(5) {
-  width: 148px;
-  min-width: 148px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.payment-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--blue-primary, #173876); }
-.payment-table .payment-note { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.payment-empty { padding: 36px; text-align: center; color: var(--text-muted, #7b8798); }
-@media (max-width: 760px) {
-  .payment-list-panel .mgmt-toolbar { align-items: stretch; }
-  .payment-toolbar-actions { width: 100%; }
-  .payment-toolbar-actions .btn { flex: 1; }
-}
+.payment-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--ui2-border); }
+.payment-toolbar label { display: grid; gap: 5px; font-weight: 700; }
+.payment-toolbar select { min-width: 190px; min-height: 42px; padding: 8px 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
+.payment-toolbar > span { color: var(--ui2-subtext); font-size: 13px; }
+.payment-table-wrap { overflow-x: auto; }
+.payment-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.payment-table th { padding: 14px 12px; text-align: left; color: var(--ui2-subtext); background: #f6f9fe; font-size: 12px; text-transform: uppercase; }
+.payment-table td { height: 64px; padding: 8px 12px; border-top: 1px solid var(--ui2-border); vertical-align: middle; }
+.payment-table th:first-child, .payment-table td:first-child { width: 48px; text-align: center; }
+.payment-table th:nth-child(2) { width: 24%; }
+.payment-table th:nth-child(3) { width: 13%; text-align: right; }
+.payment-table th:nth-child(4) { width: 17%; }
+.payment-table th:nth-child(5) { width: 16%; }
+.payment-table th:nth-child(6) { width: 17%; }
+.payment-table th:nth-child(7) { width: 13%; }
+.payment-table td:nth-child(2) strong, .payment-table td:nth-child(2) small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payment-table td:nth-child(2) small { color: var(--ui2-subtext); }
+.payment-table input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--ui2-navy); }
+.payment-amount { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payment-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.payment-row--pending { box-shadow: inset 3px 0 #ad6800; background: #fffcf5; }
+.payment-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.payment-badge--pending { background: var(--amber-surface); color: var(--amber-text); border: 1px solid var(--amber-border); }
+.payment-badge--success { background: var(--green-surface); color: var(--green-text); border: 1px solid var(--green-border); }
+.payment-badge--cancelled { background: #e8edf4; color: #3e526c; border: 1px solid var(--ui2-border); }
+.payment-source { display: block; color: var(--ui2-subtext); font-size: 11px; }
+.payment-menu { position: relative; }
+.payment-menu summary { width: 36px; padding: 5px; border: 1px solid var(--ui2-border); border-radius: 8px; cursor: pointer; list-style: none; text-align: center; }
+.payment-menu[open] { z-index: 3; }
+.payment-menu button { display: block; width: 170px; padding: 8px 10px; border: 1px solid var(--ui2-border); background: #fff; text-align: left; cursor: pointer; }
+.payment-menu button:first-of-type { position: absolute; right: 0; top: 32px; }
+.payment-menu button:last-of-type:not(:first-of-type) { position: absolute; right: 0; top: 67px; }
+.payment-empty { padding: 32px; text-align: center; color: var(--ui2-subtext); }
+.payment-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--ui2-border); }
+.payment-selection { position: sticky; bottom: 12px; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 18px; border: 1px solid var(--ui2-border); border-radius: 12px; background: #fff; box-shadow: 0 10px 30px #17387626; }
+.payment-selection[hidden] { display: none; }
+.payment-is-loading { opacity: .55; pointer-events: none; }
+.payment-skeleton { display: grid; gap: 12px; padding: 20px; }
+.payment-skeleton .skeleton { height: 54px; border-radius: 9px; }
+.payment-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.payment-cards { display: none; }
+.payment-drawer-overlay { position: fixed; inset: 0; z-index: 1100; display: flex; justify-content: flex-end; background: #0b193b80; }
+.payment-drawer { display: flex; flex-direction: column; width: min(480px, 100%); height: 100%; background: #fff; box-shadow: -18px 0 40px #0b193b3d; }
+.payment-drawer header, .payment-drawer footer { display: flex; justify-content: space-between; gap: 10px; padding: 18px 22px; border-bottom: 1px solid var(--ui2-border); }
+.payment-drawer header h2 { margin: 0; }
+.payment-drawer header button { border: 0; background: #edf3fb; border-radius: 8px; width: 36px; font-size: 22px; cursor: pointer; }
+.payment-drawer__body { flex: 1; overflow: auto; padding: 22px; }
+.payment-drawer__body h3 { margin: 0 0 4px; }
+.payment-drawer__body > p { margin: 0 0 20px; color: var(--ui2-subtext); }
+.payment-drawer dl { display: grid; gap: 14px; }
+.payment-drawer dl > div { border-bottom: 1px solid var(--ui2-border); padding-bottom: 12px; }
+.payment-drawer dt { color: var(--ui2-subtext); font-size: 12px; }
+.payment-drawer dd { margin: 5px 0 0; overflow-wrap: anywhere; font-weight: 700; }
+.payment-drawer footer { border-top: 1px solid var(--ui2-border); border-bottom: 0; }
+.payment-page :focus-visible, .payment-drawer :focus-visible { outline: 3px solid #1671d8; outline-offset: 2px; }
+@media (max-width: 1279px) { .payment-table th:nth-child(6), .payment-table td:nth-child(6) { display: none; } .payment-table th:nth-child(2) { width: 32%; } }
+@media (max-width: 767px) { .payment-heading, .payment-toolbar, .payment-pagination, .payment-selection { flex-wrap: wrap; } .payment-table-wrap { display: none; } .payment-cards { display: grid; gap: 10px; padding: 16px; } .payment-card { display: grid; gap: 5px; padding: 14px; border: 1px solid var(--ui2-border); border-radius: 10px; } .payment-card b { font-variant-numeric: tabular-nums; } .payment-selection { bottom: 0; } .payment-drawer { width: 100%; } }
