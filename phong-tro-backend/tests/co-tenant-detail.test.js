@@ -7,10 +7,10 @@ test("FR-166 audit snapshots discard identity, address and birth date recursivel
   assert.deepEqual(snapshot, { nested: { roomId: "room" } });
 });
 
-test("FR-166 detail route validates UUID before reading proposal", () => {
+test("FR-166 detail route validates bounded request ID before reading proposal", () => {
   const source = require("node:fs").readFileSync(require("node:path").resolve(__dirname, "../src/routes/mvp.routes.js"), "utf8");
   const block = source.slice(source.indexOf('router.get("/co-tenant-proposals/:id"'), source.indexOf('router.post("/co-tenants"'));
-  assert.match(block, /Joi\.string\(\)\.guid/);
+  assert.match(block, /Joi\.string\(\)\.max\(36\)\.pattern/);
   assert.match(block, /getProposal/);
   assert.doesNotMatch(block, /\.create\(|\.update\(/);
 });

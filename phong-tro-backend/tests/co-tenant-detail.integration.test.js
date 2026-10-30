@@ -14,6 +14,12 @@ test("FR-166 detail is read-only and limited to owner and proposing tenant", asy
   assert.equal(created.response.status, 201, JSON.stringify(created.body));
   const id = created.body.data.request.ma_yeu_cau;
   const url = `/api/v1/co-tenant-proposals/${id}`;
+  const legacyId = `legacy-${Date.now()}`;
+  const originalRequest = await YeuCau.findByPk(id);
+  const originalProposal = await DeXuatBanCungPhong.findByPk(id);
+  await YeuCau.create({ ...originalRequest.get({ plain: true }), ma_yeu_cau: legacyId });
+  await DeXuatBanCungPhong.create({ ...originalProposal.get({ plain: true }), ma_yeu_cau: legacyId });
+  assert.equal((await request(`/api/v1/co-tenant-proposals/${legacyId}`, { headers: headers(landlord) })).response.status, 200);
   const countsBefore = await Promise.all([YeuCau.count(), DeXuatBanCungPhong.count(), ThanhVienPhong.count(), AuditLog.count()]);
   const owner = await request(url, { headers: headers(landlord) });
   const proposer = await request(url, { headers: headers(fresh.tenantToken) });
@@ -31,7 +37,8 @@ test("FR-166 detail is read-only and limited to owner and proposing tenant", asy
   await ChuTro.create({ ma_tai_khoan: rogueAccount.ma_tai_khoan, ho_ten: "Other owner", so_dien_thoai: "0987654320" });
   const rogue = jwt.sign({ ma_tai_khoan: rogueAccount.ma_tai_khoan, vai_tro: "CHU_TRO" }, process.env.JWT_SECRET);
   assert.equal((await request(url, { headers: headers(rogue) })).response.status, 404);
-  assert.equal((await request("/api/v1/co-tenant-proposals/bad", { headers: headers(landlord) })).response.status, 400);
+  assert.equal((await request("/api/v1/co-tenant-proposals/bad!", { headers: headers(landlord) })).response.status, 400);
+  assert.equal((await request("/api/v1/co-tenant-proposals/bad", { headers: headers(landlord) })).response.status, 404);
   assert.equal((await request(`/api/v1/co-tenant-proposals/${crypto.randomUUID()}`, { headers: headers(landlord) })).response.status, 404);
   const list = await request("/api/v1/requests", { headers: headers(landlord) });
   assert.equal(JSON.stringify(list.body.data).includes(body.identityNumber), false);

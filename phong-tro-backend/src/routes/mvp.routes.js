@@ -405,7 +405,7 @@ router.delete("/incidents/:id", landlord, async (req, res, next) => {
 
 router.get("/co-tenant-proposals/:id", async (req, res, next) => {
   try {
-    const { error, value } = Joi.string().guid({ version: "uuidv4" }).required().validate(req.params.id);
+    const { error, value } = Joi.string().max(36).pattern(/^[A-Za-z0-9_-]+$/).required().validate(req.params.id);
     if (error) throw fail(400, "Mã đề xuất không hợp lệ", "INVALID_PROPOSAL_ID");
     return data(res, await coTenantService.getProposal(value, req.user));
   } catch (error) { next(error); }
