@@ -1,6 +1,7 @@
 import { icons } from "./icons.js";
 import { showToast } from "./toast.js";
 import { statusLabel } from "./status-labels.mjs";
+import { wholeVnd } from "../format-money.mjs";
 
 export function confirmAction(message) {
   return new Promise((resolve) => {
@@ -19,7 +20,7 @@ export function confirmAction(message) {
 export const escapeHtml = (value) =>
   String(value ?? "—").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 
-export const money = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
+export const money = (value) => `${wholeVnd(value)} đ`;
 export const date = (value) => (value ? new Date(value).toLocaleDateString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "—");
 export const datePadded = (value) => (value ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value)) : "—");
 

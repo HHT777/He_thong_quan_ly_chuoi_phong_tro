@@ -1,4 +1,5 @@
-const number = new Intl.NumberFormat("vi-VN");
+import { wholeVnd } from "../../shared/format-money.mjs";
+
 const percent = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 
 export const REPORT_MODES = ["month", "quarter", "year", "range"];
@@ -28,7 +29,8 @@ export function reportMoney(value) {
   if (value === null || value === undefined || value === "") return "—";
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "—";
-  return `${amount < 0 ? "−" : ""}${number.format(Math.abs(amount))} đ`;
+  const rounded = wholeVnd(Math.abs(amount));
+  return `${amount < 0 && rounded !== "0" ? "−" : ""}${rounded} đ`;
 }
 
 export function readCashflow(response) {

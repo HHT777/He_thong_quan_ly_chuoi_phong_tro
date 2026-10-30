@@ -1,3 +1,5 @@
+import { wholeVnd } from "../../shared/format-money.mjs";
+
 export const paymentStatus = {
   CHO_XAC_NHAN: { label: "Chờ xác nhận", tone: "pending", icon: "◷" },
   DA_XAC_NHAN: { label: "Đã xác nhận", tone: "success", icon: "✓" },
@@ -9,7 +11,7 @@ export const canConfirm = (row) => row.trang_thai_xac_nhan === "CHO_XAC_NHAN" &&
 export const canCancel = (row) => row.trang_thai_xac_nhan === "DA_XAC_NHAN" && row.nguon_thanh_toan === "THU_TIEN";
 export const defaultStatus = (pendingCount) => pendingCount > 0 ? "CHO_XAC_NHAN" : "ALL";
 export const ellipsis = (value, length = 44) => String(value || "Không xác định").length > length ? `${String(value).slice(0, length - 1)}…` : String(value || "Không xác định");
-export const paymentMoney = (value) => `${Number(value || 0).toLocaleString("vi-VN")} đ`;
+export const paymentMoney = (value) => `${wholeVnd(value)} đ`;
 export const paymentDate = (value) => {
   if (!value) return "Không xác định";
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value)).map(({ type, value: part }) => [type, part]));

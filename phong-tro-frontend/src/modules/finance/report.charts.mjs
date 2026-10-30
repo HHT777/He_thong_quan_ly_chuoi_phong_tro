@@ -9,7 +9,7 @@ const graphicClass = (metric) => ({ revenue: "report-graphic--revenue", expenses
 const shortMoney = (value) => {
   const amount = Number(value);
   const abs = Math.abs(amount);
-  const formatted = (unit) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(amount / unit);
+  const formatted = (unit) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(amount / unit);
   return abs >= 1_000_000 ? `${formatted(1_000_000)} tr` : abs >= 1_000 ? `${formatted(1_000)} nghìn` : `${Math.round(amount)} đ`;
 };
 const monthLabel = (month) => `${Number(month.slice(5))}/${month.slice(0, 4)}`;
