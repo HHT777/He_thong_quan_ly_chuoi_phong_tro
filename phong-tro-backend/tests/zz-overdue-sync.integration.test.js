@@ -24,6 +24,7 @@ test("FR-173 overdue list and debt match dashboard across Vietnam day boundary a
       ma_hop_dong: contractId, ky: "2026-10", tien_phong: 1000000, tong_phai_thanh_toan: 1000000,
     }) });
     assert.equal(result.response.status, 201, JSON.stringify(result.body));
+    await ThanhToan.update({ da_gui: true, ngay_gui: new Date("2026-10-02T01:00:00Z") }, { where: { ma_thanh_toan: result.body.data.ma_thanh_toan } });
     return result.body.data.ma_thanh_toan;
   };
   const billA = await makeBill(tokenA, rentalA.contract.ma_hop_dong);

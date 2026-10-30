@@ -36,7 +36,7 @@ test("BE-1 dashboard summary partitions real rooms and periodic bills by landlor
       const buildingIds = buildings.map((row) => row.ma_can);
       const rooms = await PhongTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } }, attributes: ["trang_thai"], raw: true });
       const bills = await ThanhToan.findAll({
-        where: { nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY" },
+        where: { nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY", da_gui: true },
         include: [{ model: HopDong, as: "hopDong", required: true,
           include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: buildingIds } } }] }],
       });
@@ -83,7 +83,7 @@ test("BE-1b dashboard derives overdue from Vietnam date even when stored cron fl
   assert.equal(config.overdueDay, 6);
   const buildings = await CanTro.findAll({ where: { ma_chu_tro: (await ChuTro.findOne({ where: { ma_tai_khoan: account.ma_tai_khoan } })).ma_chu_tro }, attributes: ["ma_can"], raw: true });
   const bills = await ThanhToan.findAll({
-    where: { nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY" },
+    where: { nam: 2026, thang: 10, loai_thanh_toan: "DINH_KY", da_gui: true },
     include: [{ model: HopDong, as: "hopDong", required: true,
       include: [{ model: PhongTro, as: "phongTro", required: true, where: { ma_can: { [Op.in]: buildings.map((row) => row.ma_can) } } }] }],
   });
