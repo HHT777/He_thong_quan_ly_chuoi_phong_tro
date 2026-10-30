@@ -170,9 +170,18 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
     label: "Tạo hợp đồng",
     endpoint: "/hop-dong",
     fieldErrors: true,
-    validate: contractDraftFeedback,
+    validate: (raw) => {
+      const feedback = contractDraftFeedback(raw);
+      if (raw.tenantMode === "existing" && !raw.ma_khach_thue) feedback.errors.form = "Chọn hồ sơ khách thuê.";
+      if (raw.tenantMode !== "existing") {
+        if (!raw.khach_ho_ten?.trim()) feedback.errors.form = "Nhập họ tên khách thuê.";
+        if (!/^\d{9,15}$/.test(raw.khach_so_dien_thoai || "")) feedback.errors.form = "Số điện thoại khách thuê phải có 9–15 chữ số.";
+        if (!raw.khach_cccd_giay_to?.trim()) feedback.errors.form = "Nhập CCCD/giấy tờ khách thuê.";
+      }
+      return feedback;
+    },
     onError: contractServerErrors,
-    onOpen: ({ form }) => {
+    onOpen: async ({ context, form }) => {
       for (const name of CONTRACT_MONEY_FIELDS) {
         const input = form.elements.namedItem(name);
         input.value = formatVnd(input.value);
@@ -181,12 +190,55 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
         input.addEventListener("input", () => { input.value = formatVnd(input.value); });
       }
       form.addEventListener("input", () => { form.querySelector("[data-form-warnings]").textContent = contractDraftFeedback(Object.fromEntries(new FormData(form))).warnings.join(" "); });
+      const mode = form.elements.namedItem("tenantMode");
+      const selected = form.elements.namedItem("ma_khach_thue");
+      const search = form.elements.namedItem("tenantSearch");
+      const names = ["khach_ho_ten", "khach_so_dien_thoai", "khach_cccd_giay_to"];
+      const hint = document.createElement("p"); hint.setAttribute("role", "status");
+      form.insertBefore(hint, form.querySelector(".modal-footer"));
+      const normalize = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      let tenants = [];
+      const update = () => {
+        const existing = mode.value === "existing";
+        for (const name of names) { const input = form.elements.namedItem(name); input.closest("label").style.display = existing ? "none" : ""; input.required = !existing; }
+        selected.closest("label").style.display = existing ? "" : "none"; selected.required = existing;
+        search.closest("label").style.display = existing ? "" : "none";
+        hint.replaceChildren();
+        if (existing) {
+          const query = normalize(search.value);
+          const selectedId = selected.value;
+          selected.replaceChildren(new Option("Chọn hồ sơ khách", ""));
+          for (const tenant of tenants.filter((item) => !query || [item.ho_ten, item.so_dien_thoai, item.cccd_giay_to].some((value) => normalize(value).includes(query)))) selected.add(new Option(`${tenant.ho_ten} · ${tenant.so_dien_thoai}`, tenant.ma_khach_thue));
+          selected.value = [...selected.options].some((option) => option.value === selectedId) ? selectedId : "";
+          const chosen = tenants.find((item) => String(item.ma_khach_thue) === selected.value);
+          if (chosen) hint.textContent = `${chosen.ho_ten} · ${chosen.so_dien_thoai} · ${chosen.hopDongs?.some((contract) => ["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(contract.trang_thai)) ? "Có hợp đồng hiệu lực" : "Chưa có hợp đồng hiệu lực"}`;
+        } else {
+          const phone = normalize(form.elements.namedItem("khach_so_dien_thoai").value);
+          const identity = normalize(form.elements.namedItem("khach_cccd_giay_to").value);
+          const match = tenants.find((item) => phone && normalize(item.so_dien_thoai) === phone || identity && normalize(item.cccd_giay_to) === identity);
+          if (match) {
+            hint.append("Khách này đã có hồ sơ — dùng hồ sơ có sẵn? ");
+            const use = document.createElement("button"); use.type = "button"; use.textContent = "Dùng hồ sơ có sẵn";
+            use.addEventListener("click", () => { mode.value = "existing"; search.value = match.ho_ten; update(); selected.value = String(match.ma_khach_thue); update(); });
+            hint.append(use);
+          }
+        }
+      };
+      mode.addEventListener("change", update); search.addEventListener("input", update);
+      for (const name of names) form.elements.namedItem(name).addEventListener("input", update);
+      selected.addEventListener("change", update);
+      update();
+      try { tenants = (await context.api.get("/management/khach-thue")).data || []; update(); }
+      catch (error) { hint.textContent = `Không tải được hồ sơ khách: ${error.message}`; }
     },
     onCreated: () => sessionStorage.removeItem("qlpt:contract-reservation"),
     initial: () => ({ ma_phong: reservationPrefill()?.roomId || "", ma_dat_giu: reservationPrefill()?.reservationId || "", dieu_khoan: "Áp dụng 8 điều khoản mặc định về sử dụng phòng và tài sản." }),
     fields: (scope) => [
       { name: "ma_dat_giu", label: "Mã giữ phòng (nếu có)" },
-      { name: "ma_khach_thue", label: "Mã khách thuê", required: true },
+      { name: "tenantMode", label: "Khách thuê", options: [{ value: "new", label: "Khách mới" }, { value: "existing", label: "Khách đã có" }] },
+      { name: "khach_ho_ten", label: "Họ tên khách thuê" }, { name: "khach_so_dien_thoai", label: "Số điện thoại khách thuê" }, { name: "khach_cccd_giay_to", label: "CCCD/Giấy tờ khách thuê" },
+      { name: "tenantSearch", label: "Tìm hồ sơ khách" },
+      { name: "ma_khach_thue", label: "Hồ sơ khách thuê", options: [{ value: "", label: "Chọn hồ sơ khách" }] },
       { name: "ma_phong", label: "Phòng", options: [{ value: "", label: "Chọn phòng" }, ...scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong) && ["TRONG", "DA_GIU"].includes(room.trang_thai)).map((room) => ({ value: room.ma_phong, label: `${room.canTro?.ten_can || "Căn trọ"} · ${room.so_phong}` }))], required: true },
       { name: "ngay_bat_dau", label: "Ngày bắt đầu", type: "date", required: true },
       { name: "ngay_ket_thuc", label: "Ngày kết thúc", type: "date", required: true },
@@ -199,7 +251,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
       { name: "dieu_khoan", label: "Điều khoản bổ sung riêng", type: "textarea", required: true },
       { name: "da_co_ban_giay_ky", label: "Đã có bản giấy ký", type: "checkbox", required: true },
     ],
-    map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; return result; },
+    map: (raw) => { const result = numericContractValues(raw); if (!result.ma_dat_giu) delete result.ma_dat_giu; delete result.tenantSearch; delete result.tenantMode; if (raw.tenantMode === "new") { result.khachThue = { ho_ten: raw.khach_ho_ten.trim(), so_dien_thoai: raw.khach_so_dien_thoai.trim(), cccd_giay_to: raw.khach_cccd_giay_to.trim() }; delete result.ma_khach_thue; } for (const name of ["khach_ho_ten", "khach_so_dien_thoai", "khach_cccd_giay_to"]) delete result[name]; return result; },
   },
   rowActions: [{
     id: "detail", label: "Chi tiết", openDetail: true,

@@ -52,7 +52,36 @@ const residentsTab = listTab({ id: "residents", route: "/residents-contracts/res
     { label: "Căn", key: "ten_can" },
     { label: "Phòng", key: "so_phong" },
   ],
-  create: { label: "Thêm cư dân", fields: [{ name: "ho_ten", label: "Họ tên", required: true }, { name: "so_dien_thoai", label: "Số điện thoại", required: true }, { name: "cccd_giay_to", label: "CCCD/Giấy tờ", required: true }], onCreated: () => { sessionStorage.removeItem("qlpt:residents-contracts-building"); sessionStorage.removeItem("qlpt:residents-contracts-room"); } },
+  create: {
+    label: "Thêm người ở cùng", endpoint: "/v1/co-tenants",
+    fields: (scope) => [
+      { name: "roomId", label: "Căn · Phòng", options: [{ value: "", label: "Chọn phòng" }, ...scope.rooms.filter((room) => scope.matchesRoom(room.ma_phong)).map((room) => ({ value: room.ma_phong, label: `${room.canTro?.ten_can || "Căn trọ"} · ${room.so_phong}` }))], required: true },
+      { name: "name", label: "Họ tên", required: true }, { name: "phone", label: "Số điện thoại", required: true },
+      { name: "identityNumber", label: "CCCD/Giấy tờ", required: true }, { name: "birthDate", label: "Ngày sinh", type: "date", required: true },
+      { name: "gender", label: "Giới tính", required: true }, { name: "permanentAddress", label: "Địa chỉ thường trú", required: true },
+      { name: "relationship", label: "Quan hệ", required: true }, { name: "startDate", label: "Ngày bắt đầu ở", type: "date", required: true },
+    ],
+    onOpen: async ({ context, form }) => {
+      const scope = await loadBuildingScope(context.api, { contracts: true });
+      const room = form.elements.namedItem("roomId");
+      const notice = document.createElement("p");
+      notice.setAttribute("role", "status");
+      form.insertBefore(notice, form.querySelector(".modal-footer"));
+      const update = () => {
+        const active = [...scope.contractById.values()].some((contract) => String(contract.ma_phong) === room.value && ACTIVE_CONTRACTS.has(contract.trang_thai));
+        notice.replaceChildren();
+        if (room.value && !active) {
+          notice.append("Hãy lập hợp đồng trước. ");
+          const link = document.createElement("button"); link.type = "button"; link.textContent = "Tạo hợp đồng";
+          link.addEventListener("click", () => { window.location.hash = "#/residents-contracts/contracts"; });
+          notice.append(link);
+        }
+        form.querySelector('button[type="submit"]').disabled = Boolean(room.value && !active);
+      };
+      room.addEventListener("change", update); update();
+    },
+    onCreated: () => { sessionStorage.removeItem("qlpt:residents-contracts-building"); sessionStorage.removeItem("qlpt:residents-contracts-room"); },
+  },
   rowActions: [
     { id: "details", label: "Xem chi tiết", openDetail: true },
     {
