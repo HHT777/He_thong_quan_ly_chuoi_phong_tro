@@ -49,10 +49,10 @@ class KhoanPhaiThuService {
       if (actorId) await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "contract", contract.ma_hop_dong, { transaction });
       if (await ThanhToan.findOne({ where: { ma_hop_dong: contract.ma_hop_dong, thang, nam, loai_thanh_toan: "DINH_KY" }, transaction })) throw { status: 409, code: "BILL_ALREADY_EXISTS", message: "Khoản phải thu của hợp đồng trong kỳ đã tồn tại" };
       const lines = [
-        { type: BILL_LINE_TYPES.RENT, amount: Number(data.tien_phong), description: "Tiền phòng" },
-        { type: BILL_LINE_TYPES.ELECTRICITY, amount: Number(data.tien_dien), description: "Tiền điện" },
-        { type: BILL_LINE_TYPES.WATER, amount: Number(data.tien_nuoc), description: "Tiền nước" },
-        { type: BILL_LINE_TYPES.SERVICE_FEE, amount: Number(data.phi_dich_vu), description: "Phí dịch vụ" },
+        { type: BILL_LINE_TYPES.RENT, amount: Number(data.tien_phong), description: data.lineDescriptions?.rent || "Tiền phòng" },
+        { type: BILL_LINE_TYPES.ELECTRICITY, amount: Number(data.tien_dien), description: data.lineDescriptions?.electricity || "Tiền điện" },
+        { type: BILL_LINE_TYPES.WATER, amount: Number(data.tien_nuoc), description: data.lineDescriptions?.water || "Tiền nước" },
+        { type: BILL_LINE_TYPES.SERVICE_FEE, amount: Number(data.phi_dich_vu), description: data.lineDescriptions?.serviceFee || "Phí dịch vụ" },
         { type: BILL_LINE_TYPES.INCIDENTAL_FEE, amount: Number(data.phi_phat_sinh), description: "Phí phát sinh" },
       ].filter(({ amount }) => amount > 0);
       const definitions = Array.isArray(data.adjustments) ? data.adjustments : [];

@@ -29,9 +29,16 @@ async function buildPreview(contract, period) {
   if (!Number.isFinite(electricity) || electricity < 0) throw Object.assign(new Error("Sản lượng điện của kỳ không hợp lệ"), { status: 422, code: "INVALID_ELECTRICITY_AMOUNT" });
   const ratio = firstPeriodRatio(contract.ngay_bat_dau, period);
   const rent = prorateMonthlyAmount(contract.gia_thue, ratio);
-  const water = calculateWaterCharge(contract.don_gia_nuoc, occupantCount, ratio);
+  const water = Math.round(calculateWaterCharge(contract.don_gia_nuoc, occupantCount, ratio));
   const serviceFee = prorateMonthlyAmount(contract.phi_dich_vu, ratio);
-  const adjustments = definitions.map((row) => ({ id: row.ma_khoan_dieu_chinh, type: row.loai_khoan, amount: Number(row.so_tien), description: row.ten_ly_do }));
+  const adjustments = definitions.map((row) => ({ id: row.ma_khoan_dieu_chinh, type: row.loai_khoan, amount: Math.round(Number(row.so_tien)), description: row.ten_ly_do }));
+  const periodDays = ratio < 1 ? `; ${Math.round(ratio * daysInMonth(year, month))}/${daysInMonth(year, month)} ngày` : "";
+  const lineDescriptions = {
+    rent: `Giá hợp đồng ${Number(contract.gia_thue).toLocaleString("vi-VN")} đ/tháng${periodDays}`,
+    electricity: firstPeriod ? "Kỳ đầu hợp đồng: 0 đ" : `${Number(meter.chi_so_moi) - previous} kWh × ${Number(meter.don_gia_ap_dung).toLocaleString("vi-VN")} đ/kWh`,
+    water: `${occupantCount} người × ${Number(contract.don_gia_nuoc).toLocaleString("vi-VN")} đ/người${periodDays}`,
+    serviceFee: `Theo hợp đồng ${Number(contract.phi_dich_vu).toLocaleString("vi-VN")} đ/tháng${periodDays}`,
+  };
   const lines = [
     { type: BILL_LINE_TYPES.RENT, amount: rent },
     { type: BILL_LINE_TYPES.ELECTRICITY, amount: electricity },
@@ -45,7 +52,7 @@ async function buildPreview(contract, period) {
   }
   return {
     contractId: contract.ma_hop_dong, roomId: contract.ma_phong, period, ratio, occupantCount,
-    components: { rent, electricity, water, serviceFee }, adjustments, lines, total: sumSignedLineAmounts(lines),
+    components: { rent, electricity, water, serviceFee }, adjustments, lineDescriptions, lines, total: sumSignedLineAmounts(lines),
   };
 }
 
@@ -96,7 +103,7 @@ async function generate(period, actorId, contractIds, buildingIds) {
         ma_hop_dong: item.contractId, ky: period,
         tien_phong: item.components.rent, tien_dien: item.components.electricity,
         tien_nuoc: item.components.water, phi_dich_vu: item.components.serviceFee,
-        phi_phat_sinh: 0, khoan_giam_tru: 0, adjustments: item.adjustments,
+        phi_phat_sinh: 0, khoan_giam_tru: 0, adjustments: item.adjustments, lineDescriptions: item.lineDescriptions,
         tong_phai_thanh_toan: item.total,
       }, actorId));
     } catch (error) {

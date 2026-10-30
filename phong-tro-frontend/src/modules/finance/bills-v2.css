@@ -75,6 +75,28 @@
 .bill-dialog h2 { margin: 0; color: #123665; font-size: 20px; }
 .bill-icon-button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: #edf3fb; color: #19375f; cursor: pointer; font-size: 22px; }
 .bill-dialog__body { display: grid; gap: 15px; padding: 20px 22px; }
+.bill-invoice { display: grid; gap: 18px; }
+.bill-invoice__heading { display: flex; justify-content: space-between; gap: 18px; padding-bottom: 16px; border-bottom: 1px solid #e2eaf4; }
+.bill-invoice__heading > div:first-child > span { color: #526b90; font-size: 11px; font-weight: 800; letter-spacing: .1em; }
+.bill-invoice__heading h3 { margin: 7px 0 3px; color: #123665; font-size: 24px; }
+.bill-invoice__heading p { margin: 0; color: #526b90; }
+.bill-invoice__state { display: grid; align-content: start; justify-items: end; gap: 4px; white-space: nowrap; }
+.bill-invoice__state small { color: #61718a; }
+.bill-invoice__section h4 { margin: 0 0 10px; color: #173967; font-size: 14px; }
+.bill-invoice__prices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.bill-invoice__prices > div { display: grid; gap: 5px; padding: 11px 12px; border-radius: 9px; background: #f3f7fd; }
+.bill-invoice__prices span { color: #526b90; font-size: 12px; }
+.bill-invoice__prices strong { color: #173967; font-variant-numeric: tabular-nums; }
+.bill-invoice__lines { border: 1px solid #dce5f1; border-radius: 10px; overflow: hidden; }
+.bill-invoice__lines > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 14px; border-bottom: 1px solid #e9eef6; }
+.bill-invoice__lines > div:last-child { border-bottom: 0; }
+.bill-invoice__lines > div > span { display: grid; gap: 4px; }
+.bill-invoice__lines small { color: #61718a; line-height: 1.4; }
+.bill-invoice__lines > div > strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bill-invoice__lines > p { padding: 0 14px; }
+.bill-invoice__totals { display: grid; gap: 8px; padding: 14px; border-radius: 10px; background: #f3f7fd; }
+.bill-invoice__totals > div { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
+.bill-invoice__remaining { padding-top: 10px; border-top: 1px solid #cdd9e8; color: #123665; font-size: 17px; }
 .bill-dialog-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 0; }
 .bill-segments { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid #cdd9e8; border-radius: 9px; overflow: hidden; }
 .bill-segments:has(button:only-child) { grid-template-columns: 1fr; }
@@ -126,3 +148,4 @@
 @media (max-width: 600px) { .bill-payment-filters { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { .bill-segments { grid-template-columns: 1fr; } .bill-page .table-wrap { overflow-x: auto; } .bill-dialog { max-height: calc(100vh - 32px); } }
 @media (max-width: 600px) { .bill-schedule-time, .bill-schedule-buildings { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .bill-invoice__heading { flex-direction: column; } .bill-invoice__state { justify-items: start; } .bill-invoice__prices { grid-template-columns: 1fr; } }

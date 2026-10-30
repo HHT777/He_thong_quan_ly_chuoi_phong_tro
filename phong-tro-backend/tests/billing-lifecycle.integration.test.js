@@ -47,6 +47,8 @@ test("FR-157/164/175/176/179 preview and generation snapshot contract charges at
   const bill = await ThanhToan.findByPk(generated.body.data.created[0].ma_thanh_toan, { include: [{ model: ChiTietThanhToan, as: "chiTiets" }] });
   assert.equal(sumSignedLineAmounts(bill.chiTiets), Number(bill.tong_phai_tra));
   assert.equal(Number(bill.tong_phai_tra), item.total, "preview and saved draft must agree");
+  assert.match(bill.chiTiets.find((line) => line.loai_khoan === "TIEN_PHONG").dien_giai, /2\.500\.000 đ\/tháng/);
+  assert.match(bill.chiTiets.find((line) => line.loai_khoan === "TIEN_NUOC").dien_giai, /2 người × 100\.000 đ\/người/);
   const draftList = await request("/api/khoan-phai-thu?ky=2026-10&issuance=DRAFT&page=1&limit=20", { headers: headers(landlord) });
   assert.equal(draftList.response.status, 200, JSON.stringify(draftList.body));
   assert.ok(draftList.body.data.some((row) => row.ma_thanh_toan === bill.ma_thanh_toan));
