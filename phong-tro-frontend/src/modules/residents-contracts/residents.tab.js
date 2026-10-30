@@ -93,7 +93,7 @@ const residentsTab = listTab({ id: "residents", route: "/residents-contracts/res
     { label: "Căn", key: "ten_can" },
     { label: "Phòng", key: "so_phong" },
   ],
-  create: { label: "Thêm cư dân", fields: [{ name: "ho_ten", label: "Họ tên", required: true }, { name: "so_dien_thoai", label: "Số điện thoại", required: true }, { name: "cccd_giay_to", label: "CCCD/Giấy tờ", required: true }] },
+  create: { label: "Thêm cư dân", fields: [{ name: "ho_ten", label: "Họ tên", required: true }, { name: "so_dien_thoai", label: "Số điện thoại", required: true }, { name: "cccd_giay_to", label: "CCCD/Giấy tờ", required: true }], onCreated: () => { sessionStorage.removeItem("qlpt:residents-contracts-building"); sessionStorage.removeItem("qlpt:residents-contracts-room"); } },
   rowActions: [
     { id: "details", label: "Xem chi tiết", openDetail: true },
     {
