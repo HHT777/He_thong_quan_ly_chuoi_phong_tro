@@ -412,6 +412,9 @@ export async function renderList(context, config) {
     const uniqueBuildings = Array.from(
       new Set(allRows.map((r) => r.canTro?.ten_can).filter(Boolean))
     );
+    const buildingOptions = config.buildingOptions
+      ? config.buildingOptions(allRows, preloaded)
+      : isRoomsModule ? uniqueBuildings.map((name) => ({ value: name, label: name })) : [];
 
     // Function to compute room stats strip
     const renderStatStrip = () => {
@@ -468,11 +471,11 @@ export async function renderList(context, config) {
         if (routeContractId && String(config.routeContractFilter.id(row)) !== routeContractId) return false;
         if (buildingScope && !config.buildingMatch(row, buildingScope)) return false;
         // Status filter
-        if (statusFilter !== "ALL" && row.trang_thai !== statusFilter) {
+        if (statusFilter !== "ALL" && (config.statusValue ? config.statusValue(row) : row.trang_thai) !== statusFilter) {
           return false;
         }
         // Building filter
-        if (buildingFilter !== "ALL" && row.canTro?.ten_can !== buildingFilter) {
+        if (buildingFilter !== "ALL" && String(config.buildingValue ? config.buildingValue(row) : row.canTro?.ten_can) !== buildingFilter) {
           return false;
         }
         // Search query
@@ -507,16 +510,16 @@ export async function renderList(context, config) {
 
               <!-- Status Filter Select -->
               <select class="mgmt-filter-select" id="mgmtStatusFilter">
-                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ALL">${escapeHtml(config.statusFilterLabel || "Tất cả trạng thái")}</option>
                 ${(config.statusOptions || [{ value: "DANG_THUE", label: "Đang thuê" }, { value: "TRONG", label: "Trống" }, { value: "DANG_XU_LY_TRA_PHONG", label: "Đang xử lý trả" }]).map((option) => `<option value="${escapeHtml(option.value)}" ${statusFilter === option.value ? "selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
               </select>
 
               ${
-                isRoomsModule && uniqueBuildings.length > 0
+                buildingOptions.length > 0
                   ? `
                 <select class="mgmt-filter-select" id="mgmtBuildingFilter">
                   <option value="ALL">Tất cả căn trọ</option>
-                  ${uniqueBuildings.map((b) => `<option value="${escapeHtml(b)}" ${buildingFilter === b ? "selected" : ""}>${escapeHtml(b)}</option>`).join("")}
+                  ${buildingOptions.map((building) => `<option value="${escapeHtml(building.value)}" ${buildingFilter === String(building.value) ? "selected" : ""}>${escapeHtml(building.label)}</option>`).join("")}
                 </select>
               `
                   : ""
@@ -564,8 +567,8 @@ export async function renderList(context, config) {
               <span>Đang lọc theo:</span>
               ${searchQuery ? `<span class="filter-chip">Từ khóa: "${escapeHtml(searchQuery)}" <span class="filter-chip-remove" id="clearSearchChip">✕</span></span>` : ""}
               ${routeContractId ? `<span class="filter-chip">Hợp đồng: ${escapeHtml(config.routeContractFilter.label(allRows.find((row) => String(config.routeContractFilter.id(row)) === routeContractId) || {}))} <span class="filter-chip-remove" id="clearContractChip">✕</span></span>` : ""}
-              ${statusFilter !== "ALL" ? `<span class="filter-chip">Trạng thái: ${escapeHtml((config.statusOptions || []).find((option) => option.value === statusFilter)?.label || statusFilter)} <span class="filter-chip-remove" id="clearStatusChip">✕</span></span>` : ""}
-              ${buildingFilter !== "ALL" ? `<span class="filter-chip">Căn: ${escapeHtml(buildingFilter)} <span class="filter-chip-remove" id="clearBuildingChip">✕</span></span>` : ""}
+              ${statusFilter !== "ALL" ? `<span class="filter-chip">${escapeHtml(config.statusChipLabel || "Trạng thái")}: ${escapeHtml((config.statusOptions || []).find((option) => option.value === statusFilter)?.label || statusFilter)} <span class="filter-chip-remove" id="clearStatusChip">✕</span></span>` : ""}
+              ${buildingFilter !== "ALL" ? `<span class="filter-chip">Căn: ${escapeHtml(buildingOptions.find((building) => String(building.value) === buildingFilter)?.label || "Không rõ căn")} <span class="filter-chip-remove" id="clearBuildingChip">✕</span></span>` : ""}
               <span class="filter-chip-clear" id="clearAllFiltersBtn">Xóa lọc</span>
             </div>
           `
