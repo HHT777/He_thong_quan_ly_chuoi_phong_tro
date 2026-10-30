@@ -182,6 +182,7 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
     },
     onError: contractServerErrors,
     onOpen: async ({ context, form }) => {
+      form.classList.add("contract-create-form");
       for (const name of CONTRACT_MONEY_FIELDS) {
         const input = form.elements.namedItem(name);
         input.value = formatVnd(input.value);

@@ -27,3 +27,18 @@
   margin: 4px 0 0;
   color: var(--text-secondary);
 }
+
+.contract-create-form .currency-control { position: relative; display: block; min-width: 0; }
+.contract-create-form .currency-control input { padding-right: 38px; }
+.contract-create-form .currency-control__unit {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: var(--text-secondary); font-weight: 600;
+}
+.contract-create-form .modal-field--checkbox {
+  display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+}
+.contract-create-form .modal-field--checkbox input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex: none; }
+.contract-create-form [data-form-message]:empty,
+.contract-create-form [data-form-warnings]:empty { display: none; }
+.contract-create-form [data-form-message],
+.contract-create-form [data-form-warnings] { grid-column: 1 / -1; margin: 0; }

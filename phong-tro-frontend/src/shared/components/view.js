@@ -84,7 +84,8 @@ function fieldControl(field, value = "") {
   if (field.type === "textarea") {
     return `<textarea class="form-control" name="${field.name}" ${field.required ? "required" : ""}>${escapeHtml(value)}</textarea>`;
   }
-  return `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.currency ? 'inputmode="numeric"' : ""} ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>${field.currency ? "<span>đ</span>" : ""}`;
+  const input = `<input class="form-control" name="${field.name}" type="${field.type || "text"}" value="${escapeHtml(value)}" ${field.currency ? 'inputmode="numeric"' : ""} ${field.required ? "required" : ""} ${field.readOnly ? "readonly aria-readonly=\"true\"" : ""}>`;
+  return field.currency ? `<span class="currency-control">${input}<span class="currency-control__unit" aria-hidden="true">đ</span></span>` : input;
 }
 
 export function openFormModal({ title, fields = [], initial = {}, submitLabel = "Lưu", submit, onOpen, validate, onError, fieldErrors = false }) {
@@ -107,7 +108,7 @@ export function openFormModal({ title, fields = [], initial = {}, submitLabel = 
           ${fields
             .map(
               (field) => `
-            <label class="modal-field">
+            <label class="modal-field${field.type === "checkbox" ? " modal-field--checkbox" : ""}">
               <span>${escapeHtml(field.label)}</span>
               ${fieldControl(field, initial[field.name] ?? field.value ?? "")}
               ${fieldErrors ? `<small data-field-error="${escapeHtml(field.name)}" role="alert"></small>` : ""}
