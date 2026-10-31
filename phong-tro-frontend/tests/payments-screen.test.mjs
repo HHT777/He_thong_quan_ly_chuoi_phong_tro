@@ -14,6 +14,8 @@ test("payment states carry text, tone and icon; deposit offsets cannot be select
   assert.equal(defaultStatus(1), "CHO_XAC_NHAN");
   assert.equal(defaultStatus(0), "ALL");
   assert.equal(canConfirm({ trang_thai_xac_nhan: "CHO_XAC_NHAN", nguon_thanh_toan: "KHAU_TRU_COC" }), false);
+  assert.equal(canConfirm({ trang_thai_xac_nhan: "CHO_XAC_NHAN", nguon_thanh_toan: "THU_TIEN", so_tien: 0 }), false);
+  assert.equal(canConfirm({ trang_thai_xac_nhan: "CHO_XAC_NHAN", nguon_thanh_toan: "THU_TIEN", so_tien: 500000 }), true);
   assert.equal(canCancel({ trang_thai_xac_nhan: "DA_XAC_NHAN", nguon_thanh_toan: "KHAU_TRU_COC" }), false);
   assert.equal(canCancel({ trang_thai_xac_nhan: "DA_XAC_NHAN", nguon_thanh_toan: "THU_TIEN" }), true);
 });

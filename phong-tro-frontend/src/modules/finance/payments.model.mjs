@@ -7,7 +7,7 @@ export const paymentStatus = {
 };
 
 export const paymentBadge = (row) => paymentStatus[row.trang_thai_xac_nhan] || { label: "Không xác định", tone: "cancelled", icon: "−" };
-export const canConfirm = (row) => row.trang_thai_xac_nhan === "CHO_XAC_NHAN" && row.nguon_thanh_toan !== "KHAU_TRU_COC";
+export const canConfirm = (row) => row.trang_thai_xac_nhan === "CHO_XAC_NHAN" && row.nguon_thanh_toan !== "KHAU_TRU_COC" && Number.isFinite(Number(row.so_tien)) && Number(row.so_tien) > 0;
 export const canCancel = (row) => row.trang_thai_xac_nhan === "DA_XAC_NHAN" && row.nguon_thanh_toan === "THU_TIEN";
 export const defaultStatus = (pendingCount) => pendingCount > 0 ? "CHO_XAC_NHAN" : "ALL";
 export const ellipsis = (value, length = 44) => String(value || "Không xác định").length > length ? `${String(value).slice(0, length - 1)}…` : String(value || "Không xác định");
