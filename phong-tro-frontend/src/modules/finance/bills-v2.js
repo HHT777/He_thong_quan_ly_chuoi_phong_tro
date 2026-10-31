@@ -318,13 +318,15 @@ export async function renderBillsV2(context) {
     if (action === "adjust") {
       const modal = dialog("Điều chỉnh phiếu", `<form class="bill-action-form"><p>Phòng ${rowName(row)} · ${tenantName(row)} · kỳ ${escapeHtml(periodLabel(row))}</p><label>Loại điều chỉnh<select name="direction"><option value="decrease">Giảm trừ</option><option value="increase">Khoản tăng</option></select></label><label>Số tiền (VND)<input name="amount" type="number" min="1" step="1" inputmode="numeric" required></label><label>Lý do<textarea name="reason" rows="3" required></textarea></label><div class="bill-adjustment-preview" data-preview aria-live="polite"></div><button class="btn btn--primary" type="submit" disabled>Ghi nhận điều chỉnh</button><span data-message role="status"></span></form>`);
       const form = modal.body.querySelector("form");
+      const amountInput = form.elements.namedItem("amount");
       const updatePreview = () => {
-        const result = billAdjustmentPreview(row, form.elements.namedItem("direction").value, form.elements.namedItem("amount").value);
+        const result = billAdjustmentPreview(row, form.elements.namedItem("direction").value, amountInput.value);
         const preview = form.querySelector("[data-preview]");
         preview.innerHTML = `<div><span>Phải thu hiện tại</span><strong>${escapeHtml(money(row.tong_phai_tra))}</strong></div><div><span>Đã thu</span><strong>${escapeHtml(money(result.paid))}</strong></div><div><span>Còn nợ hiện tại</span><strong>${escapeHtml(money(row.so_tien_con_no))}</strong></div><div><span>Sau điều chỉnh</span><strong>${result.error ? "—" : `${escapeHtml(money(result.total))} phải thu · ${escapeHtml(money(result.remaining))} còn nợ`}</strong></div><p data-preview-error></p>`;
-        preview.querySelector("[data-preview-error]").textContent = result.error;
+        preview.querySelector("[data-preview-error]").textContent = amountInput.dataset.touched === "true" ? result.error : "";
         form.querySelector('[type="submit"]').disabled = Boolean(result.error) || !form.elements.namedItem("reason").value.trim();
       };
+      amountInput.addEventListener("input", () => { amountInput.dataset.touched = "true"; });
       form.addEventListener("input", updatePreview);
       form.addEventListener("change", updatePreview);
       form.onsubmit = async (event) => {
