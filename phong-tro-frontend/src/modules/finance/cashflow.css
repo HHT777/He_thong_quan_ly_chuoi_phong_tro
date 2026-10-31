@@ -3,9 +3,11 @@
 .cashflow-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
 .cashflow-heading h2 { margin: 0 0 4px; color: var(--ui2-ink); font-size: 18px; }
 .cashflow-heading p { margin: 0; color: var(--ui2-subtext); font-size: 13px; }
-.cashflow-filters { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; }
-.cashflow-filters label { color: var(--ui2-ink); font-size: 13px; font-weight: 600; }
-.cashflow-filters select { width: min(280px, 100%); min-height: 42px; padding: 0 36px 0 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
+.cashflow-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 0 0 14px; }
+.cashflow-filters label { display: grid; gap: 5px; color: var(--ui2-ink); font-size: 13px; font-weight: 600; }
+.cashflow-filters select { width: 210px; max-width: 100%; min-height: 42px; padding: 0 36px 0 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
+.cashflow-filters input[type="date"] { width: 170px; max-width: 100%; min-height: 42px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
+.cashflow-filter-error { margin: 0 0 14px; color: #b42318; }
 .cashflow-table-scroll { overflow-x: auto; }
 .cashflow-panel table { width: 100%; min-width: 1040px; border-collapse: collapse; }
 .cashflow-panel th, .cashflow-panel td { padding: 12px; border-bottom: 1px solid var(--ui2-border); text-align: left; }

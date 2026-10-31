@@ -1,6 +1,6 @@
 import { escapeHtml, money, openFormModal, shellPage } from "../../shared/components/view.js";
 import { expenseLabel } from "./report.model.mjs";
-import { expensePayload } from "./cashflow.model.mjs";
+import { expensePayload, filterExpenses } from "./cashflow.model.mjs";
 import "./cashflow.css";
 
 const endpoint = "/management/thu-chi";
@@ -46,17 +46,17 @@ export default {
     const buildingNames = new Map(buildings.map((row) => [row.ma_can, row.ten_can]));
     let rows = [];
     let selectedBuildingId = "";
+    let fromDate = "";
+    let toDate = "";
     let status = "loading";
     let errorMessage = "";
     const paint = () => {
-      const visibleRows = selectedBuildingId
-        ? rows.filter((row) => row.ma_can === selectedBuildingId)
-        : rows;
+      const visibleRows = filterExpenses(rows, { buildingId: selectedBuildingId, fromDate, toDate });
       const body = status === "loading" ? '<p role="status">Đang tải khoản chi...</p>' : status === "error"
         ? `<p role="alert">${escapeHtml(errorMessage)}</p><button type="button" data-expense-retry>Thử lại</button>`
         : visibleRows.length ? `<div class="cashflow-table-scroll"><table><thead><tr><th>Loại chi</th><th>Căn</th><th>Ngày</th><th>Số tiền</th><th>Ghi chú</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody>${visibleRows.map((row) => `<tr><td>${escapeHtml(expenseLabel(row.loai_khoan_chi))}</td><td>${escapeHtml(row.ma_can ? buildingNames.get(row.ma_can) : "Toàn chuỗi")}</td><td>${escapeHtml(row.ngay_phat_sinh)}</td><td class="cashflow-amount">${escapeHtml(money(row.so_tien))}</td><td class="cashflow-note">${escapeHtml(displayExpenseNote(row))}</td><td><span class="cashflow-status ${row.trang_thai === "DA_HUY" ? "cashflow-status--cancelled" : ""}">${row.trang_thai === "DA_HUY" ? "Đã hủy" : "Hiệu lực"}</span></td><td><details class="cashflow-menu"><summary aria-label="Thao tác khoản chi">⋯</summary><div class="cashflow-menu__content"><button type="button" data-expense-view="${escapeHtml(row.ma_khoan_chi)}">Xem chi tiết</button>${row.trang_thai === "HIEU_LUC" && !row.ma_su_co ? `<button type="button" data-expense-edit="${escapeHtml(row.ma_khoan_chi)}">Sửa</button><button type="button" class="cashflow-menu__danger" data-expense-cancel="${escapeHtml(row.ma_khoan_chi)}">Xóa</button>` : ""}</div></details></td></tr>`).join("")}</tbody></table></div>`
-          : `<p>${selectedBuildingId ? "Không có khoản chi ở căn này." : "Chưa có khoản chi cho các căn đang quản lý."}</p>`;
-      content.innerHTML = `<section class="cashflow-panel"><div class="cashflow-heading"><div><h2>Khoản chi</h2><p>Hủy khoản chi sẽ lưu lý do và không tính vào báo cáo.</p></div><button type="button" class="btn btn--primary" data-expense-add ${buildings.length ? "" : "disabled"}>+ Thêm khoản chi</button></div><div class="cashflow-filters"><label for="cashflow-building-filter">Căn</label><select id="cashflow-building-filter" data-expense-building-filter><option value="">Tất cả căn</option>${buildings.map((building) => `<option value="${escapeHtml(building.ma_can)}" ${building.ma_can === selectedBuildingId ? "selected" : ""}>${escapeHtml(building.ten_can)}</option>`).join("")}</select></div>${body}</section>`;
+          : `<p>${fromDate || toDate ? "Không có khoản chi trong khoảng ngày đã chọn." : selectedBuildingId ? "Không có khoản chi ở căn này." : "Chưa có khoản chi cho các căn đang quản lý."}</p>`;
+      content.innerHTML = `<section class="cashflow-panel"><div class="cashflow-heading"><div><h2>Khoản chi</h2><p>Hủy khoản chi sẽ lưu lý do và không tính vào báo cáo.</p></div><button type="button" class="btn btn--primary" data-expense-add ${buildings.length ? "" : "disabled"}>+ Thêm khoản chi</button></div><div class="cashflow-filters"><label>Căn<select id="cashflow-building-filter" data-expense-building-filter><option value="">Tất cả căn</option>${buildings.map((building) => `<option value="${escapeHtml(building.ma_can)}" ${building.ma_can === selectedBuildingId ? "selected" : ""}>${escapeHtml(building.ten_can)}</option>`).join("")}</select></label><label>Từ ngày<input type="date" data-expense-from-date value="${escapeHtml(fromDate)}"></label><label>Đến ngày<input type="date" data-expense-to-date value="${escapeHtml(toDate)}"></label></div><p class="cashflow-filter-error" data-expense-date-error role="alert" hidden></p>${body}</section>`;
     };
     const refresh = async () => {
       status = "loading"; paint();
@@ -116,9 +116,16 @@ export default {
     });
     content.addEventListener("change", (event) => {
       const filter = event.target.closest("[data-expense-building-filter]");
-      if (!filter) return;
-      selectedBuildingId = filter.value;
-      paint();
+      if (filter) { selectedBuildingId = filter.value; paint(); return; }
+      if (!event.target.matches("[data-expense-from-date], [data-expense-to-date]")) return;
+      const nextFrom = content.querySelector("[data-expense-from-date]").value;
+      const nextTo = content.querySelector("[data-expense-to-date]").value;
+      const invalid = Boolean(nextFrom && nextTo && nextFrom > nextTo);
+      const error = content.querySelector("[data-expense-date-error]");
+      error.textContent = invalid ? "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc." : "";
+      error.hidden = !invalid;
+      if (invalid) return;
+      fromDate = nextFrom; toDate = nextTo; paint();
     });
     await refresh();
   },

@@ -8,3 +8,9 @@ export function expensePayload(raw, categories) {
   return { loai_khoan_chi: raw.loai_khoan_chi, so_tien: amount, ngay_phat_sinh: raw.ngay_phat_sinh,
     pham_vi: raw.pham_vi, ma_can: raw.pham_vi === "CAN_TRO" ? raw.ma_can : null, ghi_chu: String(raw.ghi_chu || "").trim() };
 }
+
+export function filterExpenses(rows, { buildingId = "", fromDate = "", toDate = "" } = {}) {
+  return rows.filter((row) => (!buildingId || row.ma_can === buildingId)
+    && (!fromDate || String(row.ngay_phat_sinh).slice(0, 10) >= fromDate)
+    && (!toDate || String(row.ngay_phat_sinh).slice(0, 10) <= toDate));
+}
