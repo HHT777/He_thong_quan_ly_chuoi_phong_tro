@@ -330,7 +330,7 @@ router.get("/move-outs", landlord, async (req, res, next) => {
   try {
     const buildingIds = await getOwnedBuildingIds(req.user);
     const contracts = await HopDong.findAll({
-      attributes: ["ma_hop_dong"],
+      attributes: ["ma_hop_dong", "trang_thai"],
       include: [{ model: PhongTro, as: "phongTro", attributes: [], required: true, where: { ma_can: { [Op.in]: buildingIds } } }],
       raw: true,
     });
@@ -343,7 +343,11 @@ router.get("/move-outs", landlord, async (req, res, next) => {
       raw: true,
     });
     const contractByRequest = new Map(details.map((row) => [row.ma_yeu_cau, row.ma_hop_dong]));
-    return data(res, requests.map((row) => ({ ...row, ma_hop_dong: contractByRequest.get(row.ma_yeu_cau) || null })));
+    const statusByContract = new Map(contracts.map((row) => [row.ma_hop_dong, row.trang_thai]));
+    return data(res, requests.map((row) => {
+      const contractId = contractByRequest.get(row.ma_yeu_cau) || null;
+      return { ...row, ma_hop_dong: contractId, trang_thai_hop_dong: statusByContract.get(contractId) || null };
+    }));
   } catch (e) { next(e); }
 });
 

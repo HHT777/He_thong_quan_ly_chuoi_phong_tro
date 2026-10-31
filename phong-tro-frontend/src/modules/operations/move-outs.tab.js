@@ -2,6 +2,7 @@ import { shellPage, escapeHtml, money, date, confirmAction } from "../../shared/
 import { showToast } from "../../shared/components/toast.js";
 import { createRequestKeyStore, integerVnd, requiredText } from "../../core/idempotency.js";
 import { loadAllPages } from "./incident-form.mjs";
+import { actionableMoveOutRequests } from "./move-outs.model.mjs";
 import "./move-outs.css";
 
 const meta = { id: "move-outs", route: "/operations/move-outs", title: "Trả phòng & thanh lý", tabLabel: "Trả phòng", group: "move-outs", order: 52, roles: ["CHU_TRO"] };
@@ -74,7 +75,7 @@ async function render(context) {
       loadAllPages(context.api, "/hop-dong").catch(() => []),
     ]);
     const contractsById = new Map(contracts.map((contract) => [String(contract.ma_hop_dong), contract]));
-    const rows = (response.data || []).filter((row) => row.trang_thai === "DA_PHE_DUYET" && row.ma_hop_dong);
+    const rows = actionableMoveOutRequests(response.data);
     if (!rows.length) { content.innerHTML = '<div class="empty-state moveout-empty"><h3>Không có yêu cầu trả phòng đã duyệt</h3><p>Các yêu cầu đã được duyệt sẽ xuất hiện tại đây để tiếp tục kiểm tra và quyết toán.</p></div>'; return; }
     content.innerHTML = `<section class="moveout-requests panel"><header><div><span class="settlement-eyebrow">CẦN XỬ LÝ</span><h2>Yêu cầu trả phòng đã duyệt</h2></div><span class="moveout-count">${rows.length} yêu cầu</span></header><div class="moveout-request-list">${rows.map((row, index) => { const contract = contractsById.get(String(row.ma_hop_dong)); const room = contract?.phongTro?.so_phong ? `Phòng ${contract.phongTro.so_phong}` : "Không rõ phòng"; const tenant = contract?.khachThue?.ho_ten || "Khách thuê"; return `<article class="moveout-request"><div class="moveout-request__contract"><span>${escapeHtml(room)}</span><strong>${escapeHtml(tenant)}</strong></div><div><span>Nội dung</span><strong>${escapeHtml(row.noi_dung || "Đề nghị trả phòng")}</strong></div><div><span>Ngày gửi</span><strong>${escapeHtml(date(row.ngay_gui))}</strong></div><button class="btn btn--secondary" data-open-context="${index}">Mở quyết toán</button></article>`; }).join("")}</div></section><div class="moveout-workspace" data-workspace></div>`;
     const workspace = content.querySelector("[data-workspace]");
@@ -98,6 +99,10 @@ async function render(context) {
             const payload = { inspectionDate: raw.inspectionDate, finalElectricityReading: integerVnd(raw.finalElectricityReading, "Chỉ số điện cuối"), roomCondition: requiredText(raw.roomCondition, "Tình trạng phòng"), assetsChecked: raw.assetsChecked === "on", debtReviewed: raw.debtReviewed === "on", deduction: integerVnd(raw.deduction, "Khấu trừ khác"), reason: raw.reason.trim() || undefined, assetDeductions, violationDeductions, moveOutRequestId: row.ma_yeu_cau };
             const settled = (await context.api.post(`/v1/move-outs/${row.ma_hop_dong}/settle`, payload)).data;
             workspace.innerHTML = resultMarkup(settled);
+            button.closest(".moveout-request").remove();
+            const remaining = content.querySelectorAll(".moveout-request").length;
+            if (remaining) content.querySelector(".moveout-count").textContent = `${remaining} yêu cầu`;
+            else content.querySelector(".moveout-requests").remove();
             const refundForm = workspace.querySelector("[data-refund-form]");
             refundForm.addEventListener("submit", async (refundEvent) => {
               refundEvent.preventDefault();
