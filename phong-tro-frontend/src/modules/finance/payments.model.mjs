@@ -17,8 +17,9 @@ export const paymentDate = (value) => {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value)).map(({ type, value: part }) => [type, part]));
   return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
 };
-export const paymentQuery = ({ building = "ALL", page = 1, limit = 20 }) => {
+export const paymentQuery = ({ building = "ALL", status = "ALL", page = 1, limit = 20 }) => {
   const values = new URLSearchParams({ limit: String(limit), page: String(page) });
   if (building !== "ALL") values.set("ma_can", building);
+  if (status !== "ALL") values.set("trang_thai_xac_nhan", status);
   return `/khoan-phai-thu/payment/list?${values}`;
 };
