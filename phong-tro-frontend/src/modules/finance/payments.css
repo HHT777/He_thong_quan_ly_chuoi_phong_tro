@@ -3,10 +3,12 @@
 .payment-heading h2 { margin: 0; color: var(--ui2-ink); }
 .payment-heading p { margin: 5px 0 0; color: var(--ui2-subtext); }
 .payment-list-panel { overflow: hidden; }
-.payment-toolbar { display: flex; align-items: end; justify-content: flex-start; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--ui2-border); }
+.payment-toolbar { display: flex; flex-wrap: wrap; align-items: end; justify-content: flex-start; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--ui2-border); }
 .payment-toolbar label { display: grid; gap: 5px; font-weight: 700; }
 .payment-toolbar select { min-width: 190px; min-height: 42px; padding: 8px 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
+.payment-toolbar input[type="date"] { min-width: 160px; min-height: 42px; padding: 8px 12px; border: 1px solid var(--ui2-border); border-radius: 10px; background: #fff; color: var(--ui2-ink); }
 .payment-toolbar > span { margin-left: auto; color: var(--ui2-subtext); font-size: 13px; }
+.payment-filter-error { margin: 0; padding: 8px 20px; color: #b42318; }
 .payment-table-wrap { overflow-x: auto; }
 .payment-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .payment-table th { padding: 14px 12px; text-align: left; color: var(--ui2-subtext); background: #f6f9fe; font-size: 12px; text-transform: uppercase; }

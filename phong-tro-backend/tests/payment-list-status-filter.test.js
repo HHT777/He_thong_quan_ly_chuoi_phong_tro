@@ -18,8 +18,12 @@ test("payment list filters status in the database before pagination", async () =
     assert.equal(query.limit, 20);
     assert.equal(query.offset, 20);
     assert.equal(result.total, 2);
+    await service.getThanhToanList({ from_date: "2026-10-12", to_date: "2026-10-13" }, { limit: 20, offset: 0 });
+    assert.equal(query.where.thoi_diem_ghi_nhan[Op.gte].toISOString(), "2026-10-11T17:00:00.000Z");
+    assert.equal(query.where.thoi_diem_ghi_nhan[Op.lt].toISOString(), "2026-10-13T17:00:00.000Z");
     await service.getThanhToanList({}, { limit: 20, offset: 0 });
     assert.equal(query.where.so_tien, undefined);
+    assert.equal(query.where.thoi_diem_ghi_nhan, undefined);
   } finally {
     GiaoDichThanhToan.findAndCountAll = original;
   }

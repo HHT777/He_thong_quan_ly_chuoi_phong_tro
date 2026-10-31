@@ -66,6 +66,16 @@ class ThanhToanService {
     if (filters.ma_khoan_phai_thu || filters.ma_thanh_toan) where.ma_thanh_toan = filters.ma_khoan_phai_thu || filters.ma_thanh_toan;
     if (filters.trang_thai_xac_nhan) where.trang_thai_xac_nhan = filters.trang_thai_xac_nhan;
     if (filters.exclude_zero === "1") where.so_tien = { [Op.gt]: 0 };
+    if (filters.from_date || filters.to_date) {
+      const timeRange = {};
+      if (filters.from_date) timeRange[Op.gte] = new Date(`${filters.from_date}T00:00:00+07:00`);
+      if (filters.to_date) {
+        const nextDay = new Date(`${filters.to_date}T00:00:00+07:00`);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        timeRange[Op.lt] = nextDay;
+      }
+      where.thoi_diem_ghi_nhan = timeRange;
+    }
     const tenantWhere = filters.ma_khach_thue ? { ma_khach_thue: filters.ma_khach_thue } : undefined;
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const requestedRoomScope = filters.ma_can

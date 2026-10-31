@@ -146,11 +146,13 @@ class ThanhToanController {
 
   async getThanhToanList(req, res, next) {
     try {
-      validateQuery(req.query, { strings: ["ma_khoan_phai_thu", "ma_thanh_toan", "ma_can", "trang_thai_xac_nhan", "exclude_zero"], positiveIntegers: ["page", "limit"] });
+      validateQuery(req.query, { strings: ["ma_khoan_phai_thu", "ma_thanh_toan", "ma_can", "trang_thai_xac_nhan", "exclude_zero"], dates: ["from_date", "to_date"], positiveIntegers: ["page", "limit"] });
       if (req.query.trang_thai_xac_nhan && !["CHO_XAC_NHAN", "DA_XAC_NHAN", "DA_HUY"].includes(req.query.trang_thai_xac_nhan))
         throw { status: 400, code: "INVALID_QUERY_PARAMETER", message: "Trạng thái thanh toán không hợp lệ" };
       if (req.query.exclude_zero && req.query.exclude_zero !== "1")
         throw { status: 400, code: "INVALID_QUERY_PARAMETER", message: "Bộ lọc số tiền không hợp lệ" };
+      if (req.query.from_date && req.query.to_date && req.query.from_date > req.query.to_date)
+        throw { status: 400, code: "INVALID_QUERY_PARAMETER", message: "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc" };
       const filters = { ...req.query };
       if (req.user.vai_tro === "KHACH_THUE")
         filters.ma_khach_thue = req.user.ma_khach_thue;

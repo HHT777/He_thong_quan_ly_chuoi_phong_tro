@@ -27,6 +27,7 @@ test("payment labels, date and server query use existing fields", () => {
   assert.equal(paymentQuery({ building: "can-1", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&exclude_zero=1&ma_can=can-1");
   assert.equal(paymentQuery({ building: "can-1", status: "CHO_XAC_NHAN", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&exclude_zero=1&ma_can=can-1&trang_thai_xac_nhan=CHO_XAC_NHAN");
   assert.equal(paymentQuery({ status: "DA_HUY" }), "/khoan-phai-thu/payment/list?limit=20&page=1&exclude_zero=1&trang_thai_xac_nhan=DA_HUY");
+  assert.equal(paymentQuery({ fromDate: "2026-10-12", toDate: "2026-10-13" }), "/khoan-phai-thu/payment/list?limit=20&page=1&exclude_zero=1&from_date=2026-10-12&to_date=2026-10-13");
 });
 
 test("screen uses server pagination, aborts stale reads and keeps failed selections", () => {
@@ -39,6 +40,8 @@ test("screen uses server pagination, aborts stale reads and keeps failed selecti
   assert.match(source, /empty-state--error/);
   assert.match(source, /class="payment-cards"/);
   assert.match(source, /data-status/);
+  assert.match(source, /data-from-date/);
+  assert.match(source, /data-to-date/);
   assert.match(source, /state\.status = event\.target\.value; state\.page = 1/);
   const bar = source.match(/const selectionBar = \(\) => \{.*?\};\n    const render/s)?.[0];
   assert.ok(bar);
