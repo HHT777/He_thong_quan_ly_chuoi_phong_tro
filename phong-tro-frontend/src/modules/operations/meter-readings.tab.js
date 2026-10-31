@@ -156,7 +156,13 @@ export default {
       });
       history.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-confirm]"); if (!button) return; button.disabled = true;
-        try { await context.api.post(`/v1/meter-readings/${encodeURIComponent(button.dataset.confirm)}/confirmations`, {}, { "Idempotency-Key": crypto.randomUUID(), "If-Match": "*" }); await loadHistory(); }
+        try {
+          await context.api.post(`/v1/meter-readings/${encodeURIComponent(button.dataset.confirm)}/confirmations`, {}, { "Idempotency-Key": crypto.randomUUID(), "If-Match": "*" });
+          const badge = button.closest("tr").querySelector(".meter-status");
+          badge.className = "meter-status meter-status--da_xac_nhan";
+          badge.textContent = statusLabels.DA_XAC_NHAN;
+          button.replaceWith("—");
+        }
         catch (error) { message.textContent = error.message; button.disabled = false; }
       });
     } catch (error) { content.innerHTML = `<div class="empty-state empty-state--error">${escapeHtml(error.message)}</div>`; }
