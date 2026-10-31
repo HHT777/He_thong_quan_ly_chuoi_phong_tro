@@ -18,7 +18,7 @@ export const paymentDate = (value) => {
   return `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`;
 };
 export const paymentQuery = ({ building = "ALL", status = "ALL", page = 1, limit = 20 }) => {
-  const values = new URLSearchParams({ limit: String(limit), page: String(page) });
+  const values = new URLSearchParams({ limit: String(limit), page: String(page), exclude_zero: "1" });
   if (building !== "ALL") values.set("ma_can", building);
   if (status !== "ALL") values.set("trang_thai_xac_nhan", status);
   return `/khoan-phai-thu/payment/list?${values}`;

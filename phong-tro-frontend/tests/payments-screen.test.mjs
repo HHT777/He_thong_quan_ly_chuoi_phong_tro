@@ -24,9 +24,9 @@ test("payment labels, date and server query use existing fields", () => {
   assert.equal(paymentMoney(500000), "500.000 đ");
   assert.match(paymentDate("2026-10-30T01:30:00Z"), /30\/10\/2026.*08:30/);
   assert.equal(ellipsis("Tên khách rất dài", 10), "Tên khách…");
-  assert.equal(paymentQuery({ building: "can-1", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&ma_can=can-1");
-  assert.equal(paymentQuery({ building: "can-1", status: "CHO_XAC_NHAN", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&ma_can=can-1&trang_thai_xac_nhan=CHO_XAC_NHAN");
-  assert.equal(paymentQuery({ status: "DA_HUY" }), "/khoan-phai-thu/payment/list?limit=20&page=1&trang_thai_xac_nhan=DA_HUY");
+  assert.equal(paymentQuery({ building: "can-1", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&exclude_zero=1&ma_can=can-1");
+  assert.equal(paymentQuery({ building: "can-1", status: "CHO_XAC_NHAN", page: 2 }), "/khoan-phai-thu/payment/list?limit=20&page=2&exclude_zero=1&ma_can=can-1&trang_thai_xac_nhan=CHO_XAC_NHAN");
+  assert.equal(paymentQuery({ status: "DA_HUY" }), "/khoan-phai-thu/payment/list?limit=20&page=1&exclude_zero=1&trang_thai_xac_nhan=DA_HUY");
 });
 
 test("screen uses server pagination, aborts stale reads and keeps failed selections", () => {

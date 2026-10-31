@@ -65,6 +65,7 @@ class ThanhToanService {
     const where = {};
     if (filters.ma_khoan_phai_thu || filters.ma_thanh_toan) where.ma_thanh_toan = filters.ma_khoan_phai_thu || filters.ma_thanh_toan;
     if (filters.trang_thai_xac_nhan) where.trang_thai_xac_nhan = filters.trang_thai_xac_nhan;
+    if (filters.exclude_zero === "1") where.so_tien = { [Op.gt]: 0 };
     const tenantWhere = filters.ma_khach_thue ? { ma_khach_thue: filters.ma_khach_thue } : undefined;
     const ownedBuildings = requester?.vai_tro === "CHU_TRO" ? await getOwnedBuildingIds(requester) : null;
     const requestedRoomScope = filters.ma_can
