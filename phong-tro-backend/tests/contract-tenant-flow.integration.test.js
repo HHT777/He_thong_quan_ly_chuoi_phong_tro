@@ -1,0 +1,42 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const { KhachThue, HopDong, ThanhVienPhong, TaiKhoan, ChuTro } = require("../src/models");
+const { integration, request, headers, login, createBaseRental, uniqueValues } = require("./helpers/integration-api");
+
+test("FR-036 new tenant and contract commit together; landlord adds one co-tenant within capacity", async () => {
+  const landlord = await login(integration.landlord);
+  const base = await createBaseRental(landlord, "contract-tenant-flow");
+  const unique = uniqueValues();
+  const tenant = { ho_ten: "Khách trong hợp đồng", so_dien_thoai: unique.phone, cccd_giay_to: unique.identity };
+  const payload = { khachThue: tenant, ma_phong: base.room.ma_phong, ngay_bat_dau: "2026-10-01", ngay_ket_thuc: "2027-09-30", gia_thue: 2500000, tien_coc: 2500000, don_gia_dien: 3500, don_gia_nuoc: 100000, chi_so_dien_ban_dau: 0, dieu_khoan: "Điều khoản", da_co_ban_giay_ky: true };
+  const created = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify(payload) });
+  assert.equal(created.response.status, 201, JSON.stringify(created.body));
+  const contract = await HopDong.findByPk(created.body.data.ma_hop_dong);
+  const savedTenant = await KhachThue.findByPk(contract.ma_khach_thue);
+  assert.equal(savedTenant.so_dien_thoai, unique.phone);
+  const roster = await request("/api/management/khach-thue", { headers: headers(landlord) });
+  assert.equal(roster.body.data.some((row) => row.ma_khach_thue === savedTenant.ma_khach_thue), true);
+  const duplicate = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify(payload) });
+  assert.equal(duplicate.response.status, 409);
+  assert.equal(await KhachThue.count({ where: { so_dien_thoai: unique.phone } }), 1);
+  const rolledBackPhone = "0911111122";
+  const occupied = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ...payload, khachThue: { ...tenant, so_dien_thoai: rolledBackPhone, cccd_giay_to: "999111222333" } }) });
+  assert.notEqual(occupied.response.status, 201);
+  assert.equal(await KhachThue.count({ where: { so_dien_thoai: rolledBackPhone } }), 0);
+  const invalid = await request("/api/hop-dong", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ...payload, khachThue: { ...tenant, so_dien_thoai: "0911111122", cccd_giay_to: "999111222333" }, ngay_ket_thuc: "2026-10-01" }) });
+  assert.notEqual(invalid.response.status, 201);
+  assert.equal(await KhachThue.count({ where: { so_dien_thoai: "0911111122" } }), 0);
+
+  const member = { roomId: base.room.ma_phong, name: "Người ở cùng", phone: "0987654312", identityNumber: "079203009999", birthDate: "2003-05-12", gender: "NAM", permanentAddress: "TP HCM", relationship: "BAN", startDate: "2026-10-15" };
+  const added = await request("/api/v1/co-tenants", { method: "POST", headers: headers(landlord), body: JSON.stringify(member) });
+  assert.equal(added.response.status, 201, JSON.stringify(added.body));
+  assert.equal((await ThanhVienPhong.findByPk(added.body.data.ma_thanh_vien_phong)).ma_hop_dong, contract.ma_hop_dong);
+  const next = await request("/api/v1/co-tenants", { method: "POST", headers: headers(landlord), body: JSON.stringify({ ...member, phone: "0987654313", identityNumber: "079203009998" }) });
+  assert.equal(next.response.status, 409, JSON.stringify(next.body));
+  const rogueAccount = await TaiKhoan.create({ ten_dang_nhap: `own${Date.now()}`.slice(0, 15), mat_khau: await bcrypt.hash("TestPass123!", 10), vai_tro: "CHU_TRO", trang_thai: "DA_KHOA" });
+  await ChuTro.create({ ma_tai_khoan: rogueAccount.ma_tai_khoan, ho_ten: "Other owner", so_dien_thoai: "0987654320" });
+  const rogue = jwt.sign({ ma_tai_khoan: rogueAccount.ma_tai_khoan, vai_tro: "CHU_TRO" }, process.env.JWT_SECRET);
+  assert.equal((await request("/api/v1/co-tenants", { method: "POST", headers: headers(rogue), body: JSON.stringify(member) })).response.status, 404);
+});

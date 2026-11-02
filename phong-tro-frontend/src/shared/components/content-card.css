@@ -1,0 +1,25 @@
+/* Opt-in content layout: .panel still owns surface, border and radius.
+   Table-only panels elsewhere deliberately keep their existing edge-to-edge layout. */
+.panel--padded {
+  padding: var(--space-6);
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  max-width: 100%;
+}
+.panel--padded > h2, .panel--padded > h3, .panel--padded > p,
+.panel--padded > .contract-detail-grid, .content-card-stack > h2 { margin: 0; }
+.panel--padded > h2, .panel--padded > h3, .panel--padded > p { overflow-wrap: anywhere; }
+.panel--padded > .btn { justify-self: start; }
+.content-card-stack { display: grid; gap: var(--space-5); min-width: 0; max-width: 100%; }
+.content-card-stack > * { min-width: 0; }
+.content-card-action { margin-bottom: var(--space-4); }
+.panel--padded .table-wrap { min-width: 0; max-width: 100%; overflow-x: auto; }
+.panel--padded .mgmt-toolbar { min-width: 0; border-radius: var(--radius-md); gap: var(--space-3); }
+.panel--padded .mgmt-toolbar label { display: grid; gap: var(--space-2); min-width: 0; }
+.panel--padded .mgmt-toolbar .form-control { min-width: 0; max-width: 100%; }
+@media (max-width: 640px) {
+  .panel--padded { padding: var(--space-4); }
+  .panel--padded .mgmt-toolbar label, .panel--padded .mgmt-toolbar .btn { width: 100%; }
+  .panel--padded > .btn { width: 100%; }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "phong-tro-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Hệ Thống Quản Lý Chuỗi Phòng Trọ",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node scripts/start-with-ocr.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node scripts/seed.js",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "node scripts/run-test-suite.js unit",
+    "test:integration": "node scripts/run-test-suite.js integration",
+    "verify:mysql8": "node scripts/verify-migrations.js"
+  },
+  "keywords": [
+    "phong-tro",
+    "management",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.4.0",
+    "mysql2": "^3.6.0",
+    "node-cron": "^3.0.2",
+    "sequelize": "^6.35.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

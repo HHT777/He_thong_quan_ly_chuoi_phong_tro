@@ -1,0 +1,131 @@
+/* UI-2a-1: shared tokens and shell only; page-specific layouts remain intact. */
+:root {
+  --ui2-navy: #0f2b6a;
+  --chart-profit-line: #B7791F;
+  --chart-profit-fill: #F6C26B;
+  --ui2-navy-strong: #14275e;
+  --ui2-navy-active: #1f4a9e;
+  --ui2-blue: #2b4ba0;
+  --ui2-blue-light: #6d87c6;
+  --ui2-amber: #bd7600;
+  --ui2-red: #c9272b;
+  --ui2-canvas: #f6f8fc;
+  --ui2-ink: #14275e;
+  --ui2-subtext: #465574;
+  --ui2-border: #d9e1ee;
+  --ui2-radius: 14px;
+  --ui2-shadow: 0 5px 22px rgba(17, 38, 88, .06);
+  --ui2-gap: 16px;
+  --ui2-sidebar-width: 254px;
+  --ui2-tablet: 1279px;
+  --ui2-mobile: 767px;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --brand-primary: var(--ui2-navy-active);
+  --brand-primary-dark: var(--ui2-navy);
+  --brand-primary-deep: var(--ui2-navy);
+  --brand-gradient: linear-gradient(180deg, #142e67, var(--ui2-navy));
+  --bg-app: var(--ui2-canvas);
+  --text-primary: var(--ui2-ink);
+  --text-secondary: var(--ui2-subtext);
+  --border-subtle: var(--ui2-border);
+  --shadow-card: var(--ui2-shadow);
+  --sidebar-width: var(--ui2-sidebar-width);
+}
+
+body, button, input, select, textarea { font-family: var(--font-sans); }
+.brand, .navbar h2, .module-page h1, .login-intro h1, .login-form-panel h2,
+.stat strong { font-family: var(--font-sans); }
+.stat strong, .navbar-heading-title, .dashboard-view [class*="number"] { font-variant-numeric: tabular-nums; }
+.app-shell { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); background: var(--ui2-canvas); }
+.app-shell.is-sidebar-collapsed { grid-template-columns: var(--sidebar-collapsed-width) minmax(0, 1fr); }
+.sidebar { background: var(--brand-gradient); padding: 22px 16px; box-shadow: none; }
+.brand-logo-mark { width: 42px; height: 42px; border: 0; background: #35528d; border-radius: 10px; box-shadow: none; }
+.brand-title { font-size: 20px; }
+.brand-subtitle { color: #d8e4fb; }
+.nav-group { color: #e8efff; min-height: 48px; }
+.nav-group__badge { margin-left: auto; min-width: 23px; height: 23px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 999px; background: #e74b60; color: #fff; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.nav-group__badge[hidden] { display: none; }
+.app-shell.is-sidebar-collapsed .nav-group { position: relative; }
+.app-shell.is-sidebar-collapsed .nav-group__badge { position: absolute; top: 2px; right: 2px; min-width: 18px; height: 18px; padding: 0 4px; font-size: 10px; }
+.nav-group.is-active, .nav-group:hover { background: var(--ui2-navy-active); border-color: transparent; box-shadow: none; }
+.sidebar-action-btn { color: #e8efff; }
+.sidebar-action-btn.is-active { background: var(--ui2-navy-active); color: #fff; }
+.sidebar-user-card { background: transparent; border-color: #47608e; }
+.sidebar-user-sub { color: #d8e4fb; }
+.navbar { min-height: 68px; height: auto; padding: 10px 28px; background: #fff; border-color: var(--ui2-border); }
+.navbar-breadcrumb { display: none; }
+.navbar-heading-title, .navbar h2 { font-size: 26px; font-weight: 750; color: var(--ui2-ink); }
+.navbar__right { gap: 12px; }
+.navbar-search-box { width: min(248px, 24vw); }
+.navbar-icon-btn, .navbar-user-btn { border-color: var(--ui2-border); }
+.navbar-user-avatar, .sidebar-user-avatar { background: linear-gradient(135deg, #658ad0, #2250a6); }
+.navbar-notification-dot[hidden], .navbar-create-menu[hidden] { display: none; }
+.navbar-notification-dot { top: -6px; right: -7px; width: auto; min-width: 20px; height: 20px; padding: 0 4px; display: grid; place-items: center; border: 2px solid #fff; background: #e74b60; color: #fff; font-size: 10px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.navbar-create-wrap { position: relative; }
+.navbar-create-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px;
+  border: 0; border-radius: 9px; background: var(--ui2-navy); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+.navbar-create-btn:hover { background: var(--ui2-navy-active); }
+.navbar-create-menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 190px; padding: 6px;
+  border: 1px solid var(--ui2-border); border-radius: 12px; background: #fff; box-shadow: var(--shadow-dropdown); z-index: 100; }
+.navbar-create-item { display: block; width: 100%; padding: 10px 12px; background: transparent; border: 0;
+  border-radius: 8px; color: var(--ui2-ink); text-align: left; cursor: pointer; font-size: 13px; }
+.navbar-create-item:hover { background: #eef3fc; }
+.panel, .table-wrap, .empty-state, .dashboard-card { border-radius: var(--ui2-radius); border-color: var(--ui2-border); box-shadow: var(--ui2-shadow); }
+.module-page .panel > .mgmt-toolbar { border: 0; border-bottom: 1px solid var(--ui2-border); border-radius: 0; }
+.module-page .panel #mgmtViewContainer > .table-wrap { border: 0; border-radius: 0; box-shadow: none; }
+/* Finance screens already have their own page headings and filters. Keep the
+   content closer to the finance tabs instead of reserving an empty heading row. */
+#module-root:has(.payment-list-panel),
+#module-root:has(.debt-toolbar),
+#module-root:has(.bill-page),
+#module-root:has(.cashflow-panel),
+#module-root:has(.report-page) { padding-top: 20px; padding-bottom: 24px; }
+.module-page:has(.payment-list-panel) > .module-page__heading,
+.module-page:has(.debt-toolbar) > .module-page__heading,
+.module-page:has(.bill-page) > .module-page__heading,
+.module-page:has(.cashflow-panel) > .module-page__heading,
+.module-page:has(.report-page) > .module-page__heading { display: none; }
+.btn--primary, .module-tab.is-active { background: var(--ui2-navy); color: #fff; }
+.module-tabs { min-height: 56px; align-items: center; padding: 8px 28px; }
+.ui2-card { padding: 20px; border: 1px solid var(--ui2-border); border-radius: var(--ui2-radius); background: #fff; box-shadow: var(--ui2-shadow); }
+.ui2-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: #edf2fb; color: var(--ui2-ink); font-weight: 700; }
+.ui2-progress { width: 100%; height: 10px; overflow: hidden; border-radius: 999px; background: #e8edf7; }
+.ui2-progress > span { display: block; height: 100%; background: var(--ui2-blue); border-radius: inherit; }
+.ui2-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; color: var(--ui2-subtext); font-size: 13px; }
+.ui2-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.ui2-badge, .ui2-progress, .ui2-legend, .stat strong { font-variant-numeric: tabular-nums; }
+:is(button, a, input, select, textarea):focus-visible { outline: 3px solid var(--ui2-amber); outline-offset: 3px; }
+@media (max-width: 1279px) {
+  .navbar { padding-inline: 20px; }
+  .navbar-user-name { display: none; }
+}
+@media (max-width: 900px) {
+  .app-shell, .app-shell.is-sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { width: 254px; }
+}
+@media (max-width: 767px) {
+  .module-tabs { padding-inline: 14px; }
+  .navbar { gap: 8px; padding-inline: 14px; }
+  .navbar-heading-title, .navbar h2 { font-size: 21px; }
+  .navbar__right { gap: 6px; }
+  .navbar-search-box { display: none; }
+  .navbar-create-btn { padding: 0 10px; }
+  .navbar-create-btn span { display: none; }
+}
+.resident-building-filter { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); font-weight: 600; white-space: nowrap; }
+.resident-building-filter select { min-width: 180px; }
+.module-page__heading:has(.resident-building-filter) { align-items: center; }
+.co-tenants-panel { overflow: hidden; }
+.co-tenants-panel + .co-tenants-panel { margin-top: 20px; }
+.co-tenants-panel > h3 { margin: 0; padding: 24px 24px 0; font-size: 20px; }
+.co-tenants-panel > p { margin: 0; padding: 16px 24px 20px; line-height: 1.5; }
+.co-tenants-panel > h3 + .table-wrap { margin-top: 20px; }
+.co-tenants-panel > .table-wrap { border: 0; border-top: 1px solid var(--ui2-border); border-radius: 0; box-shadow: none; }
+.co-tenants-panel th:last-child, .co-tenants-panel td:last-child { text-align: right; }
+.co-tenants-panel button { padding: 7px 12px; border: 1px solid var(--ui2-border); border-radius: 8px; background: #fff; color: var(--ui2-navy); font: 600 13px var(--font-sans); cursor: pointer; }
+.co-tenants-panel button:hover { background: #eef3fc; }
+@media (max-width: 767px) {
+  .module-page__heading:has(.resident-building-filter) { align-items: stretch; flex-direction: column; }
+  .resident-building-filter { width: 100%; }
+  .resident-building-filter select { flex: 1; min-width: 0; }
+}

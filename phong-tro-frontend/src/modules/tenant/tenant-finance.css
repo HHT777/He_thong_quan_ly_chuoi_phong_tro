@@ -1,0 +1,51 @@
+.tenant-finance-period-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.tenant-bills-table { min-width: 900px; }
+.tenant-bills-table th:nth-child(3),
+.tenant-bills-table td:nth-child(3) { min-width: 150px; white-space: nowrap; }
+
+.tenant-finance-period-form label {
+  display: grid;
+  gap: 8px;
+  flex: 0 1 256px;
+  min-width: 220px;
+}
+
+.tenant-finance-period-form .form-control {
+  width: 100%;
+}
+
+.tenant-finance-period-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.tenant-finance-period-form__actions .btn {
+  min-height: 48px;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .tenant-finance-period-form label {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .tenant-finance-period-form__actions {
+    width: 100%;
+  }
+
+  .tenant-finance-period-form__actions .btn {
+    flex: 1 1 140px;
+  }
+}

@@ -1,0 +1,120 @@
+const datCocService = require("../services/datCoc.service");
+const datCocValidation = require("../validations/datCoc.validation");
+const paginationService = require("../utils/pagination.util");
+
+class DatCocController {
+  async createDatCoc(req, res, next) {
+    try {
+      const { error, value } = datCocValidation.createDatCoc.validate(req.body);
+      if (error) {
+        error.isJoi = true;
+        return next(error);
+      }
+
+      const datCoc = await datCocService.createDatCoc(value, req.user);
+
+      res.status(201).json({
+        success: true,
+        data: datCoc,
+        message: "Tạo đặt cọc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDatCocList(req, res, next) {
+    try {
+      require("../utils/queryValidation").validateQuery(req.query, { strings: ["trang_thai", "ma_hop_dong"], positiveIntegers: ["page", "limit"] });
+      const pagination = paginationService.paginate(req);
+      const { count, data } = await datCocService.getDatCocList(
+        req.query,
+        pagination,
+        req.user,
+      );
+
+      const response = paginationService.buildResponse(
+        data,
+        count,
+        pagination.page,
+        pagination.limit,
+      );
+
+      res.json({
+        success: true,
+        data: response.data,
+        pagination: response.pagination,
+        message: "Lấy danh sách đặt cọc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDatCocById(req, res, next) {
+    try {
+      const datCoc = await datCocService.getDatCocById(req.params.id, req.user);
+
+      res.json({
+        success: true,
+        data: datCoc,
+        message: "Lấy thông tin đặt cọc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateDatCoc(req, res, next) {
+    try {
+      const { error, value } = datCocValidation.updateDatCoc.validate(req.body);
+      if (error) {
+        error.isJoi = true;
+        return next(error);
+      }
+
+      const datCoc = await datCocService.updateDatCoc(req.params.id, value, req.user);
+
+      res.json({
+        success: true,
+        data: datCoc,
+        message: "Cập nhật đặt cọc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirmDeposit(req, res, next) {
+    try {
+      const datCoc = await datCocService.confirmDeposit(req.params.id, req.user);
+
+      res.json({
+        success: true,
+        data: datCoc,
+        message: "Xác nhận đặt cọc thành công. Phòng sẵn sàng thuê",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async cancelDeposit(req, res, next) {
+    try {
+      const datCoc = await datCocService.cancelDeposit(
+        req.params.id,
+        req.user,
+      );
+
+      res.json({
+        success: true,
+        data: datCoc,
+        message: "Hủy đặt cọc thành công",
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+module.exports = new DatCocController();

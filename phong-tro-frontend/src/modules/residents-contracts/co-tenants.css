@@ -1,0 +1,25 @@
+.co-tenant-box {
+  width: min(1320px, 96vw);
+  max-width: 96vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.co-tenant-box__body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.co-tenant-box__section {
+  margin-top: 20px;
+}
+
+.co-tenant-box__section h3 {
+  margin: 0 0 12px;
+}
+
+.co-tenant-box .table-wrap {
+  max-height: 42vh;
+  overflow: auto;
+}

@@ -1,0 +1,29 @@
+.tenant-account-name {
+  width: 22%;
+  min-width: 210px;
+  white-space: normal;
+}
+
+.tenant-account-phone,
+.tenant-account-username {
+  min-width: 132px;
+  white-space: nowrap;
+}
+
+.tenant-account-building {
+  min-width: 150px;
+}
+
+.tenant-account-room {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+.tenant-account-contract {
+  min-width: 170px;
+}
+
+.tenant-account-status {
+  min-width: 112px;
+  white-space: nowrap;
+}

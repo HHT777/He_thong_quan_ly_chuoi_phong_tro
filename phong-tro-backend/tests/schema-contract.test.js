@@ -1,0 +1,106 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("fs");
+const path = require("path");
+const models = require("../src/models");
+const { requiredSchema } = require("../src/services/schemaReadiness.service");
+
+function ddlTables() {
+  const source = fs.readFileSync(path.resolve(__dirname, "../../data2.md"), "utf8");
+  const result = new Map();
+  const tablePattern = /create table `([^`]+)` \(([\s\S]*?)\) engine=/gi;
+  for (const match of source.matchAll(tablePattern)) {
+    const columns = [...match[2].matchAll(/^`([^`]+)`\s+/gm)].map((item) => item[1]);
+    result.set(match[1], columns);
+  }
+  return result;
+}
+
+test("canonical DDL and Sequelize models pin utf8mb4_unicode_ci", () => {
+  const documented = fs.readFileSync(path.resolve(__dirname, "../../data2.md"), "utf8");
+  const migrationDir = path.resolve(__dirname, "../migrations");
+  const migrations = fs.readdirSync(migrationDir).filter((name) => /^0(?:0[4-9]|1[0-7])_.*\.sql$/.test(name));
+  const definitions = [{ name: "data2.md", source: documented }, ...migrations.map((name) => ({ name, source: fs.readFileSync(path.join(migrationDir, name), "utf8") }))];
+  for (const { name, source } of definitions) {
+    const tables = [...source.matchAll(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`([^`]+)`[\s\S]*?;/gi)];
+    const expectedCount = (source.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`/gi) || []).length;
+    assert.equal(tables.length, expectedCount, `${name}: all CREATE TABLE statements must declare charset and collation`);
+    for (const [statement, table] of tables) {
+      assert.match(statement, /DEFAULT\s+CHARSET=utf8mb4\s+COLLATE=utf8mb4_unicode_ci/i, `${name}:${table}`);
+    }
+    for (const line of source.split(/\r?\n/)) {
+      if (line.trim().startsWith("--")) continue;
+      if (/\b(?:ADD|MODIFY|CHANGE)\s+COLUMN\s+`[^`]+`\s+varchar\(\d+\)/i.test(line)) {
+        assert.match(line, /varchar\(\d+\)\s+CHARACTER\s+SET\s+utf8mb4\s+COLLATE\s+utf8mb4_unicode_ci/i, `${name}: altered varchar needs explicit collation`);
+      }
+    }
+  }
+  for (const model of Object.values(models)) {
+    if (!model?.tableName) continue;
+    assert.equal(model.options.charset, "utf8mb4", `${model.tableName} charset`);
+    assert.equal(model.options.collate, "utf8mb4_unicode_ci", `${model.tableName} collation`);
+  }
+});
+
+test("Sequelize maps every documented table and physical column", () => {
+  const expected = ddlTables();
+  assert.deepEqual([...requiredSchema().keys()].sort(), [...expected.keys()].sort(), "startup schema inventory matches data2.md");
+  for (const [table, columns] of requiredSchema()) {
+    assert.deepEqual([...columns].sort(), expected.get(table).filter((column) => column !== "maPhongDangThue").sort(), `startup columns differ from data2.md: ${table}`);
+  }
+  assert.ok(expected.size >= 25);
+  assert.deepEqual(
+    ["LichSuGiaHanHopDong", "LichSuSuaHopDong", "LichSuChuyenPhong", "GiaoDichHoanCoc"].filter((table) => !expected.has(table)),
+    [],
+    "Migration 010/011 tables must be represented in data2.md",
+  );
+  assert.equal(expected.size, 40, "Meter replacement must map 40 documented tables");
+  assert.ok(expected.has("ThayDongHoDien"), "Migration 024 meter replacements must be documented");
+  assert.ok(expected.has("NhatKyLapPhieu") && expected.has("ChiTietNhatKyLapPhieu"));
+  assert.ok(expected.get("ThanhToan")?.includes("nguoiGuiId") && expected.get("ThanhToan")?.includes("soLanGui"));
+  assert.ok(expected.has("KhoanDieuChinh"), "Migration 013 adjustment table must be documented");
+  assert.ok(expected.get("ThongBao")?.includes("khoaSuKien"), "Migration 014 notification event key must be documented");
+  assert.ok(expected.get("ThongBao")?.includes("daAn"), "Migration 023 hidden notification state must be documented");
+  assert.ok(expected.get("SuCo")?.includes("maSuCoTruoc"), "Migration 016 previous incident must be documented");
+  assert.deepEqual(
+    ["doanhThuGop", "giamTruPhanBo", "nguonSnapshot"].filter((column) => !expected.get("KhoanThu")?.includes(column)),
+    [],
+    "Migration 015 receipt snapshots must be documented",
+  );
+  assert.deepEqual(
+    ["loaiChiSo", "khoaNghiepVu"].filter((column) => !expected.get("ChiSoDien")?.includes(column)),
+    [],
+    "Migration 012 meter business key must be documented",
+  );
+  assert.deepEqual(
+    ["loaiThanhToan", "maBienBanTraPhong"].filter((column) => !expected.get("ThanhToan")?.includes(column)),
+    [],
+    "Migration 012 payment classification must be documented",
+  );
+  assert.deepEqual(
+    ["ngayLap", "daGui", "ngayGui", "daNhacHan", "ngayNhacHan", "quaHan", "ngayQuaHan", "daChotCongNo", "ngayChotCongNo", "soTienChotCongNo"].filter((column) => !expected.get("ThanhToan")?.includes(column)),
+    [],
+    "Migration 013 billing/debt lifecycle columns must be documented",
+  );
+  assert.deepEqual(
+    ["maKhoanDieuChinh", "nguoiThucHienId", "thoiDiemTao"].filter((column) => !expected.get("ChiTietThanhToan")?.includes(column)),
+    [],
+    "Migration 013 signed-line metadata must be documented",
+  );
+  assert.deepEqual(
+    ["daCoBanGiayKy", "phiDichVu", "goiGiaHanChoPhep"].filter((column) => !expected.get("HopDong")?.includes(column)),
+    [],
+    "Migration 010 contract columns must be represented in data2.md",
+  );
+  const registered = new Map();
+  for (const model of Object.values(models)) {
+    if (!model?.tableName || registered.has(model.tableName)) continue;
+    registered.set(model.tableName, Object.values(model.rawAttributes).map((attribute) => attribute.field));
+  }
+  assert.deepEqual([...registered.keys()].sort(), [...expected.keys()].sort());
+  for (const [table, columns] of expected) {
+    // maPhongDangThue is generated by MySQL and must never be inserted/updated by Sequelize.
+    const writableColumns = columns.filter((column) => column !== "maPhongDangThue");
+    assert.deepEqual(registered.get(table).sort(), writableColumns.sort(), `Column mapping differs for ${table}`);
+  }
+});

@@ -1,0 +1,66 @@
+.tenant-meter-page > .module-page__heading {
+  display: none;
+}
+
+#module-root:has(.tenant-meter-page) {
+  padding-top: 20px;
+  padding-bottom: 24px;
+}
+
+.tenant-meter .meter-capture__controls { min-width: 0; }
+
+.tenant-meter [data-file-name] {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: var(--space-3) 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tenant-meter .tenant-meter-preview {
+  position: relative;
+  display: block;
+  align-self: stretch;
+  min-height: clamp(280px, 45vh, 560px);
+  padding: 0;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+}
+
+.tenant-meter .tenant-meter-preview > button {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.tenant-meter .tenant-meter-preview img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+  object-position: center;
+  border-radius: inherit;
+}
+
+.tenant-meter .tenant-meter-preview .meter-image__empty {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.tenant-meter-lightbox .modal-dialog { width: min(960px, 94vw); max-width: 94vw; }
+.tenant-meter-lightbox .modal-body { padding: var(--space-4); background: var(--bg-subtle); }
+.tenant-meter-lightbox img { display: block; width: 100%; height: 65vh; object-fit: contain; border-radius: var(--radius-md); }
+
+@media (max-width: 640px) {
+  .tenant-meter .tenant-meter-preview { height: clamp(280px, 60vh, 480px); min-height: 0; }
+}

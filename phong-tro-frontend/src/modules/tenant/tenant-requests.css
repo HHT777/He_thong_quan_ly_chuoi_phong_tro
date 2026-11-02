@@ -1,0 +1,45 @@
+/* Component layout only; controls, tabs, cards and badges use the shared UI. */
+.tenant-requests { max-width: 1100px; min-width: 0; margin-inline: auto; }
+#module-root:has(.tenant-requests) { padding-top: var(--space-4); }
+.module-page:has(.tenant-requests) > .module-page__heading { display: none; }
+.tenant-requests .module-tabs { width: max-content; max-width: 100%; min-height: 0; padding: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: var(--space-3); }
+.tenant-requests [role="tabpanel"] { display: grid; gap: var(--space-3); min-width: 0; }
+.tenant-requests [hidden] { display: none !important; }
+.tenant-requests .renewal-card { padding: var(--space-6); min-width: 0; }
+.tenant-requests .renewal-card__heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-4); }
+.tenant-requests h2, .tenant-requests h3 { margin: 0; color: var(--text-primary); }
+.tenant-requests h2 { font-size: 18px; }
+.tenant-requests h3 { font-size: 16px; }
+.tenant-requests .renewal-fields { display: grid; gap: var(--space-5); border: 0; padding: 0; margin: 0; min-width: 0; }
+.tenant-requests .renewal-field { display: grid; gap: var(--space-2); min-width: 0; }
+.tenant-requests .renewal-field label, .tenant-requests .renewal-label { font-weight: var(--font-semibold); color: var(--text-primary); }
+.tenant-requests .form-control { min-width: 0; max-width: 100%; min-height: 44px; box-sizing: border-box; }
+.tenant-requests textarea.form-control { resize: vertical; }
+.tenant-requests .form-control:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: not-allowed; }
+.tenant-requests .renewal-selected { margin: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tenant-requests .contract-detail-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 var(--space-4); }
+.tenant-requests .contract-detail-grid.co-tenant-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tenant-requests .contract-detail-grid dd, .tenant-requests .renewal-content { overflow-wrap: anywhere; white-space: pre-wrap; }
+.tenant-requests .renewal-notice { padding: 14px 16px; background: #f7f9fd; color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.tenant-requests .renewal-notice--blocked { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 12px; align-items: start; border-color: #f0d8a8; background: #fffaf0; }
+.tenant-requests .renewal-notice--blocked::before { content: "!"; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #f8e5bd; color: #805200; font-weight: 800; }
+.tenant-requests .renewal-notice--blocked > strong, .tenant-requests .renewal-notice--blocked > p { grid-column: 2; }
+.tenant-requests .renewal-notice--blocked > strong { color: #664200; line-height: 1.4; }
+.tenant-requests .renewal-notice p { margin: 4px 0 0; line-height: 1.5; }
+.tenant-requests [data-history] { display: grid; gap: var(--space-4); }
+.tenant-requests .renewal-history > h2 { margin-bottom: var(--space-4); }
+.tenant-requests .renewal-toolbar, .tenant-requests .renewal-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.tenant-requests .btn, .tenant-requests .module-tab { min-height: 44px; }
+.tenant-requests .renewal-toolbar { margin: 0; }
+.tenant-requests [data-message]:empty,
+.tenant-requests [data-move-message]:empty { display: none; }
+@media (max-width: 900px) {
+  .tenant-requests .contract-detail-grid.co-tenant-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  #module-root:has(.tenant-requests) { padding-top: var(--space-3); }
+  .tenant-requests .renewal-card { padding: var(--space-4); }
+  .tenant-requests .contract-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .tenant-requests .contract-detail-grid.co-tenant-summary { grid-template-columns: minmax(0, 1fr); }
+  .tenant-requests .renewal-toolbar .btn, .tenant-requests .renewal-actions .btn { width: 100%; }
+}

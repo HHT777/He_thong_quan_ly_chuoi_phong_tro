@@ -1,0 +1,7 @@
+.tenant-incidents { display: grid; gap: var(--space-5); min-width: 0; }
+.tenant-incidents .incident-file-name { display: block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: var(--space-2); }
+.tenant-incidents .incident-preview { width: 100%; max-height: 320px; object-fit: contain; background: var(--bg-subtle); border-radius: var(--radius-md); }
+.tenant-incidents [data-history] { display: grid; gap: var(--space-4); min-width: 0; }
+.tenant-incidents .incident-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tenant-incidents details summary { cursor: pointer; padding-block: var(--space-2); }
+.tenant-incidents details .contract-detail-grid { margin-top: var(--space-4); }

@@ -1,0 +1,114 @@
+/* app.css contains legacy Georgia headings; prefer a Vietnamese-complete face. */
+.module-page h1,
+.navbar h2,
+.brand,
+.login-intro h1,
+.login-form-panel h2 {
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
+}
+
+.login-intro > div:last-child {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(100%, 620px);
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.login-intro h1,
+.login-intro p:not(.eyebrow) {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.login-intro h1 {
+  max-width: 580px;
+  font-size: clamp(38px, 5vw, 60px);
+  line-height: 1.08;
+  margin-top: 20px;
+  margin-bottom: 28px;
+}
+
+.login-intro .eyebrow {
+  margin-bottom: 0;
+}
+
+.login-intro p:not(.eyebrow) {
+  max-width: 500px;
+  margin-top: 0;
+}
+
+.login-shell--reset .login-intro > div:last-child {
+  width: min(calc(100% - 64px), 720px);
+}
+
+.login-shell--reset .login-intro h1 {
+  max-width: 720px;
+  font-size: clamp(40px, 4.6vw, 64px);
+  line-height: 1.14;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  margin: 22px auto 26px;
+}
+
+.login-shell--reset .login-intro .eyebrow {
+  color: #c6e2ff;
+}
+
+.login-shell--reset .login-intro p:not(.eyebrow) {
+  max-width: 580px;
+  line-height: 1.6;
+  text-wrap: balance;
+}
+
+.login-shell--reset .login-form-panel {
+  max-width: 550px;
+}
+
+.login-shell--reset .login-form-panel h2 {
+  margin-bottom: 20px;
+}
+
+.login-shell--reset .login-form-panel > p {
+  max-width: 440px;
+  margin: 0 auto;
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
+.login-shell--reset .login-form {
+  margin-top: 32px;
+}
+
+.login-shell--reset .form-success:not(:empty) {
+  padding: 14px 16px;
+  border: 1px solid #b7dfc3;
+  border-radius: 10px;
+  background: #effaf2;
+  line-height: 1.5;
+}
+
+@media (max-width: 800px) {
+  .login-shell--reset .login-intro {
+    min-height: 360px;
+    padding: 32px 24px 40px;
+  }
+
+  .login-shell--reset .login-intro > div:last-child {
+    position: static;
+    width: 100%;
+    margin-top: 48px;
+    text-align: left;
+    transform: none;
+  }
+
+  .login-shell--reset .login-intro h1 {
+    font-size: clamp(34px, 7vw, 48px);
+    margin: 16px 0 20px;
+  }
+
+  .login-shell--reset .login-form-panel {
+    padding: 36px 24px;
+  }
+}
