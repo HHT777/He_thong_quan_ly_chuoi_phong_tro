@@ -1,4 +1,5 @@
 const { randomUUID } = require("node:crypto");
+const { safeFailureMetadata } = require("../utils/privacy.util");
 
 // Error handling middleware
 const errorHandler = (err, req, res, next) => {
@@ -13,7 +14,7 @@ const errorHandler = (err, req, res, next) => {
   const isExpected = !isDatabaseError && Number.isInteger(err?.status) && err.status >= 400 && err.status < 500;
   if (!isExpected) {
     const referenceId = randomUUID();
-    console.error(`[INTERNAL_ERROR ${referenceId}]`, err);
+    console.error(`[INTERNAL_ERROR ${referenceId}]`, safeFailureMetadata(err));
     if (typeof res.apiError === "function" && req.path.startsWith("/api/v1/")) {
       return res.apiError(500, "INTERNAL_ERROR", "Lỗi máy chủ nội bộ", { referenceId });
     }

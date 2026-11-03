@@ -8,11 +8,12 @@ const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend
 test("FR-165/172/173/196 debt screen groups server debt and separates post-liquidation debt", () => {
   assert.match(source, /get\("\/v1\/debt"\)/);
   assert.match(source, /debtGroup\?\.buildingId/);
-  assert.match(source, /debtGroup\?\.roomId/);
-  assert.match(source, /debtGroup\?\.tenantId/);
+  assert.match(source, /hopDong\?\.phongTro\?\.so_phong/);
+  assert.match(source, /hopDong\?\.khachThue\?\.ho_ten/);
   assert.match(source, /row\.isOverdue/);
   assert.match(source, /row\.debtAgeDays/);
-  assert.match(source, /Nhóm này không tham gia tuổi nợ định kỳ/);
+  assert.match(source, /isPostLiquidation\(row\)/);
+  assert.match(source, /postLiquidation \? "—"/);
   assert.doesNotMatch(source, /Date\.now\(\).*debtAge|new Date\(row\..*\).*debtAge/s);
 });
 
@@ -22,7 +23,7 @@ test("FR-165 debt collection uses payload-bound idempotency and supports locked 
   assert.match(source, /requestKeys\.complete\(scope\)/);
   assert.match(source, /IDEMPOTENCY_CONFLICT/);
   assert.match(source, /Tạo yêu cầu mới/);
-  assert.match(source, /tài khoản khách đã khóa/);
+  assert.doesNotMatch(source, /DA_KHOA|tài khoản khách đã khóa/);
   assert.match(source, /integerVnd\(raw\.so_tien/);
   assert.match(source, /submit\.disabled = true/);
 });

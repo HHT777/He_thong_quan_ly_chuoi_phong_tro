@@ -274,17 +274,5 @@ export default listTab({ id: "contracts", route: "/residents-contracts/contracts
         await context.api.post(`/hop-dong/${encodeURIComponent(row.ma_hop_dong)}/transfers`, { targetRoomId: raw.targetRoomId, transferDate: raw.transferDate, finalElectricityReading: integerVnd(raw.finalElectricityReading, "Chỉ số cuối"), initialElectricityReading: integerVnd(raw.initialElectricityReading, "Chỉ số đầu"), newRent: integerVnd(raw.newRent, "Giá thuê mới", { positive: true }), reason: requiredText(raw.reason, "Lý do") });
       } });
     },
-  }, {
-    id: "renew",
-    label: "Gia hạn",
-    visible: (row) => ["DANG_HIEU_LUC", "SAP_HET_HAN", "HET_HAN"].includes(row.trang_thai),
-    fields: [
-      { name: "ngay_bat_dau_moi", label: "Ngày bắt đầu mới", type: "date", required: true },
-      { name: "ngay_ket_thuc_moi", label: "Ngày kết thúc mới", type: "date", required: true },
-      { name: "gia_thue_moi", label: "Giá thuê mới", type: "number" },
-    ],
-    initial: (row) => ({ ngay_bat_dau_moi: row.ngay_bat_dau, ngay_ket_thuc_moi: row.ngay_ket_thuc, gia_thue_moi: row.gia_thue }),
-    map: (raw) => ({ ...raw, gia_thue_moi: raw.gia_thue_moi ? Number(raw.gia_thue_moi) : undefined }),
-    run: (context, row, values) => context.api.post(`/hop-dong/${row.ma_hop_dong}/renew`, values),
   }],
 });

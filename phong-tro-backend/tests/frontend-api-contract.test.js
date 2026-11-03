@@ -66,6 +66,7 @@ test("CT-013 room status filters use the database status domain", () => {
 
 test("CT-014 incident priority defaults and validation match the documented domain", () => {
   const incidentForm = frontendSource("modules/tenant/tenant-incidents.tab.js");
+  const incidentModel = frontendSource("modules/tenant/tenant-incident.model.mjs");
   const incidentRoute = fs.readFileSync(
     path.resolve(__dirname, "../src/routes/mvp.routes.js"),
     "utf8",
@@ -75,8 +76,9 @@ test("CT-014 incident priority defaults and validation match the documented doma
   assert.match(incidentRoute, /value \|\| "TRUNG_BINH"/);
   assert.match(incidentRoute, /INCIDENT_PRIORITIES\.includes\(priority\)/);
   assert.match(incidentRoute, /INVALID_INCIDENT_PRIORITY/);
-  assert.match(incidentForm, /value: "TRUNG_BINH"/);
-  assert.match(incidentForm, /INCIDENT_PRIORITIES\.includes\(values\.priority\)/);
+  assert.match(incidentModel, /priority:"TRUNG_BINH"/);
+  assert.match(incidentModel, /priorities\.includes\(draft\.priority\)/);
+  assert.match(incidentForm, /validDraft\(/);
   assert.match(incidentRoute, /incidentPriority\(req\.body\.priority\)/);
   assert.doesNotMatch(`${incidentForm}\n${incidentRoute}`, /BINH_THUONG/);
 });

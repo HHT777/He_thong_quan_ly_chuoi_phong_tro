@@ -5,7 +5,7 @@ const sequelize = require("../config/database");
 const { ChiSoDien, HopDong, LichSuChinhSuaChiSoDien, ThayDongHoDien, PhongTro } = require("../models");
 const { writeAuditLog } = require("../services/auditLog.service");
 const service = require("../services/meterReading.service");
-const { assertOwned } = require("../services/ownership.service");
+const { assertOwned, getOwnedBuildingIds } = require("../services/ownership.service");
 const replacementService = require("../services/meterReplacement.service");
 
 function header(req, name) {
@@ -20,7 +20,7 @@ function readingValue(req) {
   return value;
 }
 async function canRead(req, row) {
-  if (req.user.vai_tro === "CHU_TRO") return;
+  if (req.user.vai_tro === "CHU_TRO") { await assertOwned(req.user, "meterReading", row.ma_chi_so); return; }
   const contract = await HopDong.findOne({ where: { ma_phong: row.ma_phong, ma_khach_thue: req.user.ma_khach_thue } });
   if (!contract) throw { status: 404, code: "RESOURCE_NOT_FOUND", message: "Không tìm thấy tài nguyên" };
 }
@@ -36,22 +36,28 @@ function tenantInput(req, bodyFields = [], queryFields = []) {
 
 class MeterReadingController {
   async context(req, res, next) { try { tenantInput(req, [], ["period"]); res.apiSuccess(await service.getContext(req.user.ma_khach_thue, req.query.period)); } catch (e) { next(e); } }
-  async preview(req, res, next) { try { tenantInput(req, ["period"]); if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(req.user.ma_khach_thue, req.body.period, req.file, undefined, req.user.ma_tai_khoan)); } catch (e) { next(e); } }
-  async landlordPreview(req, res, next) { try { landlord(req); if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(null, req.body.period, req.file, req.body.roomId, req.user.ma_tai_khoan)); } catch (e) { next(e); } }
+  async preview(req, res, next) { try { tenantInput(req, ["period"]); if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(req.user.ma_khach_thue, req.body.period, req.file, undefined, req.user.ma_tai_khoan, req.uploadContext)); } catch (e) { next(e); } }
+  async landlordPreview(req, res, next) { try { landlord(req); if (!req.file) return res.apiError(400, "FILE_REQUIRED", "Vui lòng tải ảnh công tơ."); res.apiSuccess(await service.createPreview(null, req.body.period, req.file, req.body.roomId, req.user.ma_tai_khoan, req.uploadContext)); } catch (e) { next(e); } }
   async submit(req, res, next) {
     try {
       tenantInput(req, ["period", "uploadToken"]);
       header(req, "Idempotency-Key");
-      res.apiSuccess(await service.submit(req.user.ma_khach_thue, req.body, req.user.ma_tai_khoan), null, 201);
+      res.apiSuccess(await service.submit(req.user.ma_khach_thue, req.body, req.user.ma_tai_khoan, req.uploadContext), null, 201);
     } catch (e) { next(e); }
   }
-  async landlordSubmit(req, res, next) { try { landlord(req); header(req, "Idempotency-Key"); res.apiSuccess(await service.submitForLandlord({ period: req.body.period, readingValue: req.body.readingValue, uploadToken: req.body.uploadToken }, req.user.ma_tai_khoan), null, 201); } catch (e) { next(e); } }
+  async landlordSubmit(req, res, next) { try { landlord(req); header(req, "Idempotency-Key"); res.apiSuccess(await service.submitForLandlord({ period: req.body.period, readingValue: req.body.readingValue, uploadToken: req.body.uploadToken }, req.user.ma_tai_khoan, req.uploadContext), null, 201); } catch (e) { next(e); } }
   async list(req, res, next) {
     try {
-      require("../utils/queryValidation").validateQuery(req.query, { periods: ["period"], strings: ["status", "buildingId"], positiveIntegers: ["page", "pageSize"] });
+      require("../utils/queryValidation").validateQuery(req.query, { periods: ["period"], strings: ["status", "buildingId", "roomId"], positiveIntegers: ["page", "pageSize"] });
       const page = Math.max(1, Number(req.query.page || 1)); const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize || 20)));
       const where = { da_xoa: false }; if (req.query.period) Object.assign(where, service.parsePeriod(req.query.period)); if (req.query.status) where.trang_thai_xac_nhan = req.query.status;
-      const include = service.include.map((item) => item.as === "phongTro" && req.query.buildingId ? { ...item, required: true, where: { ma_can: req.query.buildingId } } : item);
+      let include = service.include.map((item) => item.as === "phongTro" && req.query.buildingId ? { ...item, required: true, where: { ma_can: req.query.buildingId } } : item);
+      if (req.user.vai_tro === "CHU_TRO") {
+        const buildingIds = await getOwnedBuildingIds(req.user);
+        if (req.query.buildingId) await assertOwned(req.user, "building", req.query.buildingId);
+        if (req.query.roomId) { await assertOwned(req.user, "room", req.query.roomId); where.ma_phong = req.query.roomId; }
+        include = service.include.map((item) => item.as === "phongTro" ? { ...item, required: true, where: { ma_can: { [Op.in]: req.query.buildingId ? [req.query.buildingId] : buildingIds } } } : item);
+      }
       if (req.user.vai_tro === "KHACH_THUE") {
         const rooms = await HopDong.findAll({ where: { ma_khach_thue: req.user.ma_khach_thue }, attributes: ["ma_phong"], raw: true });
         where.ma_phong = { [Op.in]: rooms.map((item) => item.ma_phong) };
@@ -60,7 +66,7 @@ class MeterReadingController {
       res.apiSuccess(rows.map(service.toDto), { page, pageSize, totalItems: count, totalPages: Math.ceil(count / pageSize) });
     } catch (e) { next(e); }
   }
-  async detail(req, res, next) { try { const row = await service.findReading(req.params.readingId); await canRead(req, row); res.apiSuccess(service.toDto(row)); } catch (e) { if (req.user.vai_tro === "KHACH_THUE" && e.status === 404) return next({ status: 404, code: "RESOURCE_NOT_FOUND", message: "Không tìm thấy tài nguyên" }); next(e); } }
+  async detail(req, res, next) { try { if (req.user.vai_tro === "CHU_TRO") await assertOwned(req.user, "meterReading", String(req.params.readingId).replace(/^mr_/, "")); const row = await service.findReading(req.params.readingId); await canRead(req, row); res.apiSuccess(service.toDto(row)); } catch (e) { if (req.user.vai_tro === "KHACH_THUE" && e.status === 404) return next({ status: 404, code: "RESOURCE_NOT_FOUND", message: "Không tìm thấy tài nguyên" }); next(e); } }
   async update(req, res, next) {
     try {
       landlord(req); header(req, "If-Match"); const reason = String(req.body.reason || "").trim(); if (!reason) return res.apiError(422, "REASON_REQUIRED", "Lý do chỉnh sửa là bắt buộc.");
@@ -96,9 +102,12 @@ class MeterReadingController {
       res.apiSuccess(service.toDto(await service.findReading(result.ma_chi_so)));
     } catch (e) { next(e); }
   }
-  async correction(req, res) {
-    landlord(req);
-    return res.apiError(409, "SCHEMA_DOES_NOT_SUPPORT_CORRECTION_FLAG", "Schema data2.md không có cột lưu yêu cầu chụp lại; hãy sửa bản chờ xác nhận hoặc khách gửi lại ảnh.");
+  async correction(req, res, next) {
+    try {
+      landlord(req);
+      await assertOwned(req.user, "meterReading", String(req.params.readingId).replace(/^mr_/, ""));
+      return res.apiError(409, "SCHEMA_DOES_NOT_SUPPORT_CORRECTION_FLAG", "Schema data2.md không có cột lưu yêu cầu chụp lại; hãy sửa bản chờ xác nhận hoặc khách gửi lại ảnh.");
+    } catch (error) { next(error); }
   }
   async remove(req, res, next) {
     try {
@@ -117,6 +126,7 @@ class MeterReadingController {
   async manual(req, res, next) {
     try {
       landlord(req); header(req, "Idempotency-Key"); const value = readingValue(req); const contract = await service.tenantContract(req.body.tenantId);
+      await assertOwned(req.user, "room", contract.ma_phong);
       const parsed = service.parsePeriod(req.body.period); if (await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed } })) return res.apiError(409, "PENDING_READING_EXISTS", "Kỳ này đã có chỉ số.");
       const previous = await service.submissionMinimum(contract.ma_phong, req.body.period); if (value < previous) return res.apiError(422, "READING_BELOW_PREVIOUS", "Chỉ số không được nhỏ hơn kỳ trước.");
       const row = await sequelize.transaction(async (transaction) => { const created = await ChiSoDien.create({ ...parsed, ma_phong: contract.ma_phong, chi_so_moi: value, don_gia_ap_dung: contract.don_gia_dien, trang_thai_xac_nhan: "DA_XAC_NHAN", nguoi_ghi_nhan_id: req.user.ma_tai_khoan, nguoi_xac_nhan_id: req.user.ma_tai_khoan, ngay_xac_nhan: new Date() }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "METER_READING_MANUAL_CREATED", entityType: "ChiSoDien", entityId: created.ma_chi_so, after: { value, period: req.body.period } }); return created; });
@@ -124,7 +134,7 @@ class MeterReadingController {
     } catch (e) { next(e); }
   }
   async privateFile(req, res, next) {
-    try { const row = await service.findReading(req.params.id); await canRead(req, row); if (!row.anh_cong_to_url || !fs.existsSync(row.anh_cong_to_url)) return res.apiError(404, "FILE_NOT_FOUND", "Không tìm thấy minh chứng."); res.sendFile(path.resolve(row.anh_cong_to_url)); } catch (e) { next(e); }
+    try { if (req.user.vai_tro === "CHU_TRO") await assertOwned(req.user, "meterReading", req.params.id); const row = await service.findReading(req.params.id); await canRead(req, row); if (!row.anh_cong_to_url || !fs.existsSync(row.anh_cong_to_url)) return res.apiError(404, "FILE_NOT_FOUND", "Không tìm thấy minh chứng."); res.sendFile(path.resolve(row.anh_cong_to_url)); } catch (e) { next(e); }
   }
   async createReplacement(req, res, next) {
     try { landlord(req); res.apiSuccess(await replacementService.create(req.body, req.files, req.user), null, 201); }

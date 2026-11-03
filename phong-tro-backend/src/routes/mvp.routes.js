@@ -505,11 +505,11 @@ router.post("/co-tenants", async (req, res, next) => {
     ), 201);
   } catch (e) { next(e); }
 });
-router.get("/co-tenants", async (req, res, next) => { try { if (req.user.vai_tro === "KHACH_THUE") return data(res, (await coTenantService.context(req.user)).members); return data(res, await ThanhVienPhong.findAll()); } catch (e) { next(e); } });
+router.get("/co-tenants", async (req, res, next) => { try { return data(res, await coTenantService.list(req.user)); } catch (e) { next(e); } });
 router.get("/co-tenants/:id", async (req, res, next) => {
   try { return data(res, await coTenantService.getMember(req.params.id, req.user)); } catch (e) { next(e); }
 });
-router.patch("/co-tenants/:id", landlord, async (req, res, next) => { try { const row = await sequelize.transaction(async (transaction) => { const member = await ThanhVienPhong.findByPk(req.params.id, { transaction, lock: transaction.LOCK.UPDATE }); if (!member) throw fail(404, "Thành viên phòng không tồn tại"); const before = member.get({ plain: true }); if (req.body.status === "DA_ROI") await member.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: req.body.leaveDate || new Date() }, { transaction }); await writeAuditLog({ transaction, actorId: req.user.ma_tai_khoan, action: "CO_TENANT_UPDATED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, before, after: member }); return member; }); return data(res, row); } catch (e) { next(e); } });
+router.patch("/co-tenants/:id", landlord, async (req, res, next) => { try { return data(res, await coTenantService.updateMember(req.params.id, req.body, req.user)); } catch (e) { next(e); } });
 
 router.get("/notifications", async (req, res, next) => {
   try {

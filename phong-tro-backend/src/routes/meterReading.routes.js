@@ -1,16 +1,38 @@
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
+const crypto = require("crypto");
+const { pipeline } = require("node:stream");
+const { getUploadContext } = require("../config/uploadFilesystem");
 const authMiddleware = require("../middleware/auth");
 const authorize = require("../middleware/authorize");
 const controller = require("../controllers/meterReading.controller");
 const { getPersistedSystemConfig } = require("../services/systemConfig.service");
+const { assertLandlordOwnsRoom } = require("../services/propertyAccess.service");
 
-const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads", "meter");
-fs.mkdirSync(uploadDir, { recursive: true });
 const upload = multer({
-  dest: uploadDir,
+  storage: {
+    _handleFile(req, file, callback) {
+      try {
+        const context = req.uploadContext;
+        context.mkdir(context.resolve("meter"));
+        const filename = crypto.randomBytes(16).toString("hex");
+        const target = context.resolve("meter", filename);
+        const output = context.createWriteStream(target);
+        let size = 0;
+        file.stream.on("data", (chunk) => { size += chunk.length; });
+        pipeline(file.stream, output, (error) => {
+          if (error) {
+            try { context.unlink(target); } catch (cleanupError) { if (cleanupError.code !== "ENOENT") return callback(cleanupError); }
+            return callback(error);
+          }
+          callback(null, { destination: context.resolve("meter"), filename, path: target, size });
+        });
+      } catch (error) { callback(error); }
+    },
+    _removeFile(req, file, callback) {
+      try { req.uploadContext.unlink(file.path); callback(null); } catch (error) { callback(error); }
+    },
+  },
   // Multer keeps a fixed emergency ceiling; the editable DB limit is enforced
   // by the next middleware so configuration changes do not require a restart.
   limits: { fileSize: 100 * 1024 * 1024, files: 1 },
@@ -22,6 +44,26 @@ const upload = multer({
     return cb(error);
   },
 });
+const ownerUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => ["image/jpeg", "image/png"].includes(file.mimetype)
+    ? cb(null, true) : cb(Object.assign(new Error("Chỉ chấp nhận ảnh JPEG hoặc PNG."), { code: "UNSUPPORTED_MEDIA_TYPE", status: 415 })) });
+async function storeOwnedPreview(req, res, next) {
+  try {
+    await assertLandlordOwnsRoom(req.user, req.body.roomId);
+    if (!req.file) return next();
+    const config = await getPersistedSystemConfig();
+    if (req.file.size > config.maxFileSizeBytes) return res.apiError(413, "FILE_TOO_LARGE", "Ảnh vượt quá giới hạn cho phép.");
+    const context = req.uploadContext;
+    const filename = crypto.randomBytes(16).toString("hex");
+    const uploadDir = context.resolve("meter");
+    context.mkdir(uploadDir);
+    const filePath = context.resolve("meter", filename);
+    context.writeFile(filePath, req.file.buffer);
+    Object.assign(req.file, { path: filePath, filename, destination: uploadDir });
+    delete req.file.buffer;
+    next();
+  } catch (error) { next(error); }
+}
 const replacementUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 2 },
   fileFilter: (req, file, cb) => ["image/jpeg", "image/png"].includes(file.mimetype)
     ? cb(null, true) : cb(Object.assign(new Error("Chỉ chấp nhận ảnh JPEG hoặc PNG."), { code: "UNSUPPORTED_MEDIA_TYPE", status: 415 })) });
@@ -43,16 +85,21 @@ async function configuredFileLimit(req, res, next) {
     if (!files.length) return next();
     const config = await getPersistedSystemConfig();
     if (files.every((file) => file.size <= config.maxFileSizeBytes)) return next();
-    await Promise.all(files.filter((file) => file.path).map((file) => fs.promises.unlink(file.path).catch(() => {})));
+    for (const file of files.filter((item) => item.path)) {
+      try { req.uploadContext.unlink(file.path); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    }
     return res.apiError(413, "FILE_TOO_LARGE", "Ảnh vượt quá giới hạn cho phép.");
   } catch (error) { return next(error); }
 }
 
 const router = express.Router();
 router.use(authMiddleware);
+router.use((req, res, next) => {
+  try { req.uploadContext = getUploadContext(); next(); } catch (error) { next(error); }
+});
 router.get("/me/meter-reading-context", authorize("KHACH_THUE"), controller.context.bind(controller));
 router.post("/me/meter-reading-ocr-previews", authorize("KHACH_THUE"), upload.single("file"), uploadErrorHandler, configuredFileLimit, controller.preview.bind(controller));
-router.post("/meter-readings/ocr-previews", authorize("dienNuoc.write"), upload.single("file"), uploadErrorHandler, configuredFileLimit, controller.landlordPreview.bind(controller));
+router.post("/meter-readings/ocr-previews", authorize("dienNuoc.write"), ownerUpload.single("file"), uploadErrorHandler, storeOwnedPreview, controller.landlordPreview.bind(controller));
 router.post("/me/meter-readings", authorize("KHACH_THUE"), controller.submit.bind(controller));
 router.post("/meter-readings/ocr-submit", authorize("dienNuoc.write"), controller.landlordSubmit.bind(controller));
 router.post("/meter-replacements", authorize("dienNuoc.write"), replacementUpload.fields([{ name: "oldImage", maxCount: 1 }, { name: "newImage", maxCount: 1 }]), uploadErrorHandler, configuredFileLimit, controller.createReplacement.bind(controller));

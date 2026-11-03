@@ -8,6 +8,8 @@ const bcrypt = require("bcryptjs");
 const mysql = require("mysql2/promise");
 const { applyTestAuthDefaults } = require("../src/config/environment");
 const { approvedTestTarget } = require("../src/config/testDatabaseSafety");
+const { withUploadProtection } = require("./upload-test-session");
+const { createUploadContext } = require("../src/config/uploadFilesystem");
 
 const root = path.resolve(__dirname, "..");
 const testsDir = path.join(root, "tests");
@@ -175,13 +177,16 @@ async function runIntegration() {
     return invariant.status ?? 1;
   } finally {
     if (server && server.exitCode === null) server.kill();
-    fs.rmSync(uploadDir, { recursive: true, force: true });
+    createUploadContext({ root: uploadDir, mode: "test", sessionRoot: uploadDir }).removeTree(uploadDir);
     if (process.env.TEST_KEEP_DATABASE !== "true") await dropTestDatabase(databaseName);
   }
 }
 
 async function main() {
-  if (mode === "unit") process.exitCode = runNodeTests(testFiles(false));
+  if (mode === "unit") process.exitCode = await withUploadProtection(async (session) => {
+    const env = { ...process.env, ...session.env };
+    return runNodeTests(testFiles(false), env);
+  });
   else if (mode === "integration") process.exitCode = await runIntegration();
   else throw new Error("Usage: node scripts/run-test-suite.js <unit|integration>");
 }

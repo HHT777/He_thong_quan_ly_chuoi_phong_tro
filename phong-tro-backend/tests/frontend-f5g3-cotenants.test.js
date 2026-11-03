@@ -19,8 +19,8 @@ test("FR-166 co-tenant screen shows identity, validates rejection and next-perio
 test("FR-166 generic requests screen does not approve co-tenant proposal without identity detail", () => {
   const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/residents-contracts/requests.tab.js"), "utf8");
   assert.match(source, /item\.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG"/);
-  assert.match(source, /Cần đối chiếu hồ sơ định danh/);
-  assert.match(source, /#\/residents-contracts\/co-tenants/);
+  assert.match(source, /#\/residents-contracts\/residents\?coTenantRequestId=/);
+  assert.match(source, /if \(row\.loai_yeu_cau === "DE_XUAT_BAN_CUNG_PHONG"\)/);
   assert.match(source, /requiredText\(raw\.reason/);
   assert.doesNotMatch(source, /window\.(alert|prompt|confirm)/);
 });

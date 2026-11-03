@@ -89,21 +89,20 @@ async function approve({ request, approvedDate, earlyReturnReason, actorId, tran
   const contract = detail && await HopDong.findByPk(detail.ma_hop_dong, {
     transaction, lock: transaction.LOCK.UPDATE,
   });
-  if (!contract || contract.trang_thai === "DA_THANH_LY") {
+  if (!contract || contract.ma_khach_thue !== request.ma_khach_thue || !["DANG_HIEU_LUC", "SAP_HET_HAN"].includes(contract.trang_thai) || contract.ngay_ket_thuc < dateOnly()) {
     throw fail(409, "Hợp đồng không còn hiệu lực để trả phòng", "CONTRACT_NOT_ACTIVE");
   }
-  const normalizedDate = dateOnly(approvedDate || detail.ngay_tra_du_kien || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
-    throw fail(422, "Ngày trả đã duyệt là bắt buộc", "APPROVED_MOVE_OUT_DATE_REQUIRED");
-  }
-  const reason = String(earlyReturnReason || detail.ly_do_tra_som || "").trim();
-  const earliestNormalDate = addDays(request.ngay_gui, 30);
-  if (normalizedDate < earliestNormalDate && !reason) {
-    throw fail(422, "Trả phòng sớm hơn 30 ngày phải có lý do ngoại lệ", "EARLY_MOVE_OUT_REASON_REQUIRED");
-  }
+  const normalizedDate = approvedDate || detail.ngay_tra_du_kien || "";
+  const reason = typeof earlyReturnReason === "string" ? earlyReturnReason.trim() : "";
+  if (reason.length > 1000) throw fail(400, "Lý do ngoại lệ tối đa 1000 ký tự", "INVALID_MOVE_OUT_REASON");
+  validateDate(normalizedDate, contract, request.ngay_gui, reason, { approval: true });
+  await assertNoConflict(contract.ma_hop_dong, "TRA_PHONG", { transaction });
+  if (await findContractRequest(contract.ma_hop_dong, "TRA_PHONG", { transaction, excludeId: request.ma_yeu_cau })) throw fail(409, "Có yêu cầu trả phòng khác chưa kết thúc", "MOVE_OUT_ALREADY_PENDING_OR_APPROVED");
+  const room = await PhongTro.findByPk(contract.ma_phong, { transaction });
+  if (!room || room.trang_thai !== "DANG_THUE" || await BienBanTraPhong.findOne({ where: { ma_hop_dong: contract.ma_hop_dong }, transaction })) throw fail(409, "Phòng không còn đủ điều kiện duyệt trả phòng", "MOVE_OUT_NO_LONGER_ELIGIBLE");
   await detail.update({
     ngay_tra_da_duyet: normalizedDate,
-    ly_do_tra_som: normalizedDate < earliestNormalDate ? reason : detail.ly_do_tra_som,
+    ly_do_tra_som: normalizedDate < addDays(request.ngay_gui, 30) ? reason : detail.ly_do_tra_som,
   }, { transaction });
   return {
     type: "MOVE_OUT_SCHEDULED", contractId: contract.ma_hop_dong,

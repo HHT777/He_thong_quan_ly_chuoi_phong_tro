@@ -11,6 +11,7 @@ test("first-period bill rounds every charge to VND and keeps the total equal to 
     "./ownership.service": {},
     "./khoanPhaiThu.service": {},
     "./meterReading.service": {},
+    "./meterReplacement.service": {},
     "./billingAdjustmentDefinition.service": { applicable: async () => [{ ma_khoan_dieu_chinh: "fee-1", loai_khoan: "PHI_PHAT_SINH", so_tien: 1000.49, ten_ly_do: "Phụ thu" }] },
     "./occupancy.service": { countBillableOccupants: async () => 2, calculateWaterCharge: (price, count, ratio) => Math.round(Number(price) * count * ratio * 100) / 100 },
     "../utils/billingPeriod.util": require("../src/utils/billingPeriod.util"),

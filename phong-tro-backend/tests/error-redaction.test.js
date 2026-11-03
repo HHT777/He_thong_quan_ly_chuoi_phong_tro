@@ -11,7 +11,7 @@ function response() {
   };
 }
 
-test("unexpected SQL error is redacted for legacy and v1 APIs while log retains reference and details", () => {
+test("unexpected SQL error is redacted for legacy and v1 APIs while log retains a safe reference", () => {
   const previous = console.error;
   const logs = [];
   console.error = (...args) => logs.push(args);
@@ -28,7 +28,8 @@ test("unexpected SQL error is redacted for legacy and v1 APIs while log retains 
       assert.doesNotMatch(body, /SecretColumn|MissingTable|SELECT|private|file\.sql/);
       const reference = res.body.referenceId || res.body.error.details.referenceId;
       assert.ok(reference);
-      assert.ok(logs.some(([label, logged]) => label.includes(reference) && logged === error));
+      assert.ok(logs.some(([label, logged]) => label.includes(reference) && logged?.category === "database"));
+      assert.doesNotMatch(JSON.stringify(logs), /SecretColumn|MissingTable|SELECT|private|file\.sql/);
     }
   } finally { console.error = previous; }
 });

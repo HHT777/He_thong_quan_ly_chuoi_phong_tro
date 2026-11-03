@@ -115,7 +115,7 @@ test("KT-02 initial tenant password token permits only profile and password rout
   assert.equal((await runAuth(normalTenant, "/api/v1/notifications")).passed, true);
 });
 
-test("KT-02 login sets forced-change claim only for tenant password 1", async (t) => {
+test("KT-02 login sets forced-change claim for a tenant with a reset flag or initial password", async (t) => {
   const original = TaiKhoan.findOne;
   t.after(() => { TaiKhoan.findOne = original; });
   const account = {
@@ -125,6 +125,8 @@ test("KT-02 login sets forced-change claim only for tenant password 1", async (t
   };
   TaiKhoan.findOne = async () => account;
   assert.equal((await authService.login("user", "1")).user.mustChangePassword, true);
+  assert.equal((await authService.login("user", "Normal1234")).user.mustChangePassword, true);
+  account.bat_buoc_doi_mat_khau = false;
   assert.equal((await authService.login("user", "Normal1234")).user.mustChangePassword, false);
   account.vai_tro = "CHU_TRO";
   account.khachThue = null;

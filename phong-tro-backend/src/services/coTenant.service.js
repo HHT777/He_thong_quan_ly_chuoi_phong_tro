@@ -11,7 +11,8 @@ const {
 } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const { assertLandlordOwnsRoom } = require("./propertyAccess.service");
-const { assertOwned, notFoundError, getLandlordAccountForRoom } = require("./ownership.service");
+const ownership = require("./ownership.service");
+const { assertOwned, notFoundError, getLandlordAccountForRoom } = ownership;
 const notification = require("./notification.service");
 const { businessDate } = require("../utils/businessDate.util");
 const { maskDocument } = require("../utils/privacy.util");
@@ -52,22 +53,25 @@ async function roomMembers(roomId, transaction) {
   });
 }
 
-async function assertCapacityAndUniqueness(room, phone, transaction, contract, identity) {
+function assertCapacityAndUniqueness(room, state, candidate) {
+  if (!state.availablePlaces) throw fail(409, "Phòng đã đủ người", "ROOM_CAPACITY_REACHED");
+  if ([...state.tenants, ...state.members].some((row) => normalize(row.so_dien_thoai) === candidate.phone || normalize(row.cccd_giay_to) === candidate.identity))
+    throw fail(409, "Người được đề xuất đã có trong phòng", "CO_TENANT_ALREADY_RESIDENT");
+  if (state.pending.some((row) => normalize(row.so_dien_thoai_nguoi_de_xuat) === candidate.phone || normalize(row.cccd_giay_to) === candidate.identity))
+    throw fail(409, "Đề xuất trùng đang chờ xử lý", "CO_TENANT_PROPOSAL_PENDING");
+}
+async function checkCapacityAndUniqueness(room, phone, transaction, contract, identity) {
+  if (!room) throw notFoundError();
   const members = await roomMembers(room.ma_phong, transaction);
-  const principal = await KhachThue.findByPk(contract.ma_khach_thue, { transaction });
-  const principalPhone = principal?.so_dien_thoai;
-  const principalAlreadyListed = members.some((member) => member.so_dien_thoai === principalPhone);
-  if (members.length + (principalAlreadyListed ? 0 : 1) >= Number(room.so_nguoi_toi_da)) {
-    throw fail(409, "Phòng đã đủ người", "ROOM_CAPACITY_REACHED");
-  }
-  if (normalize(phone) === normalize(principalPhone) || (identity && normalize(identity) === normalize(principal?.cccd_giay_to)) || members.some((member) => normalize(member.so_dien_thoai) === normalize(phone) || (identity && normalize(member.cccd_giay_to) === normalize(identity)))) {
-    throw fail(409, "Người được đề xuất đang ở trong phòng", "CO_TENANT_ALREADY_RESIDENT");
-  }
+  const contracts = await HopDong.findAll({ where: { ma_phong: room.ma_phong, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, transaction });
+  const tenantIds = [...new Set(contracts.map((row) => row.ma_khach_thue))];
+  const tenants = tenantIds.length ? await KhachThue.findAll({ where: { ma_khach_thue: { [Op.in]: tenantIds } }, transaction }) : [];
+  assertCapacityAndUniqueness(room, { members, tenants, pending: [], availablePlaces: Math.max(0, Number(room.so_nguoi_toi_da) - members.length - tenants.length) }, { phone: normalize(phone), identity: normalize(identity) });
 }
 
 async function propose(tenantId, payload, actorId) {
   const { name, phone, identity, birthDate, gender, address, relationship, startDate } = validateProposal(payload);
-  return sequelize.transaction(async (transaction) => {
+  const result = await sequelize.transaction(async (transaction) => {
     const contract = await HopDong.findOne({
       where: {
         ma_khach_thue: tenantId,
@@ -80,7 +84,7 @@ async function propose(tenantId, payload, actorId) {
     });
     if (!contract) throw notFoundError();
     const room = await PhongTro.findByPk(contract.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
-    await assertCapacityAndUniqueness(room, phone, transaction, contract, identity);
+    await checkCapacityAndUniqueness(room, phone, transaction, contract, identity);
 
     const roomProposals = await DeXuatBanCungPhong.findAll({ where: { ma_phong: room.ma_phong }, transaction, lock: transaction.LOCK.UPDATE });
     if (roomProposals.length) {
@@ -103,11 +107,15 @@ async function propose(tenantId, payload, actorId) {
       noi_dung_bo_sung: payload.note || null,
       cccd_giay_to: identity, ngay_sinh: birthDate, gioi_tinh: gender, dia_chi_thuong_tru: address, quan_he: relationship, ngay_bat_dau_o: startDate,
     }, { transaction });
-    const ownerAccount = await getLandlordAccountForRoom(room.ma_phong, transaction);
-    if (ownerAccount) await notification.createIdempotent({ ma_tai_khoan: ownerAccount, loai_thong_bao: "YEU_CAU", noi_dung: "Có đề xuất người ở cùng mới chờ xử lý.", thoi_diem_tao: new Date(), khoa_su_kien: `YEU_CAU_MOI:${request.ma_yeu_cau}` }, { transaction });
     await writeAuditLog({ transaction, actorId, action: "CO_TENANT_PROPOSED", entityType: "DeXuatBanCungPhong", entityId: request.ma_yeu_cau, after: { roomId: room.ma_phong, contractId: contract.ma_hop_dong } });
-    return { request, proposal };
+    try {
+      const ownerAccount = await ownership.getLandlordAccountForRoom(room.ma_phong, transaction);
+      if (!ownerAccount) throw new Error("Missing notice recipient");
+      await notification.createIdempotent({ ma_tai_khoan: ownerAccount, loai_thong_bao: "YEU_CAU", noi_dung: "Có đề xuất người ở cùng mới chờ xử lý.", thoi_diem_tao: new Date(), khoa_su_kien: `YEU_CAU_MOI:${request.ma_yeu_cau}` }, { transaction });
+    } catch (_) { require("../utils/privacy.util").logPrivateFailure("CO_TENANT_NOTICE_FAILED"); }
+    return { request: { ma_yeu_cau: request.ma_yeu_cau, trang_thai: "CHO_XU_LY" }, proposal, roomId: room.ma_phong };
   });
+  return { request: result.request };
 }
 
 async function addByLandlord(user, payload) {
@@ -119,7 +127,7 @@ async function addByLandlord(user, payload) {
     if (!room) throw fail(404, "Không tìm thấy phòng", "RESOURCE_NOT_FOUND");
     const contract = await HopDong.findOne({ where: { ma_phong: payload.roomId, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, transaction, lock: transaction.LOCK.UPDATE });
     if (!contract) throw fail(409, "Hãy lập hợp đồng trước", "ACTIVE_CONTRACT_NOT_FOUND");
-    await assertCapacityAndUniqueness(room, details.phone, transaction, contract, details.identity);
+    await checkCapacityAndUniqueness(room, details.phone, transaction, contract, details.identity);
     const member = await ThanhVienPhong.create({ ma_phong: room.ma_phong, ma_hop_dong: contract.ma_hop_dong, ho_ten: details.name, so_dien_thoai: details.phone, cccd_giay_to: details.identity, ngay_sinh: details.birthDate, gioi_tinh: details.gender, dia_chi_thuong_tru: details.address, quan_he: details.relationship, ngay_vao: details.startDate, trang_thai_cu_tru: "DANG_O" }, { transaction });
     await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "CO_TENANT_ADMITTED", entityType: "ThanhVienPhong", entityId: member.ma_thanh_vien_phong, after: { roomId: room.ma_phong, contractId: contract.ma_hop_dong } });
     return member;
@@ -147,7 +155,7 @@ async function approve(request, transaction, actorId) {
   });
   if (!contract) throw fail(409, "Hợp đồng thuê phòng không còn hiệu lực", "ACTIVE_CONTRACT_NOT_FOUND");
   const room = await PhongTro.findByPk(proposal.ma_phong, { transaction, lock: transaction.LOCK.UPDATE });
-  await assertCapacityAndUniqueness(room, proposal.so_dien_thoai_nguoi_de_xuat, transaction, contract, proposal.cccd_giay_to);
+  await checkCapacityAndUniqueness(room, proposal.so_dien_thoai_nguoi_de_xuat, transaction, contract, proposal.cccd_giay_to);
 
   const member = await ThanhVienPhong.create({
     ho_ten: proposal.ho_ten_nguoi_de_xuat,
@@ -240,4 +248,30 @@ async function getMember(id, user) {
     : member;
 }
 
-module.exports = { propose, approve, validateProposal, getProposal, addByLandlord, context, getMember, memberView };
+async function list(user) {
+  let where;
+  if (user.vai_tro === "KHACH_THUE") {
+    const contracts = await HopDong.findAll({ where: { ma_khach_thue: user.ma_khach_thue, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, attributes: ["ma_hop_dong"] });
+    where = { ma_hop_dong: { [Op.in]: contracts.map((row) => row.ma_hop_dong) } };
+  } else {
+    const buildingIds = await ownership.getOwnedBuildingIds(user);
+    const rooms = await PhongTro.findAll({ where: { ma_can: { [Op.in]: buildingIds } }, attributes: ["ma_phong"] });
+    where = { ma_phong: { [Op.in]: rooms.map((row) => row.ma_phong) } };
+  }
+  return (await ThanhVienPhong.findAll({ where, order: [["ngay_vao", "DESC"]] })).map((row) => memberView(row));
+}
+
+async function updateMember(id, body, user) {
+  return sequelize.transaction(async (transaction) => {
+    await ownership.assertOwned(user, "coTenant", id, { transaction });
+    const member = await ThanhVienPhong.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+    if (!member) throw notFoundError();
+    if (Object.keys(body).some((key) => !["status", "leaveDate"].includes(key)) || body.status !== "DA_ROI" || !validDate(body.leaveDate) || body.leaveDate < member.ngay_vao)
+      throw fail(400, "Ngày rời hoặc trạng thái không hợp lệ", "INVALID_CO_TENANT_DEPARTURE");
+    await member.update({ trang_thai_cu_tru: "DA_ROI", ngay_roi: body.leaveDate }, { transaction });
+    await writeAuditLog({ transaction, actorId: user.ma_tai_khoan, action: "CO_TENANT_UPDATED", entityType: "ThanhVienPhong", entityId: id, after: { status: "DA_ROI" } });
+    return memberView(member);
+  });
+}
+
+module.exports = { propose, approve, validateProposal, assertCapacityAndUniqueness, getProposal, addByLandlord, context, getMember, memberView, list, updateMember };

@@ -35,10 +35,23 @@ async function setupSelectors({ context, form, overlay, incidentRoomId = "", res
         ];
         typeField.innerHTML = `<span>Loại sự cố</span><select class="form-control" name="type" required><option value="" selected disabled>Chọn loại sự cố</option>${categories.map((category) => `<option value="${escapeHtml(category.ma)}">${escapeHtml(category.ten)}</option>`).join("")}</select>`;
       }
+      const previousSelect = form.querySelector('[name="previousIncidentId"]');
+      let previousIncidents = [];
+      if (previousSelect) {
+        try { previousIncidents = (await context.api.get("/v1/incidents")).data || []; }
+        catch { previousSelect.disabled = true; }
+      }
+      const refreshPrevious = ({ roomId }) => {
+        if (!previousSelect || previousSelect.disabled) return;
+        previousSelect.replaceChildren(new Option("Không liên kết", ""));
+        for (const incident of previousIncidents.filter((row) => String(row.ma_phong) === String(roomId)))
+          previousSelect.add(new Option(`${incident.mo_ta || "Sự cố"} · ${date(incident.ngay_gui)}`, incident.ma_su_co));
+      };
       const selectors = mountIncidentSelectors({
         form, data, incidentRoomId, tenantFieldName: overlay.querySelector('[name="responsibleTenantId"]') ? "responsibleTenantId" : "tenantId",
         responsibleTenant: Boolean(overlay.querySelector('[name="responsibleTenantId"]')),
         isTenantRequired: responsible,
+        onChange: refreshPrevious,
       });
       if (incidentRoomId) {
         for (const name of ["buildingId", "roomId"]) {
@@ -81,6 +94,7 @@ export default listTab({ id: "incidents", route: "/operations/incidents", title:
         { value: "CAO", label: "Cao" }, { value: "KHAN_CAP", label: "Khẩn cấp" },
       ] },
       { name: "tenantId", label: "Khách liên quan" },
+      { name: "previousIncidentId", label: "Sự cố trước", options: [{ value: "", label: "Không liên kết" }] },
       { name: "description", label: "Mô tả", type: "textarea", required: true },
     ],
     map: buildCreateIncidentPayload,

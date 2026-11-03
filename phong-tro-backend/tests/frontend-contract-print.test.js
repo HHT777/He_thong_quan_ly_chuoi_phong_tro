@@ -22,7 +22,7 @@ test("FR-184 contract detail opens browser print from one button after preload",
 test("FR-184 HTML API uses the shared base URL and authenticated request", () => {
   const source = read("core/api.js");
   assert.match(source, /async function getHtml\(path\)/);
-  assert.match(source, /headers\.Authorization = `Bearer \$\{token\(\)\}`/);
+  assert.match(source, /headers\.Authorization = `Bearer \$\{requestToken\}`/);
   assert.match(source, /fetch\(`\$\{API_ROOT\}\$\{path\.startsWith/);
   assert.match(source, /getHtml,/);
 });

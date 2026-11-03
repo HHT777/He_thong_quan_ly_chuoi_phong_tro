@@ -6,11 +6,11 @@ const sequelize = require("../config/database");
 const { ChiSoDien, HopDong, PhongTro, CanTro, KhachThue, ThanhToan } = require("../models");
 const { writeAuditLog } = require("./auditLog.service");
 const { getPersistedSystemConfig } = require("./systemConfig.service");
+const { getUploadContext } = require("../config/uploadFilesystem");
 const { businessMonth } = require("../utils/businessDate.util");
 const meterReplacement = require("./meterReplacement.service");
-const { notFoundError, getLandlordAccountForRoom } = require("./ownership.service");
+const { notFoundError, getLandlordAccountForRoom, assertOwned } = require("./ownership.service");
 
-const uploadDir = path.resolve(process.env.UPLOAD_DIR || "./uploads", "meter");
 const uploadTokenTtlMs = 15 * 60 * 1000;
 function tokenSecret() {
   const value = process.env.UPLOAD_TOKEN_SECRET || process.env.JWT_SECRET;
@@ -22,7 +22,7 @@ function signUploadPayload(payload) {
   const signature = crypto.createHmac("sha256", tokenSecret()).update(encoded).digest("base64url");
   return `${encoded}.${signature}`;
 }
-function verifyUploadToken(token, actorId, tenantId, period, now = Date.now()) {
+function verifyUploadToken(token, actorId, tenantId, period, now = Date.now(), uploadContext = getUploadContext()) {
   try {
     const [encoded, signature, extra] = String(token || "").split(".");
     if (!encoded || !signature || extra) throw new Error("malformed");
@@ -31,19 +31,26 @@ function verifyUploadToken(token, actorId, tenantId, period, now = Date.now()) {
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) throw new Error("signature");
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
     if (payload.sub !== actorId || payload.tenantId !== (tenantId || null) || payload.period !== period || Number(payload.exp) <= now) throw new Error("claims");
-    const filePath = path.resolve(uploadDir, payload.fileName);
+    const uploadDir = uploadContext.resolve("meter");
+    const filePath = uploadContext.resolve("meter", payload.fileName);
     if (!filePath.startsWith(`${uploadDir}${path.sep}`)) throw new Error("path");
     return { ...payload, filePath };
   } catch (_) {
     throw { status: 422, code: "UPLOAD_TOKEN_EXPIRED", message: "Preview upload không hợp lệ hoặc đã hết hạn" };
   }
 }
-function cleanupExpiredUploads(now = Date.now()) {
-  if (!fs.existsSync(uploadDir)) return 0;
+async function cleanupExpiredUploads(now = Date.now(), uploadContext = getUploadContext()) {
+  const uploadDir = uploadContext.resolve("meter");
+  if (!uploadContext.exists(uploadDir)) return 0;
+  const rows = await ChiSoDien.findAll({ attributes: ["anh_cong_to_url"], raw: true });
+  const pathKey = (value) => process.platform === "win32" ? path.resolve(value).toLowerCase() : path.resolve(value);
+  const referenced = new Set(rows.filter((row) => row.anh_cong_to_url).map((row) => pathKey(row.anh_cong_to_url)));
   let removed = 0;
-  for (const name of fs.readdirSync(uploadDir)) {
+  for (const name of uploadContext.list(uploadDir)) {
     const filePath = path.resolve(uploadDir, name);
-    try { if (now - fs.statSync(filePath).mtimeMs > uploadTokenTtlMs) { fs.unlinkSync(filePath); removed += 1; } } catch (_) { /* file raced with another worker */ }
+    if (referenced.has(pathKey(filePath))) continue;
+    try { if (now - uploadContext.stat(filePath).mtimeMs > uploadTokenTtlMs) { uploadContext.unlink(filePath); removed += 1; } }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
   }
   return removed;
 }
@@ -186,22 +193,23 @@ async function callOcr(filePath) {
     return { status: "MANUAL_REQUIRED", rawValue: null, numericValue: null, warning: { code, message } };
   } finally { clearTimeout(timer); }
 }
-async function createPreview(tenantId, period, file, roomId, actorId) {
+async function createPreview(tenantId, period, file, roomId, actorId, uploadContext = getUploadContext()) {
   if (tenantId) return tenantPreview(tenantId, period, file, roomId, actorId);
+  await assertOwned({ vai_tro: "CHU_TRO", ma_tai_khoan: actorId }, "room", roomId);
   parsePeriod(period);
   const contract = tenantId ? await tenantContract(tenantId) : null;
   const targetRoomId = roomId || contract?.ma_phong;
   if (!targetRoomId) throw { status: 422, code: "ROOM_REQUIRED", message: "Chủ trọ phải chọn phòng khi OCR" };
   const previous = await submissionMinimum(targetRoomId, period);
   const ocr = await callOcr(file.path);
-  cleanupExpiredUploads();
+  await cleanupExpiredUploads(Date.now(), uploadContext);
   const expiresAt = new Date(Date.now() + uploadTokenTtlMs);
   const token = signUploadPayload({ sub: actorId, tenantId: tenantId || null, roomId: targetRoomId, period, fileName: path.basename(file.path), ocrValue: ocr.rawValue, ocrStatus: ocr.status, exp: expiresAt.getTime() });
   return { uploadToken: token, expiresAt: expiresAt.toISOString(), ocrStatus: ocr.status, ocrValue: ocr.rawValue, suggestedReading: ocr.numericValue, previousReading: previous, canSubmit: ocr.numericValue !== null && ocr.numericValue >= previous, warnings: ocr.warning ? [ocr.warning] : [] };
 }
-function resolvePreview(tenantId, period, token, actorId) {
+function resolvePreview(tenantId, period, token, actorId, uploadContext) {
   if (!token) return null;
-  return verifyUploadToken(token, actorId, tenantId, period);
+  return verifyUploadToken(token, actorId, tenantId, period, Date.now(), uploadContext);
 }
 async function findReading(id, transaction) {
   const row = await ChiSoDien.findByPk(String(id).replace(/^mr_/, ""), { include, transaction });
@@ -225,7 +233,7 @@ async function tenantPreview(tenantId, requested, file, roomId, actorId) {
   return { period, uploadToken, expiresAt: uploadToken ? expiresAt.toISOString() : null, ocrStatus: ocr.status, ocrValue: ocr.rawValue,
     suggestedReading: ocr.numericValue, previousReading: previous.value, canSubmit: ocr.status === "RECOGNIZED" && Number.isSafeInteger(ocr.numericValue) && ocr.numericValue >= previous.value, warnings };
 }
-async function submit(tenantId, payload, actorId, uploadContext) {
+async function submit(tenantId, payload, actorId, uploadContext = getUploadContext()) {
   if (Object.hasOwn(payload, "readingValue")) throw tenantError(400, "TENANT_MANUAL_READING_FORBIDDEN", "Khách thuê chỉ được gửi chỉ số qua ảnh/OCR");
   if (!payload.uploadToken) throw tenantError(400, "OCR_UPLOAD_REQUIRED", "Vui lòng nhận dạng ảnh trước khi gửi");
   // Verify actor before querying the contract; period/contract/room are checked again below.
@@ -236,7 +244,7 @@ async function submit(tenantId, payload, actorId, uploadContext) {
   if (payload.period != null && payload.period !== preview.period) throw tenantError(409, "TENANT_READING_PERIOD_MISMATCH", "Kỳ không khớp preview");
   const value = Number(preview.ocrValue);
   if (preview.ocrStatus !== "RECOGNIZED" || !/^\d+$/.test(preview.ocrValue || "") || !Number.isSafeInteger(value)) throw tenantError(400, "OCR_RECOGNITION_REQUIRED", "Hiện chưa gửi được chỉ số, vui lòng liên hệ Chủ trọ");
-  if (!fs.existsSync(preview.filePath)) throw tenantError(422, "UPLOAD_TOKEN_EXPIRED", "Ảnh preview đã hết hạn");
+  if (!uploadContext.exists(preview.filePath)) throw tenantError(422, "UPLOAD_TOKEN_EXPIRED", "Ảnh preview đã hết hạn");
   try {
     return await sequelize.transaction(async (transaction) => {
       // Serialize two first submissions as well as replacements without a new table/index.
@@ -264,15 +272,18 @@ async function submit(tenantId, payload, actorId, uploadContext) {
   }
 }
 
-async function submitForLandlord(payload, actorId) {
+async function submitForLandlord(payload, actorId, uploadContext = getUploadContext()) {
   const parsed = parsePeriod(payload.period);
-  const preview = resolvePreview(null, payload.period, payload.uploadToken, actorId);
+  const preview = resolvePreview(null, payload.period, payload.uploadToken, actorId, uploadContext);
   if (!preview?.roomId) throw { status: 422, code: "UPLOAD_TOKEN_EXPIRED", message: "Preview upload không hợp lệ hoặc đã hết hạn" };
+  const owner = { vai_tro: "CHU_TRO", ma_tai_khoan: actorId };
+  await assertOwned(owner, "room", preview.roomId);
   const value = Number(payload.readingValue);
   if (!Number.isInteger(value) || value < 0) throw { status: 422, code: "INVALID_READING", message: "Chỉ số điện phải là số nguyên không âm" };
   const contract = await HopDong.findOne({ where: { ma_phong: preview.roomId, trang_thai: { [Op.in]: ["DANG_HIEU_LUC", "SAP_HET_HAN"] } }, order: [["ngay_bat_dau", "DESC"]] });
   if (!contract) throw { status: 404, code: "ACTIVE_CONTRACT_NOT_FOUND", message: "Phòng chưa có hợp đồng hiệu lực" };
   return sequelize.transaction(async (transaction) => {
+    await assertOwned(owner, "room", preview.roomId, { transaction });
     const previous = await submissionMinimum(contract.ma_phong, payload.period, transaction);
     if (value < previous) throw { status: 400, code: "READING_BELOW_PREVIOUS", message: "Chỉ số điện không được nhỏ hơn kỳ trước", details: { previousReading: previous } };
     const existing = await ChiSoDien.findOne({ where: { ma_phong: contract.ma_phong, ...parsed }, transaction, lock: transaction.LOCK.UPDATE });

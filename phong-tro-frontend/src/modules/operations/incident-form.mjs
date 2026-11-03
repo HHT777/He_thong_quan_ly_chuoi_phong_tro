@@ -97,6 +97,7 @@ export function buildCreateIncidentPayload(raw) {
     priority: raw.priority,
     ...(raw.responsible ? { responsible: raw.responsible } : {}),
     description: String(raw.description || "").trim(),
+    previousIncidentId: raw.previousIncidentId || undefined,
   };
 }
 

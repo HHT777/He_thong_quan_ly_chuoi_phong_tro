@@ -24,8 +24,13 @@ test("bill management does not show the old draft rounding action", () => {
   assert.doesNotMatch(source, /data-round-old|Làm tròn Nháp cũ/);
 });
 
-test("tenant bill list opens the same invoice view", () => {
+test("tenant bill list opens a stored bill detail with its line items", async () => {
   const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/tenant/tenant-finance.tab.js"), "utf8");
-  assert.match(source, /rowActions: \[\{ id: "invoice", label: "Xem hóa đơn", openDetail: true \}\]/);
-  assert.match(source, /renderBillInvoice\(row, billStatus\(row\)/);
+  assert.match(source, /data-bill-detail/);
+  assert.match(source, /billDetailMarkup\(result\.data\)/);
+  const { billDetailMarkup } = await import(pathToFileURL(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/tenant/tenant-billing.model.mjs")).href);
+  const html = billDetailMarkup({ ma_thanh_toan: "bill-1", thang: 10, nam: 2026, tong_phai_tra: 263226,
+    tong_da_thanh_toan: 0, so_tien_con_no: 263226, trang_thai: "CHUA_THANH_TOAN", chiTiets: [{ loai_khoan: "TIEN_PHONG", so_tien: 258065, dien_giai: "Giá hợp đồng" }] });
+  assert.match(html, /263\.226/);
+  assert.match(html, /Giá hợp đồng/);
 });

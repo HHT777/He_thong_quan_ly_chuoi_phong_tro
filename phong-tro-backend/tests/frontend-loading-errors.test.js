@@ -7,7 +7,7 @@ const read = (relative) => fs.readFileSync(path.join(front, relative), "utf8");
 
 test("FR-144 bill loading errors replace the spinner and offer retry", () => {
   const source = read("src/modules/finance/bills-v2.js");
-  assert.match(source, /const \[billResponse, summaryResponse\] = await Promise\.all/);
+  assert.match(source, /await fetchBillPage\(context\.api/);
   assert.match(source, /Không tải được phiếu thu/);
   assert.match(source, /data-retry/);
   assert.match(source, /querySelector\("\[data-retry\]"\)\.onclick = refresh/);
@@ -23,7 +23,8 @@ test("dashboard does not convert failed API calls into zero-valued data", () => 
 
 test("co-tenant page shows an API loading error instead of leaving stale content", () => {
   const source = read("src/modules/residents-contracts/co-tenants.tab.js");
-  assert.match(source, /catch \(error\) \{ content\.innerHTML = `<div class="empty-state empty-state--error">\$\{escapeHtml\(error\.message\)\}<\/div>`; \}/);
+  assert.match(source, /catch \(error\) \{[\s\S]*?empty-state--error">\$\{escapeHtml\(error\.message\)\}/);
+  assert.match(source, /data-reload/);
 });
 
 test("Vietnamese heading uses a Vietnamese-capable font and source text is valid UTF-8", () => {

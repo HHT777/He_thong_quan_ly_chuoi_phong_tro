@@ -13,13 +13,13 @@ test("FR-132..143 report filters apply month, quarter, year, range and building 
     assert.match(model, new RegExp(`query\\.set\\("${field}"`));
   }
   assert.match(model, /fields\.from > fields\.to/);
-  assert.match(tab, /form\.addEventListener\("submit"/);
-  assert.match(tab, /form\.addEventListener\("change"/);
-  assert.match(tab, /form\.elements\.mode\.value = mode\.dataset\.reportMode;[\s\S]*?syncFields\(\);[\s\S]*?applyCurrent\(\)/);
-  assert.match(tab, /load\(fields\)/);
-  assert.match(tab, /version !== loadVersion/);
-  assert.ok(tab.includes('context.api.get(`/v1/reports/cashflow?${query}`)'));
-  assert.match(tab, /error\.status === 400/);
+  assert.match(tab, /filterSlot\.addEventListener\("change"/);
+  assert.match(tab, /state\.period = defaultPeriodForMode/);
+  assert.match(tab, /state\.buildingId = event\.target\.value/);
+  assert.match(tab, /state\.year = year/);
+  assert.match(tab, /schedule\(\)/);
+  assert.match(tab, /context\.api\.request\(cashflowPath\(chosen\)/);
+  assert.match(tab, /state\.summaryError = error/);
 });
 
 test("FR-133 report cards and table use server totals and snapshot fields", () => {
@@ -27,7 +27,7 @@ test("FR-133 report cards and table use server totals and snapshot fields", () =
     assert.match(view, new RegExp(`data\\.${field}`));
   }
   for (const field of ["grossAmount", "discountAllocated", "snapshotSource"]) assert.match(view + model, new RegExp(field));
-  assert.match(tab, /readCashflow\(cashflow\)/);
+  assert.match(tab, /readCashflow\(response\)/);
   assert.match(model, /moneyFields\.some/);
   assert.doesNotMatch(tab + view, /data\.totalCollected|\bavgRevenuePerRoom\b/);
 });
@@ -38,7 +38,7 @@ test("FR-136/137 comparison excludes inactive buildings and detail retains them"
   assert.match(view, /căn ngừng hoạt động có phát sinh/);
   assert.match(view, /data-building=/);
   assert.match(view, /data-type=/);
-  assert.match(tab, /state\.view = "table"; state\.tableMode = "transactions"/);
+  assert.match(tab, /state\.view = view\.dataset\.reportView/);
   assert.match(model, /snapshotSource === "SUY_DIEN"/);
 });
 
@@ -51,17 +51,18 @@ test("FR-133 dashboard continues to read the server insights contract", () => {
 });
 
 test("F.5 report month uses the Ho Chi Minh business timezone", () => {
-  assert.match(tab, /timeZone: "Asia\/Ho_Chi_Minh"/);
+  assert.match(model, /timeZone: "Asia\/Ho_Chi_Minh"/);
 });
 
 test("FR-194 report export uses the exact applied filter and bearer-token blob API", () => {
   const api = read("core/api.js");
-  assert.match(tab, /state\.appliedQuery = query/);
-  assert.ok(tab.includes('context.api.getBlob(`/v1/reports/cashflow.xlsx?${state.appliedQuery}`)'));
+  assert.match(tab, /state\.appliedFields = selectionFields\(chosen\)/);
+  assert.match(tab, /reportQuery\(state\.appliedFields\)/);
+  assert.ok(tab.includes('context.api.getBlob(`/v1/reports/cashflow.xlsx?${query}`)'));
   assert.match(tab, /URL\.createObjectURL\(blob\)/);
   assert.match(tab, /URL\.revokeObjectURL\(url\)/);
   assert.match(api, /async function getBlob/);
-  assert.ok(api.includes('headers.Authorization = `Bearer ${token()}`'));
+  assert.ok(api.includes('headers.Authorization = `Bearer ${requestToken}`'));
 });
 
 test("FR-194 sole-landlord unassigned expenses are shown as included in server total", () => {
