@@ -7,7 +7,7 @@ test("FR-192 landlord create form submits previous incident only at creation and
   const source = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/operations/incidents.tab.js"), "utf8");
   const model = fs.readFileSync(path.resolve(__dirname, "../../phong-tro-frontend/src/modules/operations/incident-form.mjs"), "utf8");
   assert.match(source, /name: "previousIncidentId", label: "Sự cố trước/);
-  assert.match(model, /previousIncidentId: raw\.previousIncidentId \|\| undefined/);
+  assert.match(model, /raw\.previousIncidentId \? \{ previousIncidentId: raw\.previousIncidentId \} : \{\}/);
   assert.match(source, /previousIncidents\.filter\(\(row\) => String\(row\.ma_phong\) === String\(roomId\)\)/);
   assert.doesNotMatch(source, /\/incidents\/\$\{[^}]+\}\/previous/);
 });
